@@ -213,3 +213,27 @@ export interface ParsedSession {
     toolsUsed: Record<string, number>;
   };
 }
+
+// ─── Checkpoint Types ───────────────────────────────────────────────────────
+
+export interface Checkpoint {
+  id: string;
+  sessionId: string;
+  projectPath: string;
+  note: string;
+  timestamp: string;
+
+  /** JSONL position — line count at checkpoint time */
+  jsonlLineCount: number;
+
+  /** Git state */
+  gitCommitHash: string;
+  gitBranch: string;
+  gitDiff: string;
+
+  /** Files modified since last checkpoint (or session start) */
+  filesChanged: string[];
+
+  /** If this checkpoint was rewound, the new session ID */
+  rewindSessionId: string | null;
+}

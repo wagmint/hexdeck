@@ -8,6 +8,7 @@
     "build": "tsc",
     "dev": "tsx watch src/server/index.ts",
     "serve": "tsx src/server/index.ts",
+    "pylon": "tsx src/cli/index.ts",
     "parse": "tsx src/cli/parse.ts",
     "test": "vitest"
   },

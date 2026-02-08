@@ -13,6 +13,9 @@ help:
 	@echo "  make restart        - Restart API server"
 	@echo "  make install        - Install all dependencies"
 	@echo "  make build          - Build TypeScript"
+	@echo "  make checkpoint NOTE='my note' - Create a checkpoint"
+	@echo "  make rewind ID='abc123'       - Rewind to a checkpoint"
+	@echo "  make checkpoints              - List all checkpoints"
 	@echo "  make parse          - Run CLI parser (usage: make parse ARGS='projects')"
 	@echo "  make typecheck      - Run TypeScript type checking"
 	@echo "  make clean          - Remove build artifacts and node_modules"
@@ -35,6 +38,19 @@ stop:
 
 .PHONY: restart
 restart: stop start
+
+# Checkpoints
+.PHONY: checkpoint
+checkpoint:
+	$(NPX) tsx src/cli/index.ts checkpoint $(NOTE)
+
+.PHONY: rewind
+rewind:
+	$(NPX) tsx src/cli/index.ts rewind $(ID)
+
+.PHONY: checkpoints
+checkpoints:
+	$(NPX) tsx src/cli/index.ts checkpoints
 
 # CLI
 .PHONY: parse

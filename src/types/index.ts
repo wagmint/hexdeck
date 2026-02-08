@@ -156,3 +156,60 @@ export interface SessionTree {
   createdAt: string;
   updatedAt: string;
 }
+
+// ─── Turn-Pair Node Types (v0 data model) ───────────────────────────────────
+
+export interface ToolCallSummary {
+  name: string;
+  input: Record<string, unknown>;
+}
+
+export interface TurnNode {
+  id: string;
+  index: number;
+
+  /** The user's instruction text */
+  userInstruction: string;
+  /** Preview of Claude's response text (first ~200 chars) */
+  assistantPreview: string;
+
+  /** Tool calls made during this turn */
+  toolCalls: ToolCallSummary[];
+  /** Aggregated tool usage: tool name → count */
+  toolCounts: Record<string, number>;
+
+  /** Files written or edited */
+  filesChanged: string[];
+  /** Files read */
+  filesRead: string[];
+
+  /** Git commit info */
+  hasCommit: boolean;
+  commitMessage: string | null;
+
+  /** Error and compaction flags */
+  hasError: boolean;
+  hasCompaction: boolean;
+  compactionText: string | null;
+
+  /** Raw events for this turn (for drill-down) */
+  events: SessionEvent[];
+
+  /** Position in the JSONL */
+  startLine: number;
+  endLine: number;
+}
+
+export interface ParsedSession {
+  session: SessionInfo;
+  turns: TurnNode[];
+  stats: {
+    totalEvents: number;
+    totalTurns: number;
+    toolCalls: number;
+    commits: number;
+    compactions: number;
+    filesChanged: string[];
+    toolsUsed: Record<string, number>;
+  };
+}

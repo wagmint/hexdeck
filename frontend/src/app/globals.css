@@ -1,0 +1,50 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Dark dev-tool palette */
+    --background: 220 16% 8%;
+    --foreground: 220 10% 90%;
+
+    --card: 220 14% 11%;
+    --card-foreground: 220 10% 90%;
+
+    --primary: 210 100% 60%;
+    --primary-foreground: 220 16% 8%;
+
+    --secondary: 220 14% 16%;
+    --secondary-foreground: 220 10% 80%;
+
+    --muted: 220 12% 14%;
+    --muted-foreground: 220 8% 50%;
+
+    --accent: 160 60% 45%;
+    --accent-foreground: 220 16% 8%;
+
+    --border: 220 12% 18%;
+    --input: 220 12% 18%;
+    --ring: 210 100% 60%;
+
+    --radius: 0.5rem;
+
+    /* Node type colors */
+    --node-user: 210 100% 60%;
+    --node-commit: 160 60% 45%;
+    --node-error: 0 70% 55%;
+    --node-compaction: 45 80% 55%;
+    --node-default: 220 14% 20%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

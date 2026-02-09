@@ -23,11 +23,17 @@ export interface CompactionContent {
   content: string;
 }
 
+export interface ThinkingContent {
+  type: "thinking";
+  thinking: string;
+}
+
 export type ContentBlock =
   | TextContent
   | ToolUseContent
   | ToolResultContent
-  | CompactionContent;
+  | CompactionContent
+  | ThinkingContent;
 
 export interface Message {
   role: "user" | "assistant";
@@ -164,11 +170,26 @@ export interface ToolCallSummary {
   input: Record<string, unknown>;
 }
 
+export type TurnCategory =
+  | "task"         // "implement X", "build Y", "add Z"
+  | "question"     // "how does X work?", "what is Y?"
+  | "feedback"     // "this is wrong", "fix X", "change Y"
+  | "command"      // /mcp, /insights, slash commands
+  | "continuation" // "continue", "yes", "ok"
+  | "interruption" // [Interrupted by user]
+  | "context"      // pasting terminal output, sharing context
+  | "system"       // system-generated messages
+  | "conversation"; // general discussion, ideation
+
 export interface TurnNode {
   id: string;
   index: number;
 
-  /** The user's instruction text */
+  /** Short scannable summary of the user's instruction */
+  summary: string;
+  /** Category of this turn */
+  category: TurnCategory;
+  /** The user's instruction text (cleaned, for detail panel) */
   userInstruction: string;
   /** Preview of Claude's response text (first ~200 chars) */
   assistantPreview: string;
@@ -187,8 +208,12 @@ export interface TurnNode {
   hasCommit: boolean;
   commitMessage: string | null;
 
-  /** Error and compaction flags */
+  /** Bash commands run */
+  commands: string[];
+
+  /** Error tracking */
   hasError: boolean;
+  errorCount: number;
   hasCompaction: boolean;
   compactionText: string | null;
 

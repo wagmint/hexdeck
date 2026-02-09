@@ -13,17 +13,32 @@ export interface SessionInfo {
   sizeBytes: number;
 }
 
+export type TurnCategory =
+  | "task"
+  | "question"
+  | "feedback"
+  | "command"
+  | "continuation"
+  | "interruption"
+  | "context"
+  | "system"
+  | "conversation";
+
 export interface TurnNode {
   id: string;
   index: number;
+  summary: string;
+  category: TurnCategory;
   userInstruction: string;
   assistantPreview: string;
   toolCounts: Record<string, number>;
   filesChanged: string[];
   filesRead: string[];
+  commands: string[];
   hasCommit: boolean;
   commitMessage: string | null;
   hasError: boolean;
+  errorCount: number;
   hasCompaction: boolean;
   compactionText: string | null;
   startLine: number;

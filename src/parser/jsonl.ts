@@ -76,7 +76,8 @@ function isValidContentBlock(block: unknown): block is ContentBlock {
     obj.type === "text" ||
     obj.type === "tool_use" ||
     obj.type === "tool_result" ||
-    obj.type === "compaction"
+    obj.type === "compaction" ||
+    obj.type === "thinking"
   );
 }
 

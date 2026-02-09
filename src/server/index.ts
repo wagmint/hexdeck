@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
-import { listProjects, listSessions, findSession } from "../discovery/sessions.js";
+import { listProjects, listSessions, findSession, getActiveSessions } from "../discovery/sessions.js";
 import { parseSessionFile } from "../parser/jsonl.js";
 import { buildParsedSession } from "../core/nodes.js";
 
@@ -10,6 +10,20 @@ const app = new Hono();
 app.use("/*", cors({ origin: "http://localhost:3000" }));
 
 // ─── API Routes ─────────────────────────────────────────────────────────────
+
+/** List currently active sessions */
+app.get("/api/sessions/active", (c) => {
+  const sessions = getActiveSessions();
+  return c.json(
+    sessions.map((s) => ({
+      id: s.id,
+      projectPath: s.projectPath,
+      createdAt: s.createdAt.toISOString(),
+      modifiedAt: s.modifiedAt.toISOString(),
+      sizeBytes: s.sizeBytes,
+    }))
+  );
+});
 
 /** List all projects with Claude Code sessions */
 app.get("/api/projects", (c) => {
@@ -66,6 +80,7 @@ app.get("/api/sessions/:sessionId", (c) => {
       category: t.category,
       userInstruction: t.userInstruction,
       assistantPreview: t.assistantPreview,
+      sections: t.sections,
       toolCounts: t.toolCounts,
       filesChanged: t.filesChanged,
       filesRead: t.filesRead,

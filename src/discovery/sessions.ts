@@ -1,4 +1,5 @@
 import { readdirSync, statSync, existsSync } from "fs";
+import { execSync } from "child_process";
 import { join, basename } from "path";
 import { homedir } from "os";
 import type { SessionInfo, ProjectInfo } from "../types/index.js";
@@ -101,6 +102,73 @@ export function findSession(sessionId: string): SessionInfo | null {
   }
 
   return null;
+}
+
+/**
+ * Get all currently active sessions by finding running `claude` CLI processes
+ * and matching their working directories to project session files.
+ *
+ * Approach: `lsof -c claude -Fn` gets the cwd of each claude process.
+ * We map each cwd to its encoded project dir, then pick the most recently
+ * modified JSONL file in that dir (the active session).
+ */
+export function getActiveSessions(): SessionInfo[] {
+  if (!existsSync(CLAUDE_PROJECTS_DIR)) return [];
+
+  try {
+    // Get cwd of all claude CLI processes
+    // lsof -c claude -Fn outputs: p<pid>\nfcwd\nn<path>\n...
+    const output = execSync(
+      `lsof -c claude -Fn 2>/dev/null || true`,
+      { encoding: "utf-8", timeout: 5000 }
+    );
+
+    if (!output.trim()) return [];
+
+    // Parse lsof output to extract cwd paths
+    const cwds = new Set<string>();
+    const lines = output.split("\n");
+    let isCwd = false;
+    for (const line of lines) {
+      if (line === "fcwd") {
+        isCwd = true;
+      } else if (isCwd && line.startsWith("n")) {
+        const path = line.slice(1); // strip 'n' prefix
+        if (path.startsWith("/") && !path.includes(".app/")) {
+          cwds.add(path);
+        }
+        isCwd = false;
+      } else if (line.startsWith("f")) {
+        isCwd = false;
+      }
+    }
+
+    if (cwds.size === 0) return [];
+
+    // For each cwd, find the encoded project dir and get the most recent session
+    const sessions: SessionInfo[] = [];
+    const seenProjects = new Set<string>();
+
+    for (const cwd of cwds) {
+      const encoded = encodeProjectPath(cwd);
+      if (seenProjects.has(encoded)) continue;
+      seenProjects.add(encoded);
+
+      const projectDir = join(CLAUDE_PROJECTS_DIR, encoded);
+      if (!existsSync(projectDir)) continue;
+
+      // Get the most recently modified JSONL file — that's the active session
+      const projectSessions = listSessionsInDir(projectDir);
+      if (projectSessions.length === 0) continue;
+
+      // Already sorted by modifiedAt desc — first one is most recent
+      sessions.push(projectSessions[0]);
+    }
+
+    return sessions.sort((a, b) => b.modifiedAt.getTime() - a.modifiedAt.getTime());
+  } catch {
+    return [];
+  }
 }
 
 // ─── Internal helpers ────────────────────────────────────────────────────────

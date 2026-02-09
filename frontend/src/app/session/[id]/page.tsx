@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { getSession } from "@/lib/api";
 import type { ParsedSession, TurnNode } from "@/lib/types";
-import { TurnFlow } from "@/components/TurnFlow";
+import { TurnTable } from "@/components/TurnTable";
 import { NodePanel } from "@/components/NodePanel";
 import { SessionHeader } from "@/components/SessionHeader";
 
@@ -44,9 +44,9 @@ export default function SessionPage() {
       <SessionHeader session={session} />
 
       <div className="flex-1 flex">
-        {/* Turn flow — main area */}
+        {/* Turn table — main area */}
         <div className={`flex-1 ${selectedTurn ? "mr-[400px]" : ""}`}>
-          <TurnFlow
+          <TurnTable
             turns={session.turns}
             selectedTurnId={selectedTurn?.id ?? null}
             onSelectTurn={setSelectedTurn}

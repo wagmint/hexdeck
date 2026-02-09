@@ -145,6 +145,39 @@ export function getCompactionText(message: Message): string | null {
 }
 
 /**
+ * Get all thinking block text from a message.
+ */
+export function getThinkingText(message: Message): string {
+  if (typeof message.content === "string") return "";
+
+  return message.content
+    .filter((b): b is { type: "thinking"; thinking: string } => b.type === "thinking")
+    .map((b) => b.thinking)
+    .join("\n");
+}
+
+/**
+ * Get search patterns from Grep/Glob tool calls in a message.
+ */
+export function getSearchPatterns(
+  message: Message
+): string[] {
+  if (typeof message.content === "string") return [];
+
+  const patterns: string[] = [];
+  const calls = getToolCalls(message);
+  for (const call of calls) {
+    if (call.name === "Grep" && typeof call.input.pattern === "string") {
+      patterns.push(call.input.pattern);
+    }
+    if (call.name === "Glob" && typeof call.input.pattern === "string") {
+      patterns.push(call.input.pattern);
+    }
+  }
+  return patterns;
+}
+
+/**
  * Get basic stats about a parsed session.
  */
 export function getSessionStats(events: SessionEvent[]) {

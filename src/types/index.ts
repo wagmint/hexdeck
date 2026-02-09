@@ -181,6 +181,75 @@ export type TurnCategory =
   | "system"       // system-generated messages
   | "conversation"; // general discussion, ideation
 
+// ─── Turn Section Types ──────────────────────────────────────────────────────
+
+export interface GoalSection {
+  summary: string;
+  fullInstruction: string;
+}
+
+export interface ApproachSection {
+  summary: string;
+  thinking: string;
+}
+
+export interface DecisionItem {
+  choice: string;
+  reasoning: string;
+}
+
+export interface DecisionsSection {
+  summary: string;
+  items: DecisionItem[];
+}
+
+export interface ResearchSection {
+  summary: string;
+  filesRead: string[];
+  searches: string[];
+}
+
+export interface ActionsSection {
+  summary: string;
+  edits: string[];
+  commands: string[];
+  creates: string[];
+}
+
+export interface CorrectionItem {
+  error: string;
+  fix: string;
+}
+
+export interface CorrectionsSection {
+  summary: string;
+  items: CorrectionItem[];
+}
+
+export interface ArtifactsSection {
+  summary: string;
+  filesChanged: string[];
+  commits: string[];
+}
+
+export interface EscalationsSection {
+  summary: string;
+  questions: string[];
+}
+
+export interface TurnSections {
+  goal: GoalSection;
+  approach: ApproachSection;
+  decisions: DecisionsSection;
+  research: ResearchSection;
+  actions: ActionsSection;
+  corrections: CorrectionsSection;
+  artifacts: ArtifactsSection;
+  escalations: EscalationsSection;
+}
+
+// ─── Turn Node ───────────────────────────────────────────────────────────────
+
 export interface TurnNode {
   id: string;
   index: number;
@@ -193,6 +262,9 @@ export interface TurnNode {
   userInstruction: string;
   /** Preview of Claude's response text (first ~200 chars) */
   assistantPreview: string;
+
+  /** Semantic sections — progressive disclosure */
+  sections: TurnSections;
 
   /** Tool calls made during this turn */
   toolCalls: ToolCallSummary[];

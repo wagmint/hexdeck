@@ -1,5 +1,5 @@
-import type { SessionEvent, TurnNode, TurnCategory, ToolCallSummary, ParsedSession, SessionInfo, Message } from "../types/index.js";
-import { getMessageText, getToolCalls, getToolResults, hasCompaction, getCompactionText } from "../parser/jsonl.js";
+import type { SessionEvent, TurnNode, TurnCategory, ToolCallSummary, ParsedSession, SessionInfo, Message, TurnSections, DecisionItem, CorrectionItem } from "../types/index.js";
+import { getMessageText, getToolCalls, getToolResults, hasCompaction, getCompactionText, getThinkingText, getSearchPatterns } from "../parser/jsonl.js";
 
 /**
  * Build turn-pair nodes from a flat list of session events.
@@ -55,12 +55,22 @@ function buildSingleTurn(events: SessionEvent[], index: number): TurnNode | null
   const filesChanged = new Set<string>();
   const filesRead = new Set<string>();
   const commands: string[] = [];
+  const searches: string[] = [];
+  const edits: string[] = [];
+  const creates: string[] = [];
+  const commitMessages: string[] = [];
+  const escalationQuestions: string[] = [];
   let hasCommit = false;
   let commitMessage: string | null = null;
   let errorCount = 0;
   let turnHasCompaction = false;
   let compactionText: string | null = null;
   let assistantText = "";
+  let thinkingText = "";
+
+  // Track error→fix cycles for corrections
+  const errorResults: Array<{ toolId: string; error: string }> = [];
+  const toolCallSequence: Array<{ name: string; input: Record<string, unknown>; id: string }> = [];
 
   for (const event of events) {
     // Check user messages for tool results and errors
@@ -69,28 +79,53 @@ function buildSingleTurn(events: SessionEvent[], index: number): TurnNode | null
       for (const result of results) {
         if (isErrorResult(result.content)) {
           errorCount++;
+          errorResults.push({
+            toolId: result.tool_use_id,
+            error: extractErrorSummary(result.content),
+          });
         }
       }
       continue;
     }
 
-    // Process assistant messages for tool calls, text, compaction
-    // Collect text preview (skip whitespace-only text)
+    // Process assistant messages
+    // Collect thinking text
+    const thinking = getThinkingText(event.message);
+    if (thinking) {
+      thinkingText += (thinkingText ? "\n" : "") + thinking;
+    }
+
+    // Collect text preview
     const text = getMessageText(event.message).trim();
     if (text && !assistantText) {
       assistantText = text;
     }
+
+    // Collect search patterns
+    const patterns = getSearchPatterns(event.message);
+    searches.push(...patterns);
 
     // Collect tool calls
     const calls = getToolCalls(event.message);
     for (const call of calls) {
       allToolCalls.push({ name: call.name, input: call.input });
       toolCounts[call.name] = (toolCounts[call.name] ?? 0) + 1;
+      toolCallSequence.push({ name: call.name, input: call.input, id: call.id });
 
       // Detect file changes
-      if (call.name === "Write" || call.name === "Edit" || call.name === "NotebookEdit") {
+      if (call.name === "Write") {
         const filePath = extractFilePath(call.input);
-        if (filePath) filesChanged.add(filePath);
+        if (filePath) {
+          filesChanged.add(filePath);
+          creates.push(shortPath(filePath));
+        }
+      }
+      if (call.name === "Edit" || call.name === "NotebookEdit") {
+        const filePath = extractFilePath(call.input);
+        if (filePath) {
+          filesChanged.add(filePath);
+          edits.push(shortPath(filePath));
+        }
       }
 
       // Detect file reads
@@ -107,6 +142,19 @@ function buildSingleTurn(events: SessionEvent[], index: number): TurnNode | null
           if (isGitCommit(cmd)) {
             hasCommit = true;
             commitMessage = extractCommitMessage(cmd);
+            if (commitMessage) commitMessages.push(commitMessage);
+          }
+        }
+      }
+
+      // Detect escalations (AskUserQuestion)
+      if (call.name === "AskUserQuestion") {
+        const questions = call.input.questions;
+        if (Array.isArray(questions)) {
+          for (const q of questions) {
+            if (q && typeof q === "object" && "question" in q && typeof (q as Record<string, unknown>).question === "string") {
+              escalationQuestions.push((q as Record<string, unknown>).question as string);
+            }
           }
         }
       }
@@ -119,6 +167,27 @@ function buildSingleTurn(events: SessionEvent[], index: number): TurnNode | null
     }
   }
 
+  // Build sections
+  const sections = buildSections({
+    userInstruction,
+    summary,
+    thinkingText,
+    assistantText,
+    filesRead: [...filesRead],
+    filesChanged: [...filesChanged],
+    searches,
+    edits,
+    creates,
+    commands,
+    commitMessages,
+    errorResults,
+    toolCallSequence,
+    escalationQuestions,
+    errorCount,
+    hasCommit,
+    turnHasCompaction,
+  });
+
   return {
     id: `turn-${index}`,
     index,
@@ -126,6 +195,7 @@ function buildSingleTurn(events: SessionEvent[], index: number): TurnNode | null
     category,
     userInstruction: userInstruction.slice(0, 500),
     assistantPreview: assistantText.slice(0, 200),
+    sections,
     toolCalls: allToolCalls,
     toolCounts,
     filesChanged: [...filesChanged],
@@ -180,6 +250,288 @@ export function buildParsedSession(session: SessionInfo, events: SessionEvent[])
       ),
     },
   };
+}
+
+// ─── Section Extraction ──────────────────────────────────────────────────────
+
+interface SectionInput {
+  userInstruction: string;
+  summary: string;
+  thinkingText: string;
+  assistantText: string;
+  filesRead: string[];
+  filesChanged: string[];
+  searches: string[];
+  edits: string[];
+  creates: string[];
+  commands: string[];
+  commitMessages: string[];
+  errorResults: Array<{ toolId: string; error: string }>;
+  toolCallSequence: Array<{ name: string; input: Record<string, unknown>; id: string }>;
+  escalationQuestions: string[];
+  errorCount: number;
+  hasCommit: boolean;
+  turnHasCompaction: boolean;
+}
+
+function buildSections(input: SectionInput): TurnSections {
+  return {
+    goal: buildGoalSection(input),
+    approach: buildApproachSection(input),
+    decisions: buildDecisionsSection(input),
+    research: buildResearchSection(input),
+    actions: buildActionsSection(input),
+    corrections: buildCorrectionsSection(input),
+    artifacts: buildArtifactsSection(input),
+    escalations: buildEscalationsSection(input),
+  };
+}
+
+function buildGoalSection(input: SectionInput): TurnSections["goal"] {
+  return {
+    summary: input.summary || "(no instruction)",
+    fullInstruction: input.userInstruction,
+  };
+}
+
+function buildApproachSection(input: SectionInput): TurnSections["approach"] {
+  // Extract approach from thinking text — first few sentences that describe the plan
+  let approachSummary = "";
+  if (input.thinkingText) {
+    approachSummary = extractApproachFromThinking(input.thinkingText);
+  }
+  if (!approachSummary && input.assistantText) {
+    // Fall back to first sentence of assistant text
+    approachSummary = extractFirstSentence(input.assistantText);
+  }
+  if (!approachSummary) {
+    approachSummary = "(no approach captured)";
+  }
+
+  // Use thinking text if available, otherwise fall back to assistant text
+  const detailText = input.thinkingText || input.assistantText;
+
+  return {
+    summary: approachSummary.slice(0, 150),
+    thinking: detailText.slice(0, 2000),
+  };
+}
+
+function buildDecisionsSection(input: SectionInput): TurnSections["decisions"] {
+  const items: DecisionItem[] = [];
+
+  if (input.thinkingText) {
+    items.push(...extractDecisionsFromThinking(input.thinkingText));
+  }
+
+  const summary = items.length > 0
+    ? items.map((d) => d.choice).join("; ").slice(0, 150)
+    : "(no explicit decisions captured)";
+
+  return { summary, items };
+}
+
+function buildResearchSection(input: SectionInput): TurnSections["research"] {
+  const parts: string[] = [];
+  if (input.filesRead.length > 0) parts.push(`Read ${input.filesRead.length} file${input.filesRead.length > 1 ? "s" : ""}`);
+  if (input.searches.length > 0) parts.push(`${input.searches.length} search${input.searches.length > 1 ? "es" : ""}`);
+  const summary = parts.length > 0 ? parts.join(", ") : "(no research)";
+
+  return {
+    summary,
+    filesRead: input.filesRead.map(shortPath),
+    searches: input.searches,
+  };
+}
+
+function buildActionsSection(input: SectionInput): TurnSections["actions"] {
+  const parts: string[] = [];
+  if (input.creates.length > 0) parts.push(`Created ${input.creates.length} file${input.creates.length > 1 ? "s" : ""}`);
+  if (input.edits.length > 0) parts.push(`edited ${input.edits.length} file${input.edits.length > 1 ? "s" : ""}`);
+  if (input.commands.length > 0) parts.push(`ran ${input.commands.length} command${input.commands.length > 1 ? "s" : ""}`);
+  const summary = parts.length > 0 ? parts.join(", ") : "(no actions)";
+
+  return {
+    summary,
+    edits: input.edits,
+    commands: input.commands.map((c) => c.length > 120 ? c.slice(0, 120) + "..." : c),
+    creates: input.creates,
+  };
+}
+
+function buildCorrectionsSection(input: SectionInput): TurnSections["corrections"] {
+  const items: CorrectionItem[] = [];
+
+  // Match error results to subsequent tool calls that look like retries/fixes
+  for (const err of input.errorResults) {
+    // Find the error-producing tool call
+    const errCallIdx = input.toolCallSequence.findIndex((t) => t.id === err.toolId);
+    if (errCallIdx < 0) {
+      items.push({ error: err.error, fix: "(unresolved)" });
+      continue;
+    }
+    const errCall = input.toolCallSequence[errCallIdx];
+
+    // Look for the next tool call of the same type (retry) or an Edit after a Bash error
+    let fix = "";
+    for (let j = errCallIdx + 1; j < input.toolCallSequence.length && j <= errCallIdx + 5; j++) {
+      const next = input.toolCallSequence[j];
+      if (next.name === errCall.name) {
+        fix = `Retried ${next.name}`;
+        break;
+      }
+      if (next.name === "Edit" || next.name === "Write") {
+        const fp = extractFilePath(next.input);
+        fix = `Fixed in ${fp ? shortPath(fp) : next.name}`;
+        break;
+      }
+    }
+    items.push({ error: err.error, fix: fix || "(continued)" });
+  }
+
+  const summary = items.length > 0
+    ? `${items.length} error${items.length > 1 ? "s" : ""} → ${items.filter((i) => i.fix !== "(unresolved)").length} fixed`
+    : "(no errors)";
+
+  return { summary, items };
+}
+
+function buildArtifactsSection(input: SectionInput): TurnSections["artifacts"] {
+  const parts: string[] = [];
+  if (input.filesChanged.length > 0) parts.push(`${input.filesChanged.length} file${input.filesChanged.length > 1 ? "s" : ""} changed`);
+  if (input.commitMessages.length > 0) parts.push(`${input.commitMessages.length} commit${input.commitMessages.length > 1 ? "s" : ""}`);
+  if (input.turnHasCompaction) parts.push("compaction");
+  const summary = parts.length > 0 ? parts.join(", ") : "(no artifacts)";
+
+  return {
+    summary,
+    filesChanged: input.filesChanged.map(shortPath),
+    commits: input.commitMessages,
+  };
+}
+
+function buildEscalationsSection(input: SectionInput): TurnSections["escalations"] {
+  const summary = input.escalationQuestions.length > 0
+    ? `Asked ${input.escalationQuestions.length} question${input.escalationQuestions.length > 1 ? "s" : ""}`
+    : "(none)";
+
+  return {
+    summary,
+    questions: input.escalationQuestions,
+  };
+}
+
+// ─── Section Helpers ─────────────────────────────────────────────────────────
+
+/** Extract the approach/plan from thinking text — looks for planning language. */
+function extractApproachFromThinking(thinking: string): string {
+  const lines = thinking.split("\n").filter((l) => l.trim().length > 0);
+
+  // Look for lines with planning intent
+  const planPatterns = [
+    /^(?:I(?:'ll| will| need to| should| can)|Let me|First,? I|The (?:approach|plan|strategy) is|I'm going to)/i,
+    /^(?:Step \d|1\.|My approach)/i,
+  ];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (planPatterns.some((p) => p.test(trimmed))) {
+      // Found a planning line — take it plus the next line for context
+      const idx = lines.indexOf(line);
+      const combined = lines.slice(idx, idx + 2).join(" ").trim();
+      const sentence = extractFirstSentence(combined);
+      if (sentence.length > 15) return sentence;
+    }
+  }
+
+  // Fallback: first substantive sentence from thinking
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.length > 20 && !trimmed.startsWith("```") && !trimmed.startsWith("//")) {
+      return extractFirstSentence(trimmed);
+    }
+  }
+
+  return "";
+}
+
+/** Extract decisions from thinking text — looks for choice/reasoning language. */
+function extractDecisionsFromThinking(thinking: string): DecisionItem[] {
+  const decisions: DecisionItem[] = [];
+  const lines = thinking.split("\n");
+
+  const decisionPatterns = [
+    /(?:I'll|I will|Let me|Going to|I(?:'m| am) going to)\s+(?:use|go with|choose|pick|try|opt for|stick with)\s+(.+)/i,
+    /(?:instead of|rather than|over)\s+(.+)/i,
+    /(?:chose|decided on|picking|using)\s+(.+?)(?:\s+because|\s+since|\s+as\s)/i,
+  ];
+
+  const reasonPatterns = [
+    /because\s+(.+)/i,
+    /since\s+(.+)/i,
+    /this (?:is|was) (?:better|simpler|more reliable|faster|cleaner|easier)\s*(?:because|since|as)?\s*(.*)/i,
+  ];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    for (const pattern of decisionPatterns) {
+      const match = line.match(pattern);
+      if (match) {
+        const choice = extractFirstSentence(line).slice(0, 120);
+        let reasoning = "";
+
+        // Look for reasoning in the same line or next few lines
+        for (const rp of reasonPatterns) {
+          const rm = line.match(rp);
+          if (rm) {
+            reasoning = extractFirstSentence(rm[1]).slice(0, 120);
+            break;
+          }
+        }
+        if (!reasoning) {
+          // Check next line
+          const nextLine = (lines[i + 1] ?? "").trim();
+          for (const rp of reasonPatterns) {
+            const rm = nextLine.match(rp);
+            if (rm) {
+              reasoning = extractFirstSentence(rm[1]).slice(0, 120);
+              break;
+            }
+          }
+        }
+
+        decisions.push({ choice, reasoning });
+        break; // One decision per line
+      }
+    }
+
+    // Cap at 5 decisions per turn
+    if (decisions.length >= 5) break;
+  }
+
+  return decisions;
+}
+
+/** Extract a concise error summary from a tool result. */
+function extractErrorSummary(content: string): string {
+  // Find the first line with an error indicator
+  const lines = content.split("\n");
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (/(?:Error:|error:|ENOENT|EACCES|fatal:|Exit code|TypeError|SyntaxError|Cannot find)/.test(trimmed)) {
+      return trimmed.slice(0, 120);
+    }
+  }
+  return content.slice(0, 120);
+}
+
+/** Shorten a file path to just the last 2-3 segments. */
+function shortPath(filePath: string): string {
+  const parts = filePath.split("/");
+  if (parts.length <= 3) return filePath;
+  return ".../" + parts.slice(-3).join("/");
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

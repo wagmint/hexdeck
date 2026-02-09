@@ -10,6 +10,10 @@ async function fetchApi<T>(path: string): Promise<T> {
   return res.json();
 }
 
+export async function getActiveSessions(): Promise<SessionInfo[]> {
+  return fetchApi<SessionInfo[]>("/api/sessions/active");
+}
+
 export async function getProjects(): Promise<ProjectInfo[]> {
   return fetchApi<ProjectInfo[]>("/api/projects");
 }

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono, DM_Sans } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({
@@ -11,6 +11,12 @@ const inter = Inter({
 const jetbrains = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
+  display: "swap",
+});
+
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-display",
   display: "swap",
 });
 
@@ -27,7 +33,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body
-        className={`${inter.variable} ${jetbrains.variable} font-sans antialiased`}
+        className={`${inter.variable} ${jetbrains.variable} ${dmSans.variable} font-sans antialiased`}
       >
         <div className="min-h-screen flex flex-col">{children}</div>
       </body>

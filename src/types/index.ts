@@ -1,3 +1,8 @@
+export type {
+  AgentStatus, Agent, Workstream, CollisionSeverity, Collision,
+  FeedEventType, FeedEvent, DashboardSummary, DashboardState,
+} from "./dashboard.js";
+
 // ─── Claude Code JSONL Event Types ───────────────────────────────────────────
 
 export interface TextContent {

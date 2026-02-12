@@ -1,98 +1,190 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getActiveSessions } from "@/lib/api";
-import type { SessionInfo } from "@/lib/types";
-import { formatBytes, timeAgo } from "@/lib/utils";
-import {
-  FolderOpen,
-  ChevronRight,
-  Activity,
-  RefreshCw,
-} from "lucide-react";
-import Link from "next/link";
+import { useState, useRef, useEffect } from "react";
+import { useDashboard } from "@/hooks/useDashboard";
+import type { Collision } from "@/lib/dashboard-types";
+import { TopBar } from "@/components/dashboard/TopBar";
+import { PanelHeader } from "@/components/dashboard/PanelHeader";
+import { AgentCard } from "@/components/dashboard/AgentCard";
+import { WorkstreamNode } from "@/components/dashboard/WorkstreamNode";
+import { FeedItem } from "@/components/dashboard/FeedItem";
+import { CollisionDetail } from "@/components/dashboard/CollisionDetail";
+import { ProgressBar } from "@/components/dashboard/ProgressBar";
+import { DeviationItem } from "@/components/dashboard/DeviationItem";
 
-export default function Home() {
-  const [sessions, setSessions] = useState<SessionInfo[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function DashboardPage() {
+  const { state, loading, error } = useDashboard(3000);
+  const [selectedCollision, setSelectedCollision] = useState<Collision | null>(null);
+  const [seenEventIds, setSeenEventIds] = useState<Set<string>>(new Set());
+  const isFirstRender = useRef(true);
 
-  const refresh = () => {
-    setLoading(true);
-    getActiveSessions()
-      .then(setSessions)
-      .finally(() => setLoading(false));
-  };
-
+  // Track seen event IDs for flash-in animation
   useEffect(() => {
-    refresh();
-    // Poll every 10 seconds for active session changes
-    const interval = setInterval(refresh, 10_000);
-    return () => clearInterval(interval);
-  }, []);
+    if (!state) return;
+    if (isFirstRender.current) {
+      // On first render, mark all events as seen (no flash)
+      setSeenEventIds(new Set(state.feed.map((e) => e.id)));
+      isFirstRender.current = false;
+      return;
+    }
+    // After first render, only newly arrived events get flash
+    setSeenEventIds((prev) => {
+      const next = new Set(prev);
+      for (const e of state.feed) next.add(e.id);
+      return next;
+    });
+  }, [state]);
+
+  // Auto-select first collision when data loads
+  useEffect(() => {
+    if (state && state.collisions.length > 0 && !selectedCollision) {
+      setSelectedCollision(state.collisions[0]);
+    }
+  }, [state, selectedCollision]);
+
+  if (loading && !state) {
+    return (
+      <div className="h-screen bg-dash-bg flex items-center justify-center text-dash-text-muted text-sm font-mono">
+        Scanning sessions...
+      </div>
+    );
+  }
+
+  if (error && !state) {
+    return (
+      <div className="h-screen bg-dash-bg flex items-center justify-center text-dash-red text-sm font-mono">
+        {error}
+      </div>
+    );
+  }
+
+  if (!state) return null;
+
+  const { workstreams, collisions, feed, summary } = state;
 
   return (
-    <div className="min-h-screen">
-      {/* Header */}
-      <header className="border-b border-border px-6 py-4">
-        <div className="max-w-5xl mx-auto flex items-center gap-3">
-          <Activity className="w-5 h-5 text-primary" />
-          <h1 className="text-lg font-semibold">Pylon</h1>
-          <span className="text-sm text-muted-foreground">
-            Active Sessions
-          </span>
-          <div className="flex-1" />
-          <button
-            onClick={refresh}
-            className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded hover:bg-secondary"
-            title="Refresh"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          </button>
-        </div>
-      </header>
+    <div className="h-screen flex flex-col bg-dash-bg text-dash-text font-mono text-[11px] leading-relaxed overflow-hidden">
+      <TopBar summary={summary} />
 
-      {/* Content */}
-      <main className="max-w-5xl mx-auto px-6 py-8">
-        {loading && sessions.length === 0 ? (
-          <div className="text-center py-20 text-muted-foreground">
-            Scanning for active sessions...
+      <div
+        className="flex-1 grid gap-px bg-dash-border"
+        style={{ gridTemplateColumns: "260px 1fr 320px" }}
+      >
+        {/* LEFT PANEL: Workstream / Agent cards */}
+        <div className="bg-dash-bg overflow-y-auto scrollbar-thin">
+          <PanelHeader
+            title="Workstreams"
+            count={`${workstreams.length} project${workstreams.length !== 1 ? "s" : ""}`}
+          />
+          {workstreams.length === 0 ? (
+            <div className="px-3.5 py-8 text-center text-dash-text-muted text-xs">
+              No active projects
+            </div>
+          ) : (
+            workstreams.map((ws) => (
+              <AgentCard key={ws.projectId} workstream={ws} />
+            ))
+          )}
+        </div>
+
+        {/* CENTER PANEL */}
+        <div className="flex flex-col bg-dash-bg">
+          {/* Top half: Intent Map + Live Feed */}
+          <div className="flex-1 grid grid-cols-2 gap-px bg-dash-border min-h-0">
+            {/* Intent Map */}
+            <div className="bg-dash-bg overflow-y-auto scrollbar-thin">
+              <PanelHeader
+                title="Intent Map"
+                count={`${workstreams.length} workstream${workstreams.length !== 1 ? "s" : ""}`}
+              />
+              {workstreams.length === 0 ? (
+                <div className="px-3.5 py-8 text-center text-dash-text-muted text-xs">
+                  No workstreams
+                </div>
+              ) : (
+                workstreams.map((ws) => (
+                  <WorkstreamNode key={ws.projectId} workstream={ws} />
+                ))
+              )}
+            </div>
+
+            {/* Live Feed */}
+            <div className="bg-dash-bg overflow-y-auto scrollbar-thin">
+              <PanelHeader title="Live Feed">
+                <span className="inline-flex items-center gap-1 bg-dash-green-dim text-dash-green text-[8px] font-bold px-1.5 py-0.5 rounded tracking-widest uppercase">
+                  <span className="w-1 h-1 rounded-full bg-dash-green animate-dash-pulse" />
+                  streaming
+                </span>
+              </PanelHeader>
+              {feed.length === 0 ? (
+                <div className="px-3.5 py-8 text-center text-dash-text-muted text-xs">
+                  No events yet
+                </div>
+              ) : (
+                feed.map((event) => (
+                  <FeedItem
+                    key={event.id}
+                    event={event}
+                    isNew={!isFirstRender.current && !seenEventIds.has(event.id)}
+                    onClick={
+                      event.collisionId
+                        ? () => {
+                            const col = collisions.find(
+                              (c) => c.id === event.collisionId
+                            );
+                            if (col) setSelectedCollision(col);
+                          }
+                        : undefined
+                    }
+                  />
+                ))
+              )}
+            </div>
           </div>
-        ) : sessions.length === 0 ? (
-          <div className="text-center py-20 text-muted-foreground">
-            <p>No active Claude Code sessions.</p>
-            <p className="text-sm mt-2">
-              Start a Claude Code session to see it here.
-            </p>
+
+          {/* Bottom: Collision Detail */}
+          <div className="h-[200px] shrink-0 border-t border-dash-border bg-dash-surface overflow-hidden">
+            <CollisionDetail collision={selectedCollision} />
           </div>
-        ) : (
-          <div className="space-y-2">
-            {sessions.map((session) => (
-              <Link
-                key={session.id}
-                href={`/session/${session.id}`}
-                className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border bg-card hover:bg-secondary/30 transition-colors"
-              >
-                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <FolderOpen className="w-4 h-4 text-primary shrink-0" />
-                <span className="font-mono text-sm text-muted-foreground truncate max-w-[300px]">
-                  {session.projectPath}
-                </span>
-                <div className="h-4 w-px bg-border" />
-                <span className="font-mono text-xs text-muted-foreground truncate flex-1">
-                  {session.id}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {formatBytes(session.sizeBytes)}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {timeAgo(session.modifiedAt)}
-                </span>
-                <ChevronRight className="w-3 h-3 text-muted-foreground" />
-              </Link>
-            ))}
+        </div>
+
+        {/* RIGHT PANEL */}
+        <div className="flex flex-col gap-px bg-dash-border">
+          {/* Sprint Progress */}
+          <div className="flex-1 bg-dash-bg overflow-y-auto scrollbar-thin">
+            <PanelHeader
+              title="Progress"
+              count={`${summary.totalCommits} commit${summary.totalCommits !== 1 ? "s" : ""}`}
+            />
+            {workstreams.length === 0 ? (
+              <div className="px-3.5 py-8 text-center text-dash-text-muted text-xs">
+                No workstreams
+              </div>
+            ) : (
+              workstreams.map((ws) => (
+                <ProgressBar key={ws.projectId} workstream={ws} />
+              ))
+            )}
           </div>
-        )}
-      </main>
+
+          {/* Deviation Log */}
+          <div className="flex-1 bg-dash-bg overflow-y-auto scrollbar-thin">
+            <PanelHeader
+              title="Deviations"
+              count={`${collisions.length} active`}
+            />
+            {collisions.length === 0 ? (
+              <div className="px-3.5 py-8 text-center text-dash-text-muted text-xs">
+                No deviations detected
+              </div>
+            ) : (
+              collisions.map((col) => (
+                <DeviationItem key={col.id} collision={col} />
+              ))
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -4,10 +4,11 @@ import { serve } from "@hono/node-server";
 import { listProjects, listSessions, findSession, getActiveSessions } from "../discovery/sessions.js";
 import { parseSessionFile } from "../parser/jsonl.js";
 import { buildParsedSession } from "../core/nodes.js";
+import { buildDashboardState } from "../core/dashboard.js";
 
 const app = new Hono();
 
-app.use("/*", cors({ origin: "http://localhost:3000" }));
+app.use("/*", cors({ origin: ["http://localhost:3000", "http://localhost:3001"] }));
 
 // ─── API Routes ─────────────────────────────────────────────────────────────
 
@@ -96,6 +97,52 @@ app.get("/api/sessions/:sessionId", (c) => {
     })),
     stats: parsed.stats,
   });
+});
+
+// ─── Dashboard Routes ────────────────────────────────────────────────────────
+
+function serializeDate(d: Date): string {
+  return d instanceof Date ? d.toISOString() : String(d);
+}
+
+/** Full dashboard state */
+app.get("/api/dashboard", (c) => {
+  const state = buildDashboardState();
+  return c.json({
+    ...state,
+    collisions: state.collisions.map((col) => ({
+      ...col,
+      detectedAt: serializeDate(col.detectedAt),
+    })),
+    feed: state.feed.map((ev) => ({
+      ...ev,
+      timestamp: serializeDate(ev.timestamp),
+    })),
+  });
+});
+
+/** Dashboard feed only */
+app.get("/api/dashboard/feed", (c) => {
+  const limit = parseInt(c.req.query("limit") ?? "50", 10);
+  const state = buildDashboardState();
+  const feed = state.feed.slice(0, limit);
+  return c.json(
+    feed.map((ev) => ({
+      ...ev,
+      timestamp: serializeDate(ev.timestamp),
+    }))
+  );
+});
+
+/** Dashboard collisions only */
+app.get("/api/dashboard/collisions", (c) => {
+  const state = buildDashboardState();
+  return c.json(
+    state.collisions.map((col) => ({
+      ...col,
+      detectedAt: serializeDate(col.detectedAt),
+    }))
+  );
 });
 
 /** Health check */

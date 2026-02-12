@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent OS — Control Surface</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0a0c;
+    --surface: #111115;
+    --surface-2: #18181d;
+    --surface-3: #1e1e25;
+    --border: #2a2a35;
+    --border-light: #35354a;
+    --text: #e0e0e8;
+    --text-dim: #7a7a8e;
+    --text-muted: #4a4a5e;
+    --accent-green: #00e87b;
+    --accent-green-dim: #00e87b33;
+    --accent-red: #ff4d6a;
+    --accent-red-dim: #ff4d6a33;
+    --accent-yellow: #ffc44d;
+    --accent-yellow-dim: #ffc44d33;
+    --accent-blue: #4d9fff;
+    --accent-blue-dim: #4d9fff33;
+    --accent-purple: #a855f7;
+    --accent-purple-dim: #a855f733;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* TOP BAR */
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    height: 40px;
+  }
+
+  .logo {
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: -0.5px;
+    color: var(--accent-green);
+  }
+
+  .logo span { color: var(--text-dim); font-weight: 400; }
+
+  .top-bar-status {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+  }
+
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-dim);
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .status-dot.yellow { background: var(--accent-yellow); }
+  .status-dot.red { background: var(--accent-red); }
+
+  /* MAIN GRID */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 260px 1fr 320px;
+    grid-template-rows: 1fr;
+    height: calc(100vh - 40px);
+    gap: 1px;
+    background: var(--border);
+  }
+
+  .panel {
+    background: var(--bg);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .panel-header {
+    padding: 12px 14px 8px;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 2;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .panel-header .count {
+    background: var(--surface-3);
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: var(--text-dim);
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  /* LEFT PANEL — TEAM */
+  .team-member {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .team-member:hover { background: var(--surface); }
+  .team-member.active { background: var(--surface-2); border-left: 2px solid var(--accent-green); }
+
+  .member-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+
+  .member-name {
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .member-role {
+    font-size: 9px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .agent-bar {
+    display: flex;
+    gap: 3px;
+    margin-top: 6px;
+    align-items: center;
+  }
+
+  .agent-pip {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    background: var(--accent-green-dim);
+    border: 1px solid var(--accent-green);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 7px;
+    color: var(--accent-green);
+    font-weight: 600;
+  }
+
+  .agent-pip.busy {
+    background: var(--accent-blue-dim);
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+    animation: agentPulse 1.5s infinite;
+  }
+
+  .agent-pip.warning {
+    background: var(--accent-yellow-dim);
+    border-color: var(--accent-yellow);
+    color: var(--accent-yellow);
+  }
+
+  .agent-pip.conflict {
+    background: var(--accent-red-dim);
+    border-color: var(--accent-red);
+    color: var(--accent-red);
+    animation: conflictFlash 0.8s infinite;
+  }
+
+  @keyframes agentPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
+  @keyframes conflictFlash {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .agent-count {
+    font-size: 9px;
+    color: var(--text-muted);
+    margin-left: 4px;
+  }
+
+  .member-focus {
+    margin-top: 5px;
+    font-size: 10px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .member-focus span {
+    color: var(--accent-blue);
+    font-weight: 500;
+  }
+
+  /* CENTER — MAIN VIEW */
+  .center-panel {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .center-top {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    flex: 1;
+  }
+
+  .center-section {
+    background: var(--bg);
+    overflow-y: auto;
+  }
+
+  /* INTENT MAP */
+  .intent-node {
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .intent-status {
+    width: 3px;
+    min-height: 32px;
+    border-radius: 2px;
+    background: var(--accent-green);
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
+
+  .intent-status.drifting { background: var(--accent-yellow); }
+  .intent-status.conflict { background: var(--accent-red); }
+  .intent-status.pending { background: var(--text-muted); }
+
+  .intent-content { flex: 1; }
+
+  .intent-title {
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600;
+    font-size: 11px;
+    margin-bottom: 2px;
+  }
+
+  .intent-meta {
+    font-size: 9px;
+    color: var(--text-muted);
+    display: flex;
+    gap: 10px;
+  }
+
+  .intent-meta .owner { color: var(--accent-blue); }
+  .intent-meta .changed { color: var(--accent-yellow); }
+  .intent-meta .conflict-tag { color: var(--accent-red); font-weight: 600; }
+
+  .intent-children {
+    margin-top: 4px;
+    padding-left: 8px;
+    border-left: 1px solid var(--border);
+  }
+
+  .intent-child {
+    padding: 3px 0;
+    font-size: 10px;
+    color: var(--text-dim);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .intent-child .check { color: var(--accent-green); }
+  .intent-child .in-progress { color: var(--accent-blue); }
+  .intent-child .blocked { color: var(--accent-red); }
+
+  /* LIVE FEED */
+  .feed-item {
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    font-size: 10px;
+    transition: background 0.15s;
+  }
+
+  .feed-item:hover { background: var(--surface); }
+
+  .feed-item.alert {
+    background: var(--accent-red-dim);
+    border-left: 2px solid var(--accent-red);
+  }
+
+  .feed-item.warning {
+    background: var(--accent-yellow-dim);
+    border-left: 2px solid var(--accent-yellow);
+  }
+
+  .feed-time {
+    color: var(--text-muted);
+    font-size: 9px;
+    white-space: nowrap;
+    min-width: 40px;
+  }
+
+  .feed-icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    flex-shrink: 0;
+  }
+
+  .feed-icon.collision { background: var(--accent-red-dim); color: var(--accent-red); }
+  .feed-icon.drift { background: var(--accent-yellow-dim); color: var(--accent-yellow); }
+  .feed-icon.done { background: var(--accent-green-dim); color: var(--accent-green); }
+  .feed-icon.info { background: var(--accent-blue-dim); color: var(--accent-blue); }
+  .feed-icon.scope { background: var(--accent-purple-dim); color: var(--accent-purple); }
+
+  .feed-body { flex: 1; line-height: 1.5; }
+  .feed-body strong { color: var(--text); font-weight: 600; }
+  .feed-body .tag-collision { color: var(--accent-red); font-weight: 600; }
+  .feed-body .tag-drift { color: var(--accent-yellow); font-weight: 600; }
+  .feed-body .tag-new { color: var(--accent-purple); font-weight: 500; }
+
+  /* BOTTOM CENTER — COLLISION DETAIL */
+  .center-bottom {
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    height: 200px;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+
+  .collision-banner {
+    padding: 10px 14px;
+    background: var(--accent-red-dim);
+    border-bottom: 1px solid var(--accent-red);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .collision-banner-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .collision-icon {
+    width: 20px;
+    height: 20px;
+    background: var(--accent-red);
+    color: var(--bg);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 12px;
+  }
+
+  .collision-title {
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    color: var(--accent-red);
+  }
+
+  .collision-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  .btn {
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .btn-red { background: var(--accent-red); color: var(--bg); border-color: var(--accent-red); }
+  .btn-ghost { background: transparent; color: var(--text-dim); border-color: var(--border); }
+
+  .collision-detail {
+    padding: 12px 14px;
+    display: grid;
+    grid-template-columns: 1fr 40px 1fr;
+    gap: 10px;
+  }
+
+  .collision-side {
+    background: var(--bg);
+    border-radius: 6px;
+    padding: 10px;
+    border: 1px solid var(--border);
+  }
+
+  .collision-side-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
+  .collision-side-name {
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600;
+    font-size: 11px;
+  }
+
+  .collision-side-agent {
+    font-size: 9px;
+    color: var(--accent-blue);
+  }
+
+  .collision-code {
+    font-size: 10px;
+    color: var(--text-dim);
+    background: var(--surface-2);
+    padding: 6px 8px;
+    border-radius: 4px;
+    margin-top: 4px;
+    line-height: 1.6;
+  }
+
+  .collision-code .highlight { color: var(--accent-red); font-weight: 600; }
+
+  .collision-vs {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent-red);
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  /* RIGHT PANEL */
+  .right-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: var(--border);
+  }
+
+  .right-section {
+    background: var(--bg);
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  /* PLAN TRACKER */
+  .plan-item {
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .plan-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .plan-name {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .plan-pct {
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  .plan-pct.on-track { color: var(--accent-green); }
+  .plan-pct.behind { color: var(--accent-yellow); }
+  .plan-pct.blocked { color: var(--accent-red); }
+
+  .plan-bar {
+    height: 3px;
+    background: var(--surface-3);
+    border-radius: 2px;
+    margin-top: 4px;
+    overflow: hidden;
+  }
+
+  .plan-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.5s;
+  }
+
+  .plan-fill.green { background: var(--accent-green); }
+  .plan-fill.yellow { background: var(--accent-yellow); }
+  .plan-fill.red { background: var(--accent-red); }
+
+  .plan-owners {
+    margin-top: 4px;
+    font-size: 9px;
+    color: var(--text-muted);
+  }
+
+  .plan-owners span { color: var(--accent-blue); }
+
+  /* DEVIATION LOG */
+  .deviation {
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 10px;
+  }
+
+  .deviation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 3px;
+  }
+
+  .deviation-type {
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+
+  .deviation-type.scope { background: var(--accent-purple-dim); color: var(--accent-purple); }
+  .deviation-type.arch { background: var(--accent-yellow-dim); color: var(--accent-yellow); }
+  .deviation-type.dup { background: var(--accent-red-dim); color: var(--accent-red); }
+
+  .deviation-time {
+    font-size: 9px;
+    color: var(--text-muted);
+  }
+
+  .deviation-body {
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  .deviation-body strong { color: var(--text); }
+
+  /* ANNOTATION LABELS */
+  .annotation {
+    position: absolute;
+    background: var(--accent-green);
+    color: var(--bg);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 700;
+    font-size: 9px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    z-index: 10;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  .annotation::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 0;
+  }
+
+  .annotation.left-arrow::after {
+    right: -5px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    border-left: 5px solid var(--accent-green);
+  }
+
+  .annotation.down-arrow::after {
+    bottom: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid var(--accent-green);
+  }
+
+  .annotation.yellow { background: var(--accent-yellow); }
+  .annotation.yellow.left-arrow::after { border-left-color: var(--accent-yellow); }
+  .annotation.yellow.down-arrow::after { border-top-color: var(--accent-yellow); }
+
+  .annotation.red { background: var(--accent-red); }
+  .annotation.red.left-arrow::after { border-left-color: var(--accent-red); }
+  .annotation.red.down-arrow::after { border-top-color: var(--accent-red); }
+
+  .annotation.blue { background: var(--accent-blue); }
+  .annotation.blue.down-arrow::after { border-top-color: var(--accent-blue); }
+
+  /* Wrapper for annotations */
+  .annotated-wrapper { position: relative; }
+
+  .section-annotation {
+    position: absolute;
+    top: -22px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent-green);
+    color: var(--bg);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 700;
+    font-size: 8px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    z-index: 10;
+    white-space: nowrap;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  /* Tooltip-style description boxes */
+  .desc-overlay {
+    position: fixed;
+    background: var(--surface-2);
+    border: 1px solid var(--accent-green);
+    border-radius: 6px;
+    padding: 10px 14px;
+    max-width: 240px;
+    z-index: 100;
+    font-size: 10px;
+    line-height: 1.6;
+    color: var(--text-dim);
+    font-family: 'DM Sans', sans-serif;
+    pointer-events: none;
+  }
+
+  .desc-overlay .desc-title {
+    font-weight: 700;
+    color: var(--accent-green);
+    font-size: 10px;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* Live indicator */
+  .live-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--accent-green-dim);
+    color: var(--accent-green);
+    font-size: 8px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .live-tag .dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    animation: pulse 1s infinite;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .new-item-flash {
+    animation: flashIn 1.5s ease-out;
+  }
+
+  @keyframes flashIn {
+    0% { background: var(--accent-green-dim); }
+    100% { background: transparent; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="top-bar">
+  <div class="logo">PYLON <span>control surface</span></div>
+  <div class="top-bar-status">
+    <div class="status-item"><span class="live-tag"><span class="dot"></span> LIVE</span></div>
+    <div class="status-item"><span class="status-dot"></span> 37 agents active</div>
+    <div class="status-item"><span class="status-dot yellow"></span> 2 collisions detected</div>
+    <div class="status-item"><span class="status-dot red"></span> 1 critical deviation</div>
+    <div class="status-item" style="color: var(--text-muted);">Sprint: v0.3 Launch · Day 4/7</div>
+  </div>
+</div>
+
+<!-- MAIN GRID -->
+<div class="main-grid">
+
+  <!-- LEFT: TEAM OVERVIEW -->
+  <div class="panel">
+    <div class="panel-header">
+      Team <span class="count">5 humans · 37 agents</span>
+    </div>
+
+    <div class="team-member active">
+      <div class="member-row">
+        <div class="member-name">Jake</div>
+        <div class="member-role">Founder / Lead</div>
+      </div>
+      <div class="member-focus">Owning: <span>Checkout flow · Store API</span></div>
+      <div class="agent-bar">
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-pip conflict">!</div>
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-pip">✓</div>
+        <div class="agent-pip">✓</div>
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-count">8 agents</div>
+      </div>
+    </div>
+
+    <div class="team-member">
+      <div class="member-row">
+        <div class="member-name">Sarah</div>
+        <div class="member-role">Sr. Engineer</div>
+      </div>
+      <div class="member-focus">Owning: <span>Catalog system · Pricing</span></div>
+      <div class="agent-bar">
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-pip conflict">!</div>
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-pip">✓</div>
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-pip">✓</div>
+        <div class="agent-count">7 agents</div>
+      </div>
+    </div>
+
+    <div class="team-member">
+      <div class="member-row">
+        <div class="member-name">Marcus</div>
+        <div class="member-role">Sr. Engineer</div>
+      </div>
+      <div class="member-focus">Owning: <span>Delivery tracking · Notifications</span></div>
+      <div class="agent-bar">
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-pip warning">⚠</div>
+        <div class="agent-pip">✓</div>
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-count">8 agents</div>
+      </div>
+    </div>
+
+    <div class="team-member">
+      <div class="member-row">
+        <div class="member-name">Lina</div>
+        <div class="member-role">Sr. Engineer</div>
+      </div>
+      <div class="member-focus">Owning: <span>Auth · Admin panel</span></div>
+      <div class="agent-bar">
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-pip">✓</div>
+        <div class="agent-pip">✓</div>
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-pip">✓</div>
+        <div class="agent-count">7 agents</div>
+      </div>
+    </div>
+
+    <div class="team-member">
+      <div class="member-row">
+        <div class="member-name">Dev</div>
+        <div class="member-role">Sr. Engineer</div>
+      </div>
+      <div class="member-focus">Owning: <span>Frontend · Design system</span></div>
+      <div class="agent-bar">
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-pip">✓</div>
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-pip busy">▶</div>
+        <div class="agent-count">7 agents</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER -->
+  <div class="center-panel">
+    <div class="center-top">
+      
+      <!-- INTENT MAP -->
+      <div class="center-section">
+        <div class="panel-header">
+          Intent Map — Plan vs Reality <span class="count">12 workstreams</span>
+        </div>
+
+        <div class="intent-node">
+          <div class="intent-status conflict"></div>
+          <div class="intent-content">
+            <div class="intent-title">Checkout Flow</div>
+            <div class="intent-meta">
+              <span class="owner">Jake</span>
+              <span>4 agents active</span>
+              <span class="conflict-tag">⚠ COLLISION w/ Sarah</span>
+            </div>
+            <div class="intent-children">
+              <div class="intent-child"><span>Cart API endpoints</span> <span class="check">✓ done</span></div>
+              <div class="intent-child"><span>Payment integration</span> <span class="in-progress">▶ building</span></div>
+              <div class="intent-child"><span>Trade-in deduction logic</span> <span class="blocked">✕ conflict</span></div>
+              <div class="intent-child"><span>Order confirmation flow</span> <span style="color: var(--text-muted)">queued</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="intent-node">
+          <div class="intent-status conflict"></div>
+          <div class="intent-content">
+            <div class="intent-title">Catalog & Pricing</div>
+            <div class="intent-meta">
+              <span class="owner">Sarah</span>
+              <span>3 agents active</span>
+              <span class="conflict-tag">⚠ COLLISION w/ Jake</span>
+            </div>
+            <div class="intent-children">
+              <div class="intent-child"><span>Product data model</span> <span class="check">✓ done</span></div>
+              <div class="intent-child"><span>Price calculation engine</span> <span class="blocked">✕ conflict</span></div>
+              <div class="intent-child"><span>Catalog CRUD API</span> <span class="in-progress">▶ building</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="intent-node">
+          <div class="intent-status drifting"></div>
+          <div class="intent-content">
+            <div class="intent-title">Delivery Tracking</div>
+            <div class="intent-meta">
+              <span class="owner">Marcus</span>
+              <span>5 agents active</span>
+              <span class="changed">↗ scope expanding</span>
+            </div>
+            <div class="intent-children">
+              <div class="intent-child"><span>Tracking API</span> <span class="check">✓ done</span></div>
+              <div class="intent-child"><span>SMS notifications</span> <span class="in-progress">▶ building</span></div>
+              <div class="intent-child"><span>Email templates</span> <span class="in-progress">▶ building</span></div>
+              <div class="intent-child"><span style="color: var(--accent-purple)">+ Real-time map view</span> <span style="color: var(--accent-purple)">NEW — not in plan</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="intent-node">
+          <div class="intent-status"></div>
+          <div class="intent-content">
+            <div class="intent-title">Auth & Admin</div>
+            <div class="intent-meta">
+              <span class="owner">Lina</span>
+              <span>3 agents active</span>
+            </div>
+            <div class="intent-children">
+              <div class="intent-child"><span>OAuth integration</span> <span class="check">✓ done</span></div>
+              <div class="intent-child"><span>Admin dashboard</span> <span class="in-progress">▶ building</span></div>
+              <div class="intent-child"><span>Role permissions</span> <span class="in-progress">▶ building</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="intent-node">
+          <div class="intent-status"></div>
+          <div class="intent-content">
+            <div class="intent-title">Frontend & Design System</div>
+            <div class="intent-meta">
+              <span class="owner">Dev</span>
+              <span>4 agents active</span>
+            </div>
+            <div class="intent-children">
+              <div class="intent-child"><span>Component library</span> <span class="check">✓ done</span></div>
+              <div class="intent-child"><span>Store pages</span> <span class="in-progress">▶ building</span></div>
+              <div class="intent-child"><span>Responsive layouts</span> <span class="in-progress">▶ building</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LIVE FEED -->
+      <div class="center-section">
+        <div class="panel-header">
+          Live Feed <span class="live-tag"><span class="dot"></span> streaming</span>
+        </div>
+
+        <div class="feed-item alert new-item-flash">
+          <div class="feed-time">now</div>
+          <div class="feed-icon collision">⚡</div>
+          <div class="feed-body">
+            <span class="tag-collision">COLLISION</span> — <strong>Jake:agent-4</strong> and <strong>Sarah:agent-3</strong> both writing to <strong>pricing.service.ts</strong> with conflicting trade-in deduction logic. Jake's agent uses cart-level deduction, Sarah's uses item-level.
+          </div>
+        </div>
+
+        <div class="feed-item warning">
+          <div class="feed-time">2m</div>
+          <div class="feed-icon drift">↗</div>
+          <div class="feed-body">
+            <span class="tag-drift">DRIFT</span> — <strong>Marcus:agent-6</strong> started building real-time map view for delivery tracking. This was <strong>not in sprint plan</strong>. Est. 4hr of agent time.
+          </div>
+        </div>
+
+        <div class="feed-item warning">
+          <div class="feed-time">5m</div>
+          <div class="feed-icon scope">+</div>
+          <div class="feed-body">
+            <span class="tag-new">SCOPE ADD</span> — <strong>Marcus</strong> approved map view as stretch goal. <strong>No other owners informed.</strong> Potential conflict with Dev's frontend routing.
+          </div>
+        </div>
+
+        <div class="feed-item">
+          <div class="feed-time">8m</div>
+          <div class="feed-icon done">✓</div>
+          <div class="feed-body">
+            <strong>Lina:agent-2</strong> completed OAuth integration. All tests passing. PR ready for review.
+          </div>
+        </div>
+
+        <div class="feed-item">
+          <div class="feed-time">11m</div>
+          <div class="feed-icon info">→</div>
+          <div class="feed-body">
+            <strong>Jake:agent-1</strong> finished cart API endpoints. Moving to payment integration. Dependencies met.
+          </div>
+        </div>
+
+        <div class="feed-item">
+          <div class="feed-time">14m</div>
+          <div class="feed-icon info">→</div>
+          <div class="feed-body">
+            <strong>Dev:agent-3</strong> building store product cards. Pulling from Sarah's catalog API schema — <strong>schema is stable, no conflicts</strong>.
+          </div>
+        </div>
+
+        <div class="feed-item">
+          <div class="feed-time">18m</div>
+          <div class="feed-icon done">✓</div>
+          <div class="feed-body">
+            <strong>Sarah:agent-5</strong> completed product data model migration. 3 dependents unblocked.
+          </div>
+        </div>
+
+        <div class="feed-item">
+          <div class="feed-time">22m</div>
+          <div class="feed-icon drift">↗</div>
+          <div class="feed-body">
+            <span class="tag-drift">DRIFT</span> — <strong>Jake:agent-5</strong> implementing retry logic on payment API that exceeds agreed error-handling approach. <strong>Minor deviation from tech spec.</strong>
+          </div>
+        </div>
+
+        <div class="feed-item">
+          <div class="feed-time">25m</div>
+          <div class="feed-icon info">→</div>
+          <div class="feed-body">
+            <strong>Marcus:agent-1</strong> SMS notification templates complete. Handing off to <strong>Marcus:agent-3</strong> for integration testing.
+          </div>
+        </div>
+
+        <div class="feed-item">
+          <div class="feed-time">31m</div>
+          <div class="feed-icon done">✓</div>
+          <div class="feed-body">
+            <strong>Dev:agent-1</strong> completed component library. All 24 components documented and tested.
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- BOTTOM: COLLISION DETAIL -->
+    <div class="center-bottom">
+      <div class="collision-banner">
+        <div class="collision-banner-left">
+          <div class="collision-icon">⚡</div>
+          <div class="collision-title">Active Collision: Trade-In Deduction Logic</div>
+        </div>
+        <div class="collision-actions">
+          <button class="btn btn-red">Pause Both Agents</button>
+          <button class="btn btn-ghost">Open Diff</button>
+          <button class="btn btn-ghost">Notify Team</button>
+        </div>
+      </div>
+      <div class="collision-detail">
+        <div class="collision-side">
+          <div class="collision-side-header">
+            <div class="collision-side-name">Jake's approach</div>
+            <div class="collision-side-agent">agent-4 · pricing.service.ts</div>
+          </div>
+          <div class="collision-code">
+            <span style="color: var(--text-muted)">// Deduct trade-in value from total cart</span><br>
+            cart.total = cart.subtotal - <span class="highlight">tradeIn.totalValue</span>;<br>
+            <span style="color: var(--text-muted)">// Single deduction at checkout</span><br>
+            <span class="highlight">applyCartLevelDiscount</span>(cart, tradeIn);
+          </div>
+          <div style="margin-top: 6px; font-size: 9px; color: var(--text-muted)">
+            Rationale: Simpler for v0, one deduction step
+          </div>
+        </div>
+        <div class="collision-vs">VS</div>
+        <div class="collision-side">
+          <div class="collision-side-header">
+            <div class="collision-side-name">Sarah's approach</div>
+            <div class="collision-side-agent">agent-3 · pricing.service.ts</div>
+          </div>
+          <div class="collision-code">
+            <span style="color: var(--text-muted)">// Distribute trade-in across items</span><br>
+            items.forEach(item => {<br>
+            &nbsp;&nbsp;item.price -= <span class="highlight">tradeIn.perItemValue</span>;<br>
+            });<br>
+            <span class="highlight">applyItemLevelDiscounts</span>(items, tradeIn);
+          </div>
+          <div style="margin-top: 6px; font-size: 9px; color: var(--text-muted)">
+            Rationale: Needed for per-item merchant settlement
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    
+    <!-- SPRINT PROGRESS -->
+    <div class="right-section">
+      <div class="panel-header">
+        Sprint Progress <span class="count">Day 4 of 7</span>
+      </div>
+
+      <div class="plan-item">
+        <div class="plan-row">
+          <div class="plan-name">Checkout Flow</div>
+          <div class="plan-pct behind">62%</div>
+        </div>
+        <div class="plan-bar"><div class="plan-fill yellow" style="width: 62%"></div></div>
+        <div class="plan-owners">Owner: <span>Jake</span> · blocked by collision</div>
+      </div>
+
+      <div class="plan-item">
+        <div class="plan-row">
+          <div class="plan-name">Catalog & Pricing</div>
+          <div class="plan-pct behind">58%</div>
+        </div>
+        <div class="plan-bar"><div class="plan-fill yellow" style="width: 58%"></div></div>
+        <div class="plan-owners">Owner: <span>Sarah</span> · blocked by collision</div>
+      </div>
+
+      <div class="plan-item">
+        <div class="plan-row">
+          <div class="plan-name">Delivery Tracking</div>
+          <div class="plan-pct on-track">78%</div>
+        </div>
+        <div class="plan-bar"><div class="plan-fill green" style="width: 78%"></div></div>
+        <div class="plan-owners">Owner: <span>Marcus</span> · scope expanding ⚠</div>
+      </div>
+
+      <div class="plan-item">
+        <div class="plan-row">
+          <div class="plan-name">Auth & Admin</div>
+          <div class="plan-pct on-track">85%</div>
+        </div>
+        <div class="plan-bar"><div class="plan-fill green" style="width: 85%"></div></div>
+        <div class="plan-owners">Owner: <span>Lina</span> · on track</div>
+      </div>
+
+      <div class="plan-item">
+        <div class="plan-row">
+          <div class="plan-name">Frontend & Design</div>
+          <div class="plan-pct on-track">71%</div>
+        </div>
+        <div class="plan-bar"><div class="plan-fill green" style="width: 71%"></div></div>
+        <div class="plan-owners">Owner: <span>Dev</span> · on track</div>
+      </div>
+    </div>
+
+    <!-- DEVIATION LOG -->
+    <div class="right-section">
+      <div class="panel-header">
+        Deviations from Plan <span class="count">4 active</span>
+      </div>
+
+      <div class="deviation">
+        <div class="deviation-header">
+          <div class="deviation-type dup">COLLISION</div>
+          <div class="deviation-time">now · critical</div>
+        </div>
+        <div class="deviation-body">
+          <strong>Jake</strong> and <strong>Sarah</strong> have conflicting implementations of trade-in deduction. Cart-level vs item-level approach. Requires human decision — architectural choice affects merchant settlement.
+        </div>
+      </div>
+
+      <div class="deviation">
+        <div class="deviation-header">
+          <div class="deviation-type scope">SCOPE ADD</div>
+          <div class="deviation-time">2m ago</div>
+        </div>
+        <div class="deviation-body">
+          <strong>Marcus</strong> added real-time map view to delivery tracking. Not in sprint plan. ~4hr agent work. May conflict with <strong>Dev's</strong> frontend routing structure.
+        </div>
+      </div>
+
+      <div class="deviation">
+        <div class="deviation-header">
+          <div class="deviation-type arch">ARCH DRIFT</div>
+          <div class="deviation-time">22m ago</div>
+        </div>
+        <div class="deviation-body">
+          <strong>Jake:agent-5</strong> implementing exponential backoff retry on payment API. Tech spec called for simple 3-attempt retry. Minor deviation, low risk.
+        </div>
+      </div>
+
+      <div class="deviation">
+        <div class="deviation-header">
+          <div class="deviation-type scope">SCOPE ADD</div>
+          <div class="deviation-time">1hr ago · resolved</div>
+        </div>
+        <div class="deviation-body" style="text-decoration: line-through; opacity: 0.5">
+          <strong>Lina:agent-4</strong> started building 2FA. Flagged, paused, and deferred to v0.4.
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

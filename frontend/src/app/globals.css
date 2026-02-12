@@ -37,6 +37,27 @@
     --node-error: 0 70% 55%;
     --node-compaction: 45 80% 55%;
     --node-default: 220 14% 20%;
+
+    /* Dashboard palette (Bloomberg terminal) */
+    --dash-bg: #0a0a0c;
+    --dash-surface: #111115;
+    --dash-surface-2: #18181d;
+    --dash-surface-3: #1e1e25;
+    --dash-border: #2a2a35;
+    --dash-border-light: #35354a;
+    --dash-text: #e0e0e8;
+    --dash-text-dim: #7a7a8e;
+    --dash-text-muted: #4a4a5e;
+    --dash-green: #00e87b;
+    --dash-green-dim: #00e87b33;
+    --dash-red: #ff4d6a;
+    --dash-red-dim: #ff4d6a33;
+    --dash-yellow: #ffc44d;
+    --dash-yellow-dim: #ffc44d33;
+    --dash-blue: #4d9fff;
+    --dash-blue-dim: #4d9fff33;
+    --dash-purple: #a855f7;
+    --dash-purple-dim: #a855f733;
   }
 }
 

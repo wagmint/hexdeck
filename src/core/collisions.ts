@@ -1,11 +1,52 @@
-import { resolve, basename } from "path";
+import { execSync } from "child_process";
+import { resolve } from "path";
 import type { ParsedSession, Collision, CollisionSeverity } from "../types/index.js";
 
 /**
+ * Get the set of dirty (uncommitted) file paths for a project directory.
+ * Uses `git status --porcelain` — returns absolute paths of modified/untracked files.
+ */
+function getDirtyFiles(projectPath: string): Set<string> {
+  try {
+    const output = execSync("git status --porcelain", {
+      cwd: projectPath,
+      encoding: "utf-8",
+      timeout: 5000,
+    });
+    const dirty = new Set<string>();
+    for (const line of output.split("\n")) {
+      if (!line.trim()) continue;
+      // porcelain format: "XY filename" or "XY filename -> renamed"
+      const filePart = line.slice(3).split(" -> ").pop()!.trim();
+      if (filePart) {
+        dirty.add(resolve(projectPath, filePart));
+      }
+    }
+    return dirty;
+  } catch {
+    // If git status fails, assume all files are dirty (safe fallback)
+    return new Set(["*"]);
+  }
+}
+
+/**
  * Detect file collisions across parsed sessions.
- * A collision occurs when 2+ sessions modify the same file.
+ * A collision occurs when 2+ sessions modify the same file that is still
+ * uncommitted (dirty) in the working tree. Committed files are considered resolved.
  */
 export function detectCollisions(sessions: ParsedSession[]): Collision[] {
+  // Get dirty files per project (cached per call)
+  const dirtyByProject = new Map<string, Set<string>>();
+  function isDirty(projectPath: string, absolutePath: string): boolean {
+    if (!dirtyByProject.has(projectPath)) {
+      dirtyByProject.set(projectPath, getDirtyFiles(projectPath));
+    }
+    const dirty = dirtyByProject.get(projectPath)!;
+    // Wildcard means git status failed — treat everything as dirty
+    if (dirty.has("*")) return true;
+    return dirty.has(absolutePath);
+  }
+
   // Build map: normalized file path → list of agents who touched it
   const fileAgents = new Map<string, {
     sessionId: string;
@@ -21,6 +62,10 @@ export function detectCollisions(sessions: ParsedSession[]): Collision[] {
     for (const turn of session.turns) {
       for (const file of turn.filesChanged) {
         const normalized = normalizePath(file, projectPath);
+
+        // Skip files that have been committed (no longer dirty)
+        if (!isDirty(projectPath, normalized)) continue;
+
         if (!fileAgents.has(normalized)) {
           fileAgents.set(normalized, []);
         }

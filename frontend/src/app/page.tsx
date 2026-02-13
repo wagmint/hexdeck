@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useDashboard } from "@/hooks/useDashboard";
 import type { Collision } from "@/lib/dashboard-types";
 import { TopBar } from "@/components/dashboard/TopBar";
@@ -9,6 +9,7 @@ import { AgentCard } from "@/components/dashboard/AgentCard";
 import { WorkstreamNode } from "@/components/dashboard/WorkstreamNode";
 import { FeedItem } from "@/components/dashboard/FeedItem";
 import { CollisionDetail } from "@/components/dashboard/CollisionDetail";
+import { PlanDetail } from "@/components/dashboard/PlanDetail";
 import { ProgressBar } from "@/components/dashboard/ProgressBar";
 import { DeviationItem } from "@/components/dashboard/DeviationItem";
 
@@ -17,6 +18,37 @@ export default function DashboardPage() {
   const [selectedCollision, setSelectedCollision] = useState<Collision | null>(null);
   const [seenEventIds, setSeenEventIds] = useState<Set<string>>(new Set());
   const isFirstRender = useRef(true);
+  const [bottomPanelHeight, setBottomPanelHeight] = useState(200);
+  const isDragging = useRef(false);
+  const dragStartY = useRef(0);
+  const dragStartHeight = useRef(0);
+
+  const onResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDragging.current = true;
+    dragStartY.current = e.clientY;
+    dragStartHeight.current = bottomPanelHeight;
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!isDragging.current) return;
+      const delta = dragStartY.current - ev.clientY;
+      const newHeight = Math.min(Math.max(dragStartHeight.current + delta, 80), 600);
+      setBottomPanelHeight(newHeight);
+    };
+
+    const onMouseUp = () => {
+      isDragging.current = false;
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+    document.body.style.cursor = "row-resize";
+    document.body.style.userSelect = "none";
+  }, [bottomPanelHeight]);
 
   // Track seen event IDs for flash-in animation
   useEffect(() => {
@@ -34,13 +66,6 @@ export default function DashboardPage() {
       return next;
     });
   }, [state]);
-
-  // Auto-select first collision when data loads
-  useEffect(() => {
-    if (state && state.collisions.length > 0 && !selectedCollision) {
-      setSelectedCollision(state.collisions[0]);
-    }
-  }, [state, selectedCollision]);
 
   if (loading && !state) {
     return (
@@ -67,8 +92,8 @@ export default function DashboardPage() {
       <TopBar summary={summary} />
 
       <div
-        className="flex-1 grid gap-px bg-dash-border"
-        style={{ gridTemplateColumns: "260px 1fr 320px" }}
+        className="flex-1 grid gap-px bg-dash-border min-h-0"
+        style={{ gridTemplateColumns: "260px 1fr 320px", gridTemplateRows: "1fr" }}
       >
         {/* LEFT PANEL: Workstream / Agent cards */}
         <div className="bg-dash-bg overflow-y-auto scrollbar-thin">
@@ -88,7 +113,7 @@ export default function DashboardPage() {
         </div>
 
         {/* CENTER PANEL */}
-        <div className="flex flex-col bg-dash-bg">
+        <div className="flex flex-col bg-dash-bg min-h-0">
           {/* Top half: Intent Map + Live Feed */}
           <div className="flex-1 grid grid-cols-2 gap-px bg-dash-border min-h-0">
             {/* Intent Map */}
@@ -142,9 +167,18 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Bottom: Collision Detail */}
-          <div className="h-[200px] shrink-0 border-t border-dash-border bg-dash-surface overflow-hidden">
-            <CollisionDetail collision={selectedCollision} />
+          {/* Bottom: Plan / Collision Detail (resizable) */}
+          <div className="shrink-0 bg-dash-surface overflow-hidden" style={{ height: bottomPanelHeight }}>
+            {/* Drag handle */}
+            <div
+              onMouseDown={onResizeStart}
+              className="h-1 cursor-row-resize border-t border-dash-border hover:bg-dash-blue/30 active:bg-dash-blue/50 transition-colors"
+            />
+            {selectedCollision ? (
+              <CollisionDetail collision={selectedCollision} onDismiss={() => setSelectedCollision(null)} />
+            ) : (
+              <PlanDetail workstreams={workstreams} />
+            )}
           </div>
         </div>
 

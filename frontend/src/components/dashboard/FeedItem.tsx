@@ -35,6 +35,18 @@ const typeConfig: Record<
     icon: "\u2192",
     iconClass: "bg-dash-blue-dim text-dash-blue",
   },
+  plan_started: {
+    icon: "\u270E",
+    iconClass: "bg-dash-purple-dim text-dash-purple",
+  },
+  plan_approved: {
+    icon: "\u2713",
+    iconClass: "bg-dash-blue-dim text-dash-blue",
+  },
+  task_completed: {
+    icon: "\u2713",
+    iconClass: "bg-dash-green-dim text-dash-green",
+  },
 };
 
 export function FeedItem({ event, isNew, onClick }: FeedItemProps) {

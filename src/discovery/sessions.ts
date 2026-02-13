@@ -125,17 +125,21 @@ export function getActiveSessions(): SessionInfo[] {
 
     if (!output.trim()) return [];
 
-    // Parse lsof output to extract cwd paths
-    const cwds = new Set<string>();
+    // Parse lsof output to count distinct PIDs per cwd
+    const cwdPids = new Map<string, Set<string>>();
     const lines = output.split("\n");
+    let currentPid: string | null = null;
     let isCwd = false;
     for (const line of lines) {
-      if (line === "fcwd") {
+      if (line.startsWith("p")) {
+        currentPid = line.slice(1);
+      } else if (line === "fcwd") {
         isCwd = true;
       } else if (isCwd && line.startsWith("n")) {
         const path = line.slice(1); // strip 'n' prefix
-        if (path.startsWith("/") && !path.includes(".app/")) {
-          cwds.add(path);
+        if (path.startsWith("/") && !path.includes(".app/") && currentPid) {
+          if (!cwdPids.has(path)) cwdPids.set(path, new Set());
+          cwdPids.get(path)!.add(currentPid);
         }
         isCwd = false;
       } else if (line.startsWith("f")) {
@@ -143,13 +147,13 @@ export function getActiveSessions(): SessionInfo[] {
       }
     }
 
-    if (cwds.size === 0) return [];
+    if (cwdPids.size === 0) return [];
 
-    // For each cwd, find the encoded project dir and get the most recent session
+    // For each cwd, take N most recent sessions where N = number of claude processes
     const sessions: SessionInfo[] = [];
     const seenProjects = new Set<string>();
 
-    for (const cwd of cwds) {
+    for (const [cwd, pids] of cwdPids) {
       const encoded = encodeProjectPath(cwd);
       if (seenProjects.has(encoded)) continue;
       seenProjects.add(encoded);
@@ -157,12 +161,14 @@ export function getActiveSessions(): SessionInfo[] {
       const projectDir = join(CLAUDE_PROJECTS_DIR, encoded);
       if (!existsSync(projectDir)) continue;
 
-      // Get the most recently modified JSONL file — that's the active session
       const projectSessions = listSessionsInDir(projectDir);
       if (projectSessions.length === 0) continue;
 
-      // Already sorted by modifiedAt desc — first one is most recent
-      sessions.push(projectSessions[0]);
+      // Take as many recent sessions as there are active claude processes
+      const count = Math.min(pids.size, projectSessions.length);
+      for (let i = 0; i < count; i++) {
+        sessions.push(projectSessions[i]);
+      }
     }
 
     return sessions.sort((a, b) => b.modifiedAt.getTime() - a.modifiedAt.getTime());

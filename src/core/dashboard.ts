@@ -8,6 +8,7 @@ import { buildFeed } from "./feed.js";
 import type {
   ParsedSession, SessionInfo, Agent, AgentStatus,
   Workstream, DashboardState, DashboardSummary,
+  SessionPlan, PlanStatus, PlanTask,
 } from "../types/index.js";
 
 // ─── In-memory parse cache ──────────────────────────────────────────────────
@@ -40,6 +41,68 @@ function getCachedOrParse(session: SessionInfo): ParsedSession {
   return parsed;
 }
 
+// ─── Plan builder ────────────────────────────────────────────────────────────
+
+function buildSessionPlan(parsed: ParsedSession): SessionPlan {
+  let status: PlanStatus = "none";
+  let markdown: string | null = null;
+  const tasks: PlanTask[] = [];
+  const taskStatuses = new Map<string, string>();
+
+  for (const turn of parsed.turns) {
+    if (turn.hasPlanStart) status = "drafting";
+    if (turn.hasPlanEnd && !turn.planRejected) {
+      status = "approved";
+      markdown = turn.planMarkdown;
+    }
+    if (turn.hasPlanEnd && turn.planRejected) {
+      status = "drafting";
+    }
+
+    // Cross-session plan: planMarkdown from JSONL envelope (user approved plan in this session)
+    if (turn.planMarkdown && !markdown) {
+      markdown = turn.planMarkdown;
+      if (status === "none") status = "implementing";
+    }
+
+    for (const tc of turn.taskCreates) {
+      if (tc.taskId) {
+        tasks.push({
+          id: tc.taskId,
+          subject: tc.subject,
+          description: tc.description,
+          status: "pending",
+        });
+      }
+    }
+
+    for (const tu of turn.taskUpdates) {
+      taskStatuses.set(tu.taskId, tu.status);
+    }
+  }
+
+  // Apply final statuses
+  for (const task of tasks) {
+    const latest = taskStatuses.get(task.id);
+    if (latest === "completed" || latest === "in_progress" || latest === "pending" || latest === "deleted") {
+      task.status = latest;
+    }
+  }
+
+  // If plan is approved and tasks are being worked on, it's implementing
+  if (status === "approved" && tasks.some(t => t.status === "in_progress" || t.status === "completed")) {
+    status = "implementing";
+  }
+
+  // If all tasks are completed, plan is done
+  const activeTasks = tasks.filter(t => t.status !== "deleted");
+  if (status === "implementing" && activeTasks.length > 0 && activeTasks.every(t => t.status === "completed")) {
+    status = "completed";
+  }
+
+  return { status, markdown, tasks: activeTasks };
+}
+
 // ─── Dashboard builder ──────────────────────────────────────────────────────
 
 export function buildDashboardState(): DashboardState {
@@ -47,24 +110,13 @@ export function buildDashboardState(): DashboardState {
   const activeSessions = getActiveSessions();
   const activeSessionIds = new Set(activeSessions.map(s => s.id));
 
-  // 2. Get recent sessions from all projects (for broader context)
-  // Include active sessions plus recent sessions from active projects
+  // 2. Only show currently active sessions — no stale padding
   const allSessions = new Map<string, SessionInfo>();
   for (const s of activeSessions) {
     allSessions.set(s.id, s);
   }
 
-  // Also pull recent sessions from projects that have active sessions
-  const activeProjects = new Set(activeSessions.map(s => s.projectPath));
   const projects = listProjects();
-  for (const project of projects) {
-    if (!activeProjects.has(project.decodedPath)) continue;
-    const sessions = listSessions(project.encodedName);
-    // Include up to 3 most recent sessions per active project
-    for (const s of sessions.slice(0, 3)) {
-      allSessions.set(s.id, s);
-    }
-  }
 
   // 3. Parse all sessions
   const parsedSessions: ParsedSession[] = [];
@@ -76,8 +128,9 @@ export function buildDashboardState(): DashboardState {
     }
   }
 
-  // 4. Detect collisions
-  const collisions = detectCollisions(parsedSessions);
+  // 4. Detect collisions (only between currently active sessions)
+  const activeParsed = parsedSessions.filter(p => activeSessionIds.has(p.session.id));
+  const collisions = detectCollisions(activeParsed);
   const collisionFileSet = new Set(collisions.flatMap(c => c.agents.map(a => a.sessionId)));
 
   // 5. Build agents
@@ -95,6 +148,7 @@ export function buildDashboardState(): DashboardState {
 
     const lastTurn = parsed.turns[parsed.turns.length - 1];
     const currentTask = lastTurn?.summary ?? "idle";
+    const plan = buildSessionPlan(parsed);
 
     agents.push({
       sessionId: parsed.session.id,
@@ -104,6 +158,7 @@ export function buildDashboardState(): DashboardState {
       filesChanged: parsed.stats.filesChanged,
       projectPath,
       isActive,
+      plan,
     });
   }
 
@@ -131,7 +186,19 @@ export function buildDashboardState(): DashboardState {
     }
 
     const hasCollision = projectAgents.some(a => a.status === "conflict");
-    const completionPct = totalTurns > 0 ? Math.round((completedTurns / totalTurns) * 100) : 0;
+
+    // Aggregate plans and tasks
+    const plans = projectAgents.map(a => a.plan).filter(p => p.status !== "none");
+    const planTasks = plans.flatMap(p => p.tasks);
+
+    // Progress: use task completion if tasks exist, otherwise fall back to commit ratio
+    let completionPct: number;
+    if (planTasks.length > 0) {
+      const done = planTasks.filter(t => t.status === "completed").length;
+      completionPct = Math.round((done / planTasks.length) * 100);
+    } else {
+      completionPct = totalTurns > 0 ? Math.round((completedTurns / totalTurns) * 100) : 0;
+    }
 
     // Find the encoded project name for this path
     const project = projects.find(p => p.decodedPath === projectPath);
@@ -148,6 +215,8 @@ export function buildDashboardState(): DashboardState {
       hasCollision,
       commits,
       errors,
+      plans,
+      planTasks,
     });
   }
 

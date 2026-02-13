@@ -1,5 +1,20 @@
 // ─── Dashboard Types ─────────────────────────────────────────────────────────
 
+export type PlanStatus = "drafting" | "approved" | "implementing" | "completed" | "none";
+
+export interface PlanTask {
+  id: string;
+  subject: string;
+  description: string;
+  status: "pending" | "in_progress" | "completed" | "deleted";
+}
+
+export interface SessionPlan {
+  status: PlanStatus;
+  markdown: string | null;
+  tasks: PlanTask[];
+}
+
 export type AgentStatus = "idle" | "busy" | "warning" | "conflict";
 
 export interface Agent {
@@ -17,6 +32,8 @@ export interface Agent {
   projectPath: string;
   /** Whether this agent is currently active (has running process) */
   isActive: boolean;
+  /** Plan state for this agent's session */
+  plan: SessionPlan;
 }
 
 export interface Workstream {
@@ -40,6 +57,10 @@ export interface Workstream {
   commits: number;
   /** Total errors across sessions */
   errors: number;
+  /** Plans from agent sessions in this workstream */
+  plans: SessionPlan[];
+  /** Flattened tasks across all sessions */
+  planTasks: PlanTask[];
 }
 
 export type CollisionSeverity = "warning" | "critical";
@@ -68,7 +89,10 @@ export type FeedEventType =
   | "completion"
   | "error"
   | "compaction"
-  | "start";
+  | "start"
+  | "plan_started"
+  | "plan_approved"
+  | "task_completed";
 
 export interface FeedEvent {
   /** Unique ID for deduplication */

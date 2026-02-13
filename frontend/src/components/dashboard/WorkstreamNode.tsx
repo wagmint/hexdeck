@@ -1,10 +1,24 @@
 "use client";
 
-import type { Workstream } from "@/lib/dashboard-types";
+import type { Workstream, PlanTask } from "@/lib/dashboard-types";
 
 interface WorkstreamNodeProps {
   workstream: Workstream;
 }
+
+const planStatusBadge: Record<string, { label: string; className: string }> = {
+  drafting: { label: "PLANNING", className: "text-dash-purple bg-dash-purple/10" },
+  approved: { label: "PLANNED", className: "text-dash-blue bg-dash-blue/10" },
+  implementing: { label: "BUILDING", className: "text-dash-green bg-dash-green/10" },
+  completed: { label: "DONE", className: "text-dash-text-muted bg-dash-surface-2" },
+};
+
+const taskStatusIcon: Record<PlanTask["status"], { char: string; className: string }> = {
+  completed: { char: "\u2713", className: "text-dash-green" },
+  in_progress: { char: "\u2192", className: "text-dash-blue animate-pulse" },
+  pending: { char: "\u2013", className: "text-dash-text-muted" },
+  deleted: { char: "\u2013", className: "text-dash-text-muted" },
+};
 
 export function WorkstreamNode({ workstream }: WorkstreamNodeProps) {
   const statusColor = workstream.hasCollision
@@ -13,12 +27,22 @@ export function WorkstreamNode({ workstream }: WorkstreamNodeProps) {
       ? "bg-dash-yellow"
       : "bg-dash-green";
 
+  const activePlan = workstream.plans.find(p => p.status !== "none");
+  const badge = activePlan ? planStatusBadge[activePlan.status] : null;
+
   return (
     <div className="flex gap-2.5 px-3.5 py-2 border-b border-dash-border items-start">
       <div className={`w-[3px] min-h-[32px] rounded-sm ${statusColor} mt-0.5 shrink-0`} />
       <div className="flex-1 min-w-0">
-        <div className="font-display font-semibold text-[11px] mb-0.5">
-          {workstream.name}
+        <div className="flex items-center gap-1.5 mb-0.5">
+          <span className="font-display font-semibold text-[11px]">
+            {workstream.name}
+          </span>
+          {badge && (
+            <span className={`text-[8px] font-semibold px-1 py-px rounded ${badge.className}`}>
+              {badge.label}
+            </span>
+          )}
         </div>
         <div className="flex gap-2.5 text-[9px] text-dash-text-muted">
           <span className="text-dash-blue">
@@ -34,23 +58,52 @@ export function WorkstreamNode({ workstream }: WorkstreamNodeProps) {
             <span className="text-dash-red font-semibold">COLLISION</span>
           )}
         </div>
-        {workstream.agents.some((a) => a.isActive) && (
-          <div className="mt-1 pl-2 border-l border-dash-border">
-            {workstream.agents
-              .filter((a) => a.isActive)
-              .slice(0, 4)
-              .map((agent) => (
+
+        {/* Plan tasks checklist */}
+        {workstream.planTasks.length > 0 ? (
+          <div className="mt-1.5 pl-1 space-y-0.5">
+            {workstream.planTasks.slice(0, 8).map((task, idx) => {
+              const icon = taskStatusIcon[task.status];
+              return (
                 <div
-                  key={agent.sessionId}
-                  className="flex items-center justify-between py-0.5 text-[10px] text-dash-text-dim"
+                  key={`${task.id}-${idx}`}
+                  className="flex items-center gap-1.5 text-[10px] text-dash-text-dim"
                 >
-                  <span className="truncate">{agent.currentTask}</span>
-                  <span className="text-dash-blue shrink-0 ml-2">
-                    {agent.label}
+                  <span className={`text-[9px] w-3 text-center shrink-0 ${icon.className}`}>
+                    {icon.char}
+                  </span>
+                  <span className={`truncate ${task.status === "completed" ? "line-through opacity-50" : ""}`}>
+                    {task.subject}
                   </span>
                 </div>
-              ))}
+              );
+            })}
+            {workstream.planTasks.length > 8 && (
+              <div className="text-[9px] text-dash-text-muted pl-4">
+                +{workstream.planTasks.length - 8} more
+              </div>
+            )}
           </div>
+        ) : (
+          /* Fall back to active agent tasks */
+          workstream.agents.some((a) => a.isActive) && (
+            <div className="mt-1 pl-2 border-l border-dash-border">
+              {workstream.agents
+                .filter((a) => a.isActive)
+                .slice(0, 4)
+                .map((agent) => (
+                  <div
+                    key={agent.sessionId}
+                    className="flex items-center justify-between py-0.5 text-[10px] text-dash-text-dim"
+                  >
+                    <span className="truncate">{agent.currentTask}</span>
+                    <span className="text-dash-blue shrink-0 ml-2">
+                      {agent.label}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          )
         )}
       </div>
     </div>

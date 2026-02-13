@@ -2,6 +2,19 @@ import { readFileSync } from "fs";
 import type { SessionEvent, Message, ContentBlock } from "../types/index.js";
 
 /**
+ * Extract planContent from the JSONL envelope.
+ * Claude Code stores the approved plan markdown as `planContent` on the user message envelope.
+ */
+function extractPlanContent(raw: unknown): string | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  if (typeof obj.planContent === "string" && obj.planContent.length > 0) {
+    return obj.planContent;
+  }
+  return null;
+}
+
+/**
  * Parse a Claude Code session JSONL file into a stream of events.
  * Each line in the JSONL is a message event (user or assistant).
  */
@@ -16,7 +29,11 @@ export function parseSessionFile(filePath: string): SessionEvent[] {
       const parsed = JSON.parse(lines[i]);
       const message = normalizeMessage(parsed);
       if (message) {
-        events.push({ line: i, message });
+        const event: SessionEvent = { line: i, message };
+        // Preserve planContent from JSONL envelope (set when user approves ExitPlanMode)
+        const planContent = extractPlanContent(parsed);
+        if (planContent) event.planContent = planContent;
+        events.push(event);
       }
     } catch {
       // Skip malformed lines
@@ -111,16 +128,38 @@ export function getToolCalls(
 
 /**
  * Get all tool_result blocks from a message.
+ * Normalizes content to string (some JSONL has content as array of text blocks).
  */
 export function getToolResults(
   message: Message
-): Array<{ type: "tool_result"; tool_use_id: string; content: string }> {
+): Array<{ type: "tool_result"; tool_use_id: string; content: string; is_error?: boolean }> {
   if (typeof message.content === "string") return [];
 
-  return message.content.filter(
-    (b): b is { type: "tool_result"; tool_use_id: string; content: string } =>
-      b.type === "tool_result"
-  );
+  return message.content
+    .filter((b) => b.type === "tool_result")
+    .map((b) => {
+      const raw = b as unknown as Record<string, unknown>;
+      let content: string;
+      if (typeof raw.content === "string") {
+        content = raw.content;
+      } else if (Array.isArray(raw.content)) {
+        content = (raw.content as Array<Record<string, unknown>>)
+          .filter((c) => c.type === "text" && typeof c.text === "string")
+          .map((c) => c.text as string)
+          .join("\n");
+      } else {
+        content = String(raw.content ?? "");
+      }
+      const result: { type: "tool_result"; tool_use_id: string; content: string; is_error?: boolean } = {
+        type: "tool_result" as const,
+        tool_use_id: String(raw.tool_use_id ?? ""),
+        content,
+      };
+      if (typeof raw.is_error === "boolean") {
+        result.is_error = raw.is_error;
+      }
+      return result;
+    });
 }
 
 /**

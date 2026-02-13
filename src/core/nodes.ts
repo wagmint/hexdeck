@@ -68,6 +68,19 @@ function buildSingleTurn(events: SessionEvent[], index: number): TurnNode | null
   let assistantText = "";
   let thinkingText = "";
 
+  // Plan mode & task tracking
+  let hasPlanStart = false;
+  let hasPlanEnd = false;
+  let planMarkdown: string | null = null;
+  let planRejected = false;
+  const taskCreates: { taskId: string; subject: string; description: string }[] = [];
+  const taskUpdates: { taskId: string; status: string }[] = [];
+
+  // Check first event for planContent from JSONL envelope (set when user approves a plan)
+  if (events[0]?.planContent) {
+    planMarkdown = events[0].planContent;
+  }
+
   // Track error→fix cycles for corrections
   const errorResults: Array<{ toolId: string; error: string }> = [];
   const toolCallSequence: Array<{ name: string; input: Record<string, unknown>; id: string }> = [];
@@ -77,12 +90,26 @@ function buildSingleTurn(events: SessionEvent[], index: number): TurnNode | null
     if (event.message.role === "user") {
       const results = getToolResults(event.message);
       for (const result of results) {
-        if (isErrorResult(result.content)) {
+        // Use explicit is_error field when available; fall back to content heuristic
+        const isError = result.is_error === true ||
+          (result.is_error === undefined && isErrorResult(result.content));
+        if (isError) {
           errorCount++;
           errorResults.push({
             toolId: result.tool_use_id,
             error: extractErrorSummary(result.content),
           });
+        }
+        // Extract TaskCreate ID from "Task #N created successfully"
+        const createMatch = result.content.match(/Task #(\d+) created successfully/);
+        if (createMatch) {
+          const pending = taskCreates.find(t => !t.taskId);
+          if (pending) pending.taskId = createMatch[1];
+        }
+        // Check if ExitPlanMode was rejected
+        if (result.content.includes("tool use was rejected") && hasPlanEnd) {
+          planRejected = true;
+          planMarkdown = null;
         }
       }
       continue;
@@ -158,6 +185,34 @@ function buildSingleTurn(events: SessionEvent[], index: number): TurnNode | null
           }
         }
       }
+
+      // Detect plan mode
+      if (call.name === "EnterPlanMode") {
+        hasPlanStart = true;
+      }
+      if (call.name === "ExitPlanMode") {
+        hasPlanEnd = true;
+        if (typeof call.input.plan === "string") {
+          planMarkdown = call.input.plan;
+        }
+      }
+
+      // Detect task tracking
+      if (call.name === "TaskCreate") {
+        const input = call.input as Record<string, unknown>;
+        taskCreates.push({
+          taskId: "",
+          subject: String(input.subject ?? ""),
+          description: String(input.description ?? ""),
+        });
+      }
+      if (call.name === "TaskUpdate") {
+        const input = call.input as Record<string, unknown>;
+        taskUpdates.push({
+          taskId: String(input.taskId ?? ""),
+          status: String(input.status ?? ""),
+        });
+      }
     }
 
     // Check for compaction
@@ -207,6 +262,12 @@ function buildSingleTurn(events: SessionEvent[], index: number): TurnNode | null
     errorCount,
     hasCompaction: turnHasCompaction,
     compactionText,
+    hasPlanStart,
+    hasPlanEnd,
+    planMarkdown,
+    planRejected,
+    taskCreates,
+    taskUpdates,
     events,
     startLine: events[0].line,
     endLine: events[events.length - 1].line,
@@ -781,12 +842,17 @@ function extractCommitMessage(cmd: string): string | null {
 
 function isErrorResult(content: string): boolean {
   if (typeof content !== "string") return false;
+  // Long results (>2000 chars) are likely code/docs that mention errors, not actual errors.
+  // Real tool errors are typically short.
+  if (content.length > 2000) return false;
+  // Check first few lines for error patterns (not deep inside content)
+  const head = content.slice(0, 500);
   return (
-    content.includes("Error:") ||
-    content.includes("error:") ||
-    content.includes("ENOENT") ||
-    content.includes("EACCES") ||
-    content.includes("Exit code") ||
-    content.includes("fatal:")
+    head.includes("Error:") ||
+    head.includes("error:") ||
+    head.includes("ENOENT") ||
+    head.includes("EACCES") ||
+    head.includes("Exit code") ||
+    head.includes("fatal:")
   );
 }

@@ -8,16 +8,26 @@ interface ProgressBarProps {
 
 export function ProgressBar({ workstream }: ProgressBarProps) {
   const pct = workstream.completionPct;
-  const colorClass = workstream.hasCollision
-    ? "bg-dash-red"
-    : workstream.errors > 0
-      ? "bg-dash-yellow"
-      : "bg-dash-green";
-  const pctColorClass = workstream.hasCollision
-    ? "text-dash-red"
-    : workstream.errors > 0
-      ? "text-dash-yellow"
-      : "text-dash-green";
+  const isComplete = pct === 100;
+  const colorClass = isComplete
+    ? "bg-dash-green"
+    : workstream.hasCollision
+      ? "bg-dash-red"
+      : workstream.errors > 0
+        ? "bg-dash-yellow"
+        : "bg-dash-green";
+  const pctColorClass = isComplete
+    ? "text-dash-green"
+    : workstream.hasCollision
+      ? "text-dash-red"
+      : workstream.errors > 0
+        ? "text-dash-yellow"
+        : "text-dash-green";
+
+  const hasTasks = workstream.planTasks.length > 0;
+  const tasksDone = hasTasks
+    ? workstream.planTasks.filter(t => t.status === "completed").length
+    : 0;
 
   return (
     <div className="px-3.5 py-2 border-b border-dash-border">
@@ -36,8 +46,14 @@ export function ProgressBar({ workstream }: ProgressBarProps) {
         />
       </div>
       <div className="text-[9px] text-dash-text-muted mt-1">
-        {workstream.agents.filter((a) => a.isActive).length} active agent
-        {workstream.agents.filter((a) => a.isActive).length !== 1 ? "s" : ""}
+        {hasTasks ? (
+          <span>{tasksDone}/{workstream.planTasks.length} tasks</span>
+        ) : (
+          <span>
+            {workstream.agents.filter((a) => a.isActive).length} active agent
+            {workstream.agents.filter((a) => a.isActive).length !== 1 ? "s" : ""}
+          </span>
+        )}
         {workstream.hasCollision && (
           <span className="text-dash-red"> · collision</span>
         )}

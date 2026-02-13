@@ -4,9 +4,10 @@ import type { Collision } from "@/lib/dashboard-types";
 
 interface CollisionDetailProps {
   collision: Collision | null;
+  onDismiss?: () => void;
 }
 
-export function CollisionDetail({ collision }: CollisionDetailProps) {
+export function CollisionDetail({ collision, onDismiss }: CollisionDetailProps) {
   if (!collision) {
     return (
       <div className="h-full flex items-center justify-center text-dash-text-muted text-xs">
@@ -30,15 +31,25 @@ export function CollisionDetail({ collision }: CollisionDetailProps) {
             Collision: {fileName}
           </span>
         </div>
-        <span
-          className={`text-[8px] font-bold tracking-widest uppercase px-1.5 py-0.5 rounded ${
-            collision.severity === "critical"
-              ? "bg-dash-red-dim text-dash-red"
-              : "bg-dash-yellow-dim text-dash-yellow"
-          }`}
-        >
-          {collision.severity}
-        </span>
+        <div className="flex items-center gap-2">
+          <span
+            className={`text-[8px] font-bold tracking-widest uppercase px-1.5 py-0.5 rounded ${
+              collision.severity === "critical"
+                ? "bg-dash-red-dim text-dash-red"
+                : "bg-dash-yellow-dim text-dash-yellow"
+            }`}
+          >
+            {collision.severity}
+          </span>
+          {onDismiss && (
+            <button
+              onClick={onDismiss}
+              className="w-5 h-5 flex items-center justify-center rounded text-dash-text-muted hover:text-dash-text hover:bg-dash-surface-2 transition-colors text-xs"
+            >
+              &times;
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Side-by-side */}

@@ -73,6 +73,45 @@ export function buildFeed(
           message: "Context compacted",
         });
       }
+
+      if (turn.hasPlanStart) {
+        events.push({
+          id: `plan-start-${sessionId}-${turn.index}`,
+          type: "plan_started",
+          timestamp,
+          agentLabel: label,
+          sessionId,
+          projectPath,
+          message: "Entered plan mode",
+        });
+      }
+
+      if (turn.hasPlanEnd && !turn.planRejected) {
+        events.push({
+          id: `plan-approved-${sessionId}-${turn.index}`,
+          type: "plan_approved",
+          timestamp,
+          agentLabel: label,
+          sessionId,
+          projectPath,
+          message: `Plan approved${turn.planMarkdown ? ": " + extractPlanTitle(turn.planMarkdown) : ""}`,
+        });
+      }
+
+      for (const tu of turn.taskUpdates) {
+        if (tu.status === "completed") {
+          const task = findTaskSubject(session, tu.taskId);
+          events.push({
+            id: `task-done-${sessionId}-${tu.taskId}-${turn.index}`,
+            type: "task_completed",
+            timestamp,
+            agentLabel: label,
+            sessionId,
+            projectPath,
+            message: `Completed: ${task ?? `task #${tu.taskId}`}`,
+          });
+        }
+      }
     }
   }
 
@@ -120,4 +159,17 @@ function projectName(projectPath: string): string {
 function fileName(filePath: string): string {
   const parts = filePath.split("/");
   return parts[parts.length - 1] || filePath;
+}
+
+function extractPlanTitle(markdown: string): string {
+  const match = markdown.match(/^#\s+(.+)/m);
+  return match ? match[1].slice(0, 60) : "implementation plan";
+}
+
+function findTaskSubject(session: ParsedSession, taskId: string): string | null {
+  for (const turn of session.turns) {
+    const tc = turn.taskCreates.find(t => t.taskId === taskId);
+    if (tc) return tc.subject;
+  }
+  return null;
 }

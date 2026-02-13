@@ -1,4 +1,5 @@
 export type {
+  PlanStatus, PlanTask, SessionPlan,
   AgentStatus, Agent, Workstream, CollisionSeverity, Collision,
   FeedEventType, FeedEvent, DashboardSummary, DashboardState,
 } from "./dashboard.js";
@@ -50,6 +51,8 @@ export interface SessionEvent {
   line: number;
   /** The parsed message */
   message: Message;
+  /** Plan content from ExitPlanMode approval (on the JSONL envelope) */
+  planContent?: string;
 }
 
 // ─── Session Discovery Types ─────────────────────────────────────────────────
@@ -293,6 +296,16 @@ export interface TurnNode {
   errorCount: number;
   hasCompaction: boolean;
   compactionText: string | null;
+
+  /** Plan mode */
+  hasPlanStart: boolean;
+  hasPlanEnd: boolean;
+  planMarkdown: string | null;
+  planRejected: boolean;
+
+  /** Task tracking */
+  taskCreates: { taskId: string; subject: string; description: string }[];
+  taskUpdates: { taskId: string; status: string }[];
 
   /** Raw events for this turn (for drill-down) */
   events: SessionEvent[];

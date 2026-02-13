@@ -1,6 +1,6 @@
 "use client";
 
-import type { Workstream } from "@/lib/dashboard-types";
+import type { Workstream, PlanStatus } from "@/lib/dashboard-types";
 import { AgentPip } from "./AgentPip";
 import { useRouter } from "next/navigation";
 
@@ -8,10 +8,26 @@ interface AgentCardProps {
   workstream: Workstream;
 }
 
+const planBadges: Partial<Record<PlanStatus, { label: string; className: string }>> = {
+  drafting: { label: "PLANNING", className: "text-dash-purple bg-dash-purple/10" },
+  approved: { label: "PLANNED", className: "text-dash-blue bg-dash-blue/10" },
+  implementing: { label: "BUILDING", className: "text-dash-green bg-dash-green/10" },
+};
+
 export function AgentCard({ workstream }: AgentCardProps) {
   const router = useRouter();
   const hasActive = workstream.agents.some((a) => a.isActive);
   const focusAgent = workstream.agents.find((a) => a.isActive);
+
+  // Find the most advanced plan status across agents
+  const activePlan = workstream.plans.find(p => p.status !== "none");
+  const badge = activePlan ? planBadges[activePlan.status] : null;
+
+  // Task progress
+  const hasTasks = workstream.planTasks.length > 0;
+  const tasksDone = hasTasks
+    ? workstream.planTasks.filter(t => t.status === "completed").length
+    : 0;
 
   return (
     <div
@@ -20,9 +36,16 @@ export function AgentCard({ workstream }: AgentCardProps) {
       }`}
     >
       <div className="flex items-center justify-between mb-1">
-        <span className="font-display font-semibold text-xs text-dash-text">
-          {workstream.name}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="font-display font-semibold text-xs text-dash-text">
+            {workstream.name}
+          </span>
+          {badge && (
+            <span className={`text-[8px] font-semibold px-1 py-px rounded ${badge.className}`}>
+              {badge.label}
+            </span>
+          )}
+        </div>
         <span className="text-[9px] text-dash-text-muted uppercase tracking-wide">
           {workstream.agents.length} agent{workstream.agents.length !== 1 ? "s" : ""}
         </span>
@@ -33,6 +56,11 @@ export function AgentCard({ workstream }: AgentCardProps) {
           <span className="text-dash-blue font-medium">
             {focusAgent.currentTask}
           </span>
+        </div>
+      )}
+      {hasTasks && (
+        <div className="text-[9px] text-dash-text-muted mt-0.5">
+          {tasksDone}/{workstream.planTasks.length} tasks done
         </div>
       )}
       <div className="flex items-center gap-0.5 mt-1.5">

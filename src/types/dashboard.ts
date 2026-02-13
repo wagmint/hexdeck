@@ -86,6 +86,7 @@ export interface Collision {
 
 export type FeedEventType =
   | "collision"
+  | "collision_resolved"
   | "completion"
   | "error"
   | "compaction"

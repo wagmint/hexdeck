@@ -18,6 +18,11 @@ const typeConfig: Record<
     iconClass: "bg-dash-red-dim text-dash-red",
     rowClass: "bg-dash-red-dim border-l-2 border-l-dash-red",
   },
+  collision_resolved: {
+    icon: "\u2713",
+    iconClass: "bg-dash-green-dim text-dash-green",
+    rowClass: "border-l-2 border-l-dash-green",
+  },
   error: {
     icon: "\u2716",
     iconClass: "bg-dash-yellow-dim text-dash-yellow",

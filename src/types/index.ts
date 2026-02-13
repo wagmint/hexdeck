@@ -51,6 +51,8 @@ export interface SessionEvent {
   line: number;
   /** The parsed message */
   message: Message;
+  /** Real timestamp from the JSONL envelope (ISO 8601) */
+  timestamp?: Date;
   /** Plan content from ExitPlanMode approval (on the JSONL envelope) */
   planContent?: string;
 }
@@ -261,6 +263,9 @@ export interface TurnSections {
 export interface TurnNode {
   id: string;
   index: number;
+
+  /** Real timestamp from the first event in this turn */
+  timestamp: Date;
 
   /** Short scannable summary of the user's instruction */
   summary: string;

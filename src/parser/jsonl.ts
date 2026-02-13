@@ -2,6 +2,20 @@ import { readFileSync } from "fs";
 import type { SessionEvent, Message, ContentBlock } from "../types/index.js";
 
 /**
+ * Extract timestamp from the JSONL envelope.
+ * Every Claude Code JSONL line has a top-level `timestamp` field (ISO 8601).
+ */
+function extractTimestamp(raw: unknown): Date | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  if (typeof obj.timestamp === "string") {
+    const d = new Date(obj.timestamp);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return null;
+}
+
+/**
  * Extract planContent from the JSONL envelope.
  * Claude Code stores the approved plan markdown as `planContent` on the user message envelope.
  */
@@ -30,6 +44,9 @@ export function parseSessionFile(filePath: string): SessionEvent[] {
       const message = normalizeMessage(parsed);
       if (message) {
         const event: SessionEvent = { line: i, message };
+        // Extract real timestamp from JSONL envelope
+        const ts = extractTimestamp(parsed);
+        if (ts) event.timestamp = ts;
         // Preserve planContent from JSONL envelope (set when user approves ExitPlanMode)
         const planContent = extractPlanContent(parsed);
         if (planContent) event.planContent = planContent;

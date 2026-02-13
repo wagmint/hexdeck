@@ -243,9 +243,13 @@ function buildSingleTurn(events: SessionEvent[], index: number): TurnNode | null
     turnHasCompaction,
   });
 
+  // Use the first event's real timestamp, fall back to epoch
+  const timestamp = events[0]?.timestamp ?? new Date(0);
+
   return {
     id: `turn-${index}`,
     index,
+    timestamp,
     summary,
     category,
     userInstruction: userInstruction.slice(0, 500),

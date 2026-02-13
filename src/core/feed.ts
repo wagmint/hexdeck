@@ -25,7 +25,6 @@ export function buildFeed(
     const sessionId = session.session.id;
     const projectPath = session.session.projectPath;
     const label = sessionId.slice(0, 8);
-    const totalTurns = session.turns.length;
 
     addEvent({
       id: `start-${sessionId}`,
@@ -39,12 +38,7 @@ export function buildFeed(
 
     for (let i = 0; i < session.turns.length; i++) {
       const turn = session.turns[i];
-      const timestamp = interpolateTimestamp(
-        session.session.createdAt,
-        session.session.modifiedAt,
-        i,
-        totalTurns
-      );
+      const timestamp = turn.timestamp;
 
       if (turn.hasCommit) {
         addEvent({
@@ -193,19 +187,6 @@ function addEvent(event: FeedEvent): void {
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-
-function interpolateTimestamp(
-  createdAt: Date,
-  modifiedAt: Date,
-  turnIndex: number,
-  totalTurns: number
-): Date {
-  if (totalTurns <= 1) return new Date(modifiedAt);
-  const start = new Date(createdAt).getTime();
-  const end = new Date(modifiedAt).getTime();
-  const fraction = turnIndex / (totalTurns - 1);
-  return new Date(start + fraction * (end - start));
-}
 
 function projectName(projectPath: string): string {
   const parts = projectPath.split("/").filter(Boolean);

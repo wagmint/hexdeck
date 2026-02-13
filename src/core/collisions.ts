@@ -59,7 +59,11 @@ export function detectCollisions(sessions: ParsedSession[]): Collision[] {
     const label = session.session.id.slice(0, 8);
     const projectPath = session.session.projectPath;
 
-    for (const turn of session.turns) {
+    // Only consider turns after the session's last commit (commit = resolution boundary)
+    const lastCommitIdx = findLastCommitIndex(session);
+    const relevantTurns = session.turns.slice(lastCommitIdx + 1);
+
+    for (const turn of relevantTurns) {
       for (const file of turn.filesChanged) {
         const normalized = normalizePath(file, projectPath);
 
@@ -117,6 +121,17 @@ export function detectCollisions(sessions: ParsedSession[]): Collision[] {
     if (a.severity !== b.severity) return a.severity === "critical" ? -1 : 1;
     return a.filePath.localeCompare(b.filePath);
   });
+}
+
+/**
+ * Find the index of the last turn that has a commit.
+ * Returns -1 if no commits found (all turns are relevant).
+ */
+function findLastCommitIndex(session: ParsedSession): number {
+  for (let i = session.turns.length - 1; i >= 0; i--) {
+    if (session.turns[i].hasCommit) return i;
+  }
+  return -1;
 }
 
 function normalizePath(filePath: string, projectPath: string): string {

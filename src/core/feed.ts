@@ -19,12 +19,13 @@ const activeCollisions = new Map<string, { collision: Collision; detectedAt: Dat
 export function buildFeed(
   sessions: ParsedSession[],
   collisions: Collision[],
+  labelMap?: Map<string, string>,
 ): FeedEvent[] {
   // 1. Derive turn-based events — stable IDs mean they're only added once
   for (const session of sessions) {
     const sessionId = session.session.id;
     const projectPath = session.session.projectPath;
-    const label = sessionId.slice(0, 8);
+    const label = labelMap?.get(sessionId) ?? sessionId.slice(0, 8);
 
     addEvent({
       id: `start-${sessionId}`,

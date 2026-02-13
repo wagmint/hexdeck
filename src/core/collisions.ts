@@ -29,22 +29,60 @@ function getDirtyFiles(projectPath: string): Set<string> {
   }
 }
 
+/** Recency window fallback: only file edits within this many minutes count */
+const RECENCY_MINUTES = 15;
+
+/**
+ * Get the timestamp of the most recent commit in a git repo.
+ * Returns epoch (0) if no commits or git fails.
+ */
+function getLastCommitTime(projectPath: string): number {
+  try {
+    const output = execSync("git log -1 --format=%aI", {
+      cwd: projectPath,
+      encoding: "utf-8",
+      timeout: 5000,
+    });
+    const ts = new Date(output.trim()).getTime();
+    return isNaN(ts) ? 0 : ts;
+  } catch {
+    return 0;
+  }
+}
+
 /**
  * Detect file collisions across parsed sessions.
- * A collision occurs when 2+ sessions modify the same file that is still
- * uncommitted (dirty) in the working tree. Committed files are considered resolved.
+ * A collision occurs when 2+ sessions recently modify the same file that is still
+ * uncommitted (dirty) in the working tree.
+ *
+ * Two filters on each turn:
+ *   1. Recency floor — max(last git commit time, now - RECENCY_MINUTES).
+ *      Any commit (from any session or manual) resets the slate globally.
+ *   2. Git dirty check — only files that are currently uncommitted
  */
-export function detectCollisions(sessions: ParsedSession[]): Collision[] {
-  // Get dirty files per project (cached per call)
+export function detectCollisions(sessions: ParsedSession[], labelMap?: Map<string, string>): Collision[] {
+  const now = Date.now();
+  const recencyCutoff = now - RECENCY_MINUTES * 60 * 1000;
+
+  // Per-project caches
   const dirtyByProject = new Map<string, Set<string>>();
+  const commitTimeByProject = new Map<string, number>();
+
   function isDirty(projectPath: string, absolutePath: string): boolean {
     if (!dirtyByProject.has(projectPath)) {
       dirtyByProject.set(projectPath, getDirtyFiles(projectPath));
     }
     const dirty = dirtyByProject.get(projectPath)!;
-    // Wildcard means git status failed — treat everything as dirty
     if (dirty.has("*")) return true;
     return dirty.has(absolutePath);
+  }
+
+  function getFloor(projectPath: string): number {
+    if (!commitTimeByProject.has(projectPath)) {
+      commitTimeByProject.set(projectPath, getLastCommitTime(projectPath));
+    }
+    // Use whichever is more recent: last commit or recency window
+    return Math.max(commitTimeByProject.get(projectPath)!, recencyCutoff);
   }
 
   // Build map: normalized file path → list of agents who touched it
@@ -56,14 +94,14 @@ export function detectCollisions(sessions: ParsedSession[]): Collision[] {
   }[]>();
 
   for (const session of sessions) {
-    const label = session.session.id.slice(0, 8);
+    const label = labelMap?.get(session.session.id) ?? session.session.id.slice(0, 8);
     const projectPath = session.session.projectPath;
+    const floor = getFloor(projectPath);
 
-    // Only consider turns after the session's last commit (commit = resolution boundary)
-    const lastCommitIdx = findLastCommitIndex(session);
-    const relevantTurns = session.turns.slice(lastCommitIdx + 1);
+    for (const turn of session.turns) {
+      // Skip turns before the recency floor (last commit or time window)
+      if (turn.timestamp.getTime() < floor) continue;
 
-    for (const turn of relevantTurns) {
       for (const file of turn.filesChanged) {
         const normalized = normalizePath(file, projectPath);
 
@@ -121,17 +159,6 @@ export function detectCollisions(sessions: ParsedSession[]): Collision[] {
     if (a.severity !== b.severity) return a.severity === "critical" ? -1 : 1;
     return a.filePath.localeCompare(b.filePath);
   });
-}
-
-/**
- * Find the index of the last turn that has a commit.
- * Returns -1 if no commits found (all turns are relevant).
- */
-function findLastCommitIndex(session: ParsedSession): number {
-  for (let i = session.turns.length - 1; i >= 0; i--) {
-    if (session.turns[i].hasCommit) return i;
-  }
-  return -1;
 }
 
 function normalizePath(filePath: string, projectPath: string): string {

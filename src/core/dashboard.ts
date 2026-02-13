@@ -19,6 +19,51 @@ interface CacheEntry {
 }
 
 const parseCache = new Map<string, CacheEntry>();
+const AGENT_NAMES = [
+  "fox", "owl", "bear", "wolf", "hawk", "lynx", "elk", "ram",
+  "orca", "puma", "wren", "crow", "hare", "moth", "wasp", "newt",
+  "toad", "crab", "dove", "finch", "goat", "ibis", "kite", "lark",
+  "mink", "pike", "seal", "tern", "vole", "yak",
+];
+
+function hashToIndex(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) {
+    h = ((h << 5) - h + id.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+/** Assign unique short names per dashboard cycle. Same ID → same name. */
+function buildLabelMap(sessionIds: string[]): Map<string, string> {
+  const map = new Map<string, string>();
+  const usedNames = new Set<string>();
+
+  // Sort by hash for deterministic assignment
+  const sorted = [...sessionIds].sort((a, b) => hashToIndex(a) - hashToIndex(b));
+
+  for (const id of sorted) {
+    let idx = hashToIndex(id) % AGENT_NAMES.length;
+    let name = AGENT_NAMES[idx];
+
+    // Resolve collisions
+    let attempt = 0;
+    while (usedNames.has(name)) {
+      attempt++;
+      idx = (idx + 1) % AGENT_NAMES.length;
+      if (attempt >= AGENT_NAMES.length) {
+        name = AGENT_NAMES[hashToIndex(id) % AGENT_NAMES.length] + `-${attempt}`;
+        break;
+      }
+      name = AGENT_NAMES[idx];
+    }
+
+    usedNames.add(name);
+    map.set(id, name);
+  }
+
+  return map;
+}
 
 function getCachedOrParse(session: SessionInfo): ParsedSession {
   const cached = parseCache.get(session.id);
@@ -128,21 +173,20 @@ export function buildDashboardState(): DashboardState {
     }
   }
 
-  // 4. Detect collisions (only between currently active sessions)
+  // 4. Build session label map
+  const labelMap = buildLabelMap(parsedSessions.map(p => p.session.id));
+
+  // 5. Detect collisions (only between currently active sessions)
   const activeParsed = parsedSessions.filter(p => activeSessionIds.has(p.session.id));
-  const collisions = detectCollisions(activeParsed);
+  const collisions = detectCollisions(activeParsed, labelMap);
   const collisionFileSet = new Set(collisions.flatMap(c => c.agents.map(a => a.sessionId)));
 
-  // 5. Build agents
+  // 6. Build agents
   const agents: Agent[] = [];
-  const projectAgentCounters = new Map<string, number>();
 
   for (const parsed of parsedSessions) {
     const projectPath = parsed.session.projectPath;
-    const counter = (projectAgentCounters.get(projectPath) ?? 0) + 1;
-    projectAgentCounters.set(projectPath, counter);
-
-    const label = `agent-${counter}`;
+    const label = labelMap.get(parsed.session.id) ?? parsed.session.id.slice(0, 8);
     const isActive = activeSessionIds.has(parsed.session.id);
     const status = determineAgentStatus(parsed, isActive, collisionFileSet);
 
@@ -228,8 +272,8 @@ export function buildDashboardState(): DashboardState {
     return a.name.localeCompare(b.name);
   });
 
-  // 7. Build feed
-  const feed = buildFeed(parsedSessions, collisions);
+  // 8. Build feed
+  const feed = buildFeed(parsedSessions, collisions, labelMap);
 
   // 8. Build summary
   const summary: DashboardSummary = {

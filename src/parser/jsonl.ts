@@ -29,6 +29,26 @@ function extractPlanContent(raw: unknown): string | null {
 }
 
 /**
+ * Extract the session slug (e.g. "golden-soaring-hamster") from a JSONL file.
+ * The slug appears on early envelope lines.
+ */
+export function parseSessionSlug(filePath: string): string | null {
+  const content = readFileSync(filePath, "utf-8");
+  const lines = content.split("\n");
+  // Slug is typically in the first few lines
+  for (let i = 0; i < Math.min(lines.length, 10); i++) {
+    if (!lines[i].trim()) continue;
+    try {
+      const parsed = JSON.parse(lines[i]);
+      if (typeof parsed === "object" && parsed && typeof parsed.slug === "string") {
+        return parsed.slug;
+      }
+    } catch { /* skip */ }
+  }
+  return null;
+}
+
+/**
  * Parse a Claude Code session JSONL file into a stream of events.
  * Each line in the JSONL is a message event (user or assistant).
  */

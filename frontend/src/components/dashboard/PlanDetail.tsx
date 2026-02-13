@@ -168,7 +168,7 @@ export function PlanDetail({ workstreams }: PlanDetailProps) {
   if (selectedIdx !== null && selectedIdx < entries.length) {
     return (
       <PlanMarkdownView
-        entry={entries[activeIdx]}
+        entry={entries[selectedIdx]}
         onBack={() => setSelectedIdx(null)}
       />
     );

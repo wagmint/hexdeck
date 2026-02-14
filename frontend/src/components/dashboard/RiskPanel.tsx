@@ -56,9 +56,11 @@ function RiskCard({ agent }: { agent: Agent }) {
         <span className="text-[9px] text-dash-text-muted">
           {formatTokens(risk.totalTokens)} tokens
         </span>
-        <span className="text-[9px] text-dash-text-muted">
-          {risk.compactions} compaction{risk.compactions !== 1 ? "s" : ""}
-        </span>
+        {risk.compactions > 0 && (
+          <span className="text-[9px] text-dash-text-muted">
+            {risk.compactions} compaction{risk.compactions !== 1 ? "s" : ""}
+          </span>
+        )}
         {risk.compactionProximity !== "nominal" && (
           <span className={`text-[8px] font-bold tracking-widest uppercase px-1 py-px rounded ${
             risk.compactionProximity === "critical"

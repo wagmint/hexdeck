@@ -93,15 +93,16 @@ function hashToIndex(id: string): number {
   return Math.abs(h);
 }
 
-/** Assign unique short names per dashboard cycle. Same ID → same name. */
+/** Persistent label assignments — once a session gets a name, it keeps it. */
+const persistentLabels = new Map<string, string>();
+
+/** Assign unique short names. Existing assignments are preserved across cycles. */
 function buildLabelMap(sessionIds: string[]): Map<string, string> {
-  const map = new Map<string, string>();
-  const usedNames = new Set<string>();
+  const usedNames = new Set(persistentLabels.values());
 
-  // Sort by hash for deterministic assignment
-  const sorted = [...sessionIds].sort((a, b) => hashToIndex(a) - hashToIndex(b));
+  for (const id of sessionIds) {
+    if (persistentLabels.has(id)) continue;
 
-  for (const id of sorted) {
     let idx = hashToIndex(id) % AGENT_NAMES.length;
     let name = AGENT_NAMES[idx];
 
@@ -118,9 +119,14 @@ function buildLabelMap(sessionIds: string[]): Map<string, string> {
     }
 
     usedNames.add(name);
-    map.set(id, name);
+    persistentLabels.set(id, name);
   }
 
+  // Return only the labels for requested session IDs
+  const map = new Map<string, string>();
+  for (const id of sessionIds) {
+    map.set(id, persistentLabels.get(id)!);
+  }
   return map;
 }
 

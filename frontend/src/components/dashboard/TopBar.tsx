@@ -34,6 +34,12 @@ export function TopBar({ summary }: TopBarProps) {
             text={`${summary.criticalCollisions} critical`}
           />
         )}
+        {summary.agentsAtRisk > 0 && (
+          <StatusItem
+            color="yellow"
+            text={`${summary.agentsAtRisk} agent${summary.agentsAtRisk !== 1 ? "s" : ""} at risk`}
+          />
+        )}
         <span className="text-dash-text-muted text-[11px] font-mono">
           {summary.totalWorkstreams} project{summary.totalWorkstreams !== 1 ? "s" : ""}
           {" / "}

@@ -1,5 +1,5 @@
 import { readFileSync } from "fs";
-import type { SessionEvent, Message, ContentBlock } from "../types/index.js";
+import type { SessionEvent, Message, ContentBlock, TokenUsage } from "../types/index.js";
 
 /**
  * Extract timestamp from the JSONL envelope.
@@ -26,6 +26,74 @@ function extractPlanContent(raw: unknown): string | null {
     return obj.planContent;
   }
   return null;
+}
+
+/**
+ * Extract token usage from the JSONL envelope.
+ * Claude Code stores usage on assistant message envelopes as `message.usage`.
+ */
+function extractUsageFromEnvelope(raw: unknown): TokenUsage | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+
+  // Usage may be at top level or inside message
+  let usage: unknown = obj.usage;
+  if (!usage && obj.message && typeof obj.message === "object") {
+    usage = (obj.message as Record<string, unknown>).usage;
+  }
+  if (!usage || typeof usage !== "object") return null;
+
+  const u = usage as Record<string, unknown>;
+  return {
+    inputTokens: typeof u.input_tokens === "number" ? u.input_tokens : 0,
+    outputTokens: typeof u.output_tokens === "number" ? u.output_tokens : 0,
+    cacheReadInputTokens: typeof u.cache_read_input_tokens === "number" ? u.cache_read_input_tokens : 0,
+    cacheCreationInputTokens: typeof u.cache_creation_input_tokens === "number" ? u.cache_creation_input_tokens : 0,
+  };
+}
+
+/**
+ * Extract model string from the JSONL envelope.
+ */
+function extractModelFromEnvelope(raw: unknown): string | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+
+  if (typeof obj.model === "string") return obj.model;
+  if (obj.message && typeof obj.message === "object") {
+    const msg = obj.message as Record<string, unknown>;
+    if (typeof msg.model === "string") return msg.model;
+  }
+  return null;
+}
+
+/**
+ * System metadata lines — parse turn_duration and other system lines.
+ */
+export interface SystemMeta {
+  turnDurations: Array<{ timestamp: Date; durationMs: number }>;
+}
+
+export function parseSystemLines(filePath: string): SystemMeta {
+  const content = readFileSync(filePath, "utf-8");
+  const lines = content.split("\n");
+  const turnDurations: Array<{ timestamp: Date; durationMs: number }> = [];
+
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    try {
+      const parsed = JSON.parse(line);
+      if (parsed.type === "system" && parsed.subtype === "turn_duration") {
+        const ts = typeof parsed.timestamp === "string" ? new Date(parsed.timestamp) : null;
+        const dur = typeof parsed.durationMs === "number" ? parsed.durationMs : null;
+        if (ts && dur !== null) {
+          turnDurations.push({ timestamp: ts, durationMs: dur });
+        }
+      }
+    } catch { /* skip */ }
+  }
+
+  return { turnDurations };
 }
 
 /**
@@ -70,6 +138,11 @@ export function parseSessionFile(filePath: string): SessionEvent[] {
         // Preserve planContent from JSONL envelope (set when user approves ExitPlanMode)
         const planContent = extractPlanContent(parsed);
         if (planContent) event.planContent = planContent;
+        // Extract usage and model from envelope (before normalizeMessage strips it)
+        const usage = extractUsageFromEnvelope(parsed);
+        if (usage) event.usage = usage;
+        const model = extractModelFromEnvelope(parsed);
+        if (model) event.model = model;
         events.push(event);
       }
     } catch {

@@ -63,17 +63,17 @@ export function AgentCard({ workstream }: AgentCardProps) {
           {tasksDone}/{workstream.planTasks.length} tasks done
         </div>
       )}
-      <div className="flex items-center gap-0.5 mt-1.5">
+      <div className="mt-1.5 space-y-0.5">
         {workstream.agents.map((agent) => (
-          <AgentPip
+          <div
             key={agent.sessionId}
-            status={agent.status}
+            className="flex items-center gap-1.5 cursor-pointer hover:bg-dash-surface transition-colors rounded px-0.5 -mx-0.5"
             onClick={() => router.push(`/session/${agent.sessionId}`)}
-          />
+          >
+            <AgentPip status={agent.status} />
+            <span className="text-[10px] text-dash-text-dim">{agent.label}</span>
+          </div>
         ))}
-        <span className="text-[9px] text-dash-text-muted ml-1">
-          {workstream.agents.length}
-        </span>
       </div>
     </div>
   );

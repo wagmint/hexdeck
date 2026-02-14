@@ -1,4 +1,5 @@
-import type { SessionEvent, TurnNode, TurnCategory, ToolCallSummary, ParsedSession, SessionInfo, Message, TurnSections, DecisionItem, CorrectionItem } from "../types/index.js";
+import type { SessionEvent, TurnNode, TurnCategory, ToolCallSummary, ParsedSession, SessionInfo, Message, TurnSections, DecisionItem, CorrectionItem, TokenUsage } from "../types/index.js";
+import type { SystemMeta } from "../parser/jsonl.js";
 import { getMessageText, getToolCalls, getToolResults, hasCompaction, getCompactionText, getThinkingText, getSearchPatterns } from "../parser/jsonl.js";
 
 /**
@@ -67,6 +68,10 @@ function buildSingleTurn(events: SessionEvent[], index: number): TurnNode | null
   let compactionText: string | null = null;
   let assistantText = "";
   let thinkingText = "";
+
+  // Token usage aggregation
+  const tokenUsage: TokenUsage = { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 };
+  let model: string | null = null;
 
   // Plan mode & task tracking
   let hasPlanStart = false;
@@ -220,6 +225,17 @@ function buildSingleTurn(events: SessionEvent[], index: number): TurnNode | null
       turnHasCompaction = true;
       compactionText = getCompactionText(event.message);
     }
+
+    // Aggregate token usage and model from assistant events
+    if (event.usage) {
+      tokenUsage.inputTokens += event.usage.inputTokens;
+      tokenUsage.outputTokens += event.usage.outputTokens;
+      tokenUsage.cacheReadInputTokens += event.usage.cacheReadInputTokens;
+      tokenUsage.cacheCreationInputTokens += event.usage.cacheCreationInputTokens;
+    }
+    if (!model && event.model) {
+      model = event.model;
+    }
   }
 
   // Build sections
@@ -272,6 +288,9 @@ function buildSingleTurn(events: SessionEvent[], index: number): TurnNode | null
     planRejected,
     taskCreates,
     taskUpdates,
+    tokenUsage,
+    model,
+    durationMs: null,
     events,
     startLine: events[0].line,
     endLine: events[events.length - 1].line,
@@ -281,14 +300,35 @@ function buildSingleTurn(events: SessionEvent[], index: number): TurnNode | null
 /**
  * Build a full ParsedSession from a SessionInfo and its events.
  */
-export function buildParsedSession(session: SessionInfo, events: SessionEvent[]): ParsedSession {
+export function buildParsedSession(session: SessionInfo, events: SessionEvent[], systemMeta?: SystemMeta): ParsedSession {
   const turns = buildTurnNodes(events);
+
+  // Attach durationMs from system metadata by matching timestamps
+  if (systemMeta) {
+    for (const dur of systemMeta.turnDurations) {
+      // Find the closest turn by timestamp (within 60s)
+      let bestTurn: TurnNode | null = null;
+      let bestDiff = Infinity;
+      for (const turn of turns) {
+        const diff = Math.abs(turn.timestamp.getTime() - dur.timestamp.getTime());
+        if (diff < bestDiff && diff < 60_000) {
+          bestDiff = diff;
+          bestTurn = turn;
+        }
+      }
+      if (bestTurn) bestTurn.durationMs = dur.durationMs;
+    }
+  }
 
   const allFilesChanged = new Set<string>();
   const allToolsUsed: Record<string, number> = {};
   let totalToolCalls = 0;
   let commits = 0;
   let compactions = 0;
+  let errorTurns = 0;
+  let correctionTurns = 0;
+  const totalTokenUsage: TokenUsage = { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 };
+  const modelCounts = new Map<string, number>();
 
   for (const turn of turns) {
     for (const f of turn.filesChanged) allFilesChanged.add(f);
@@ -298,6 +338,25 @@ export function buildParsedSession(session: SessionInfo, events: SessionEvent[])
     }
     if (turn.hasCommit) commits++;
     if (turn.hasCompaction) compactions++;
+    if (turn.hasError) errorTurns++;
+    if (turn.sections.corrections.items.length > 0) correctionTurns++;
+
+    // Aggregate token usage
+    totalTokenUsage.inputTokens += turn.tokenUsage.inputTokens;
+    totalTokenUsage.outputTokens += turn.tokenUsage.outputTokens;
+    totalTokenUsage.cacheReadInputTokens += turn.tokenUsage.cacheReadInputTokens;
+    totalTokenUsage.cacheCreationInputTokens += turn.tokenUsage.cacheCreationInputTokens;
+
+    if (turn.model) {
+      modelCounts.set(turn.model, (modelCounts.get(turn.model) ?? 0) + 1);
+    }
+  }
+
+  // Primary model = most frequently used
+  let primaryModel: string | null = null;
+  let maxCount = 0;
+  for (const [m, c] of modelCounts) {
+    if (c > maxCount) { primaryModel = m; maxCount = c; }
   }
 
   return {
@@ -313,6 +372,10 @@ export function buildParsedSession(session: SessionInfo, events: SessionEvent[])
       toolsUsed: Object.fromEntries(
         Object.entries(allToolsUsed).sort((a, b) => b[1] - a[1])
       ),
+      totalTokenUsage,
+      errorTurns,
+      correctionTurns,
+      primaryModel,
     },
   };
 }

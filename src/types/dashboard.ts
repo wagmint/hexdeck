@@ -1,3 +1,32 @@
+// ─── Risk Types ──────────────────────────────────────────────────────────────
+
+export type RiskLevel = "nominal" | "elevated" | "critical";
+
+export interface SpinningSignal {
+  pattern: string;
+  level: RiskLevel;
+  detail: string;
+}
+
+export interface AgentRisk {
+  errorRate: number;
+  correctionRatio: number;
+  totalTokens: number;
+  compactions: number;
+  compactionProximity: RiskLevel;
+  fileHotspots: Array<{ file: string; count: number }>;
+  spinningSignals: SpinningSignal[];
+  overallRisk: RiskLevel;
+  errorTrend: boolean[];
+}
+
+export interface WorkstreamRisk {
+  errorRate: number;
+  totalTokens: number;
+  riskyAgents: number;
+  overallRisk: RiskLevel;
+}
+
 // ─── Dashboard Types ─────────────────────────────────────────────────────────
 
 export type PlanStatus = "drafting" | "approved" | "implementing" | "completed" | "none";
@@ -34,6 +63,8 @@ export interface Agent {
   isActive: boolean;
   /** Plan state for this agent's session */
   plan: SessionPlan;
+  /** Risk analytics */
+  risk: AgentRisk;
 }
 
 export interface Workstream {
@@ -61,6 +92,8 @@ export interface Workstream {
   plans: SessionPlan[];
   /** Flattened tasks across all sessions */
   planTasks: PlanTask[];
+  /** Workstream-level risk aggregation */
+  risk: WorkstreamRisk;
 }
 
 export type CollisionSeverity = "warning" | "critical";
@@ -122,6 +155,7 @@ export interface DashboardSummary {
   totalWorkstreams: number;
   totalCommits: number;
   totalErrors: number;
+  agentsAtRisk: number;
 }
 
 export interface DashboardState {

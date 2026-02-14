@@ -1,8 +1,18 @@
 export type {
+  RiskLevel, SpinningSignal, AgentRisk, WorkstreamRisk,
   PlanStatus, PlanTask, SessionPlan,
   AgentStatus, Agent, Workstream, CollisionSeverity, Collision,
   FeedEventType, FeedEvent, DashboardSummary, DashboardState,
 } from "./dashboard.js";
+
+// ─── Token Usage ─────────────────────────────────────────────────────────────
+
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
+}
 
 // ─── Claude Code JSONL Event Types ───────────────────────────────────────────
 
@@ -55,6 +65,10 @@ export interface SessionEvent {
   timestamp?: Date;
   /** Plan content from ExitPlanMode approval (on the JSONL envelope) */
   planContent?: string;
+  /** Token usage from the API response envelope */
+  usage?: TokenUsage;
+  /** Model used for this event */
+  model?: string;
 }
 
 // ─── Session Discovery Types ─────────────────────────────────────────────────
@@ -312,6 +326,13 @@ export interface TurnNode {
   taskCreates: { taskId: string; subject: string; description: string }[];
   taskUpdates: { taskId: string; status: string }[];
 
+  /** Token usage aggregated across all assistant events in this turn */
+  tokenUsage: TokenUsage;
+  /** Model used in this turn */
+  model: string | null;
+  /** Duration of this turn in ms (from system metadata, if available) */
+  durationMs: number | null;
+
   /** Raw events for this turn (for drill-down) */
   events: SessionEvent[];
 
@@ -331,6 +352,10 @@ export interface ParsedSession {
     compactions: number;
     filesChanged: string[];
     toolsUsed: Record<string, number>;
+    totalTokenUsage: TokenUsage;
+    errorTurns: number;
+    correctionTurns: number;
+    primaryModel: string | null;
   };
 }
 

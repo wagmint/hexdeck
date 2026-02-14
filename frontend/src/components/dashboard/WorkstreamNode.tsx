@@ -1,6 +1,6 @@
 "use client";
 
-import type { Workstream, PlanTask } from "@/lib/dashboard-types";
+import type { Workstream, PlanTask, AgentStatus } from "@/lib/dashboard-types";
 
 interface WorkstreamNodeProps {
   workstream: Workstream;
@@ -11,6 +11,13 @@ const planStatusBadge: Record<string, { label: string; className: string }> = {
   approved: { label: "PLANNED", className: "text-dash-blue bg-dash-blue/10" },
   implementing: { label: "BUILDING", className: "text-dash-green bg-dash-green/10" },
   completed: { label: "DONE", className: "text-dash-text-muted bg-dash-surface-2" },
+};
+
+const agentDot: Record<AgentStatus, string> = {
+  busy: "bg-dash-green animate-pulse",
+  idle: "bg-dash-text-muted",
+  warning: "bg-dash-yellow",
+  conflict: "bg-dash-red",
 };
 
 const taskStatusIcon: Record<PlanTask["status"], { char: string; className: string }> = {
@@ -57,6 +64,16 @@ export function WorkstreamNode({ workstream }: WorkstreamNodeProps) {
           {workstream.hasCollision && (
             <span className="text-dash-red font-semibold">COLLISION</span>
           )}
+        </div>
+
+        {/* Agent names */}
+        <div className="flex flex-wrap gap-x-2.5 gap-y-0.5 mt-1">
+          {workstream.agents.map((agent) => (
+            <div key={agent.sessionId} className="flex items-center gap-1 text-[10px]">
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${agentDot[agent.status]}`} />
+              <span className="text-dash-text-dim">{agent.label}</span>
+            </div>
+          ))}
         </div>
 
         {/* Plan tasks checklist */}

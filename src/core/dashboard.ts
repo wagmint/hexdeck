@@ -1,10 +1,11 @@
 import { statSync } from "fs";
 import { basename } from "path";
 import { getActiveSessions, listProjects, listSessions } from "../discovery/sessions.js";
-import { parseSessionFile } from "../parser/jsonl.js";
+import { parseSessionFile, parseSystemLines } from "../parser/jsonl.js";
 import { buildParsedSession } from "./nodes.js";
 import { detectCollisions } from "./collisions.js";
 import { buildFeed } from "./feed.js";
+import { computeAgentRisk, computeWorkstreamRisk } from "./risk.js";
 import type {
   ParsedSession, SessionInfo, Agent, AgentStatus,
   Workstream, DashboardState, DashboardSummary,
@@ -81,7 +82,8 @@ function getCachedOrParse(session: SessionInfo): ParsedSession {
   }
 
   const events = parseSessionFile(session.path);
-  const parsed = buildParsedSession(session, events);
+  const systemMeta = parseSystemLines(session.path);
+  const parsed = buildParsedSession(session, events, systemMeta);
   parseCache.set(session.id, { mtimeMs: currentMtime, parsed });
   return parsed;
 }
@@ -150,18 +152,38 @@ function buildSessionPlan(parsed: ParsedSession): SessionPlan {
 
 // ─── Dashboard builder ──────────────────────────────────────────────────────
 
+/** Grace period: keep recently-dead sessions visible so plans survive session transitions */
+const RECENT_GRACE_MS = 5 * 60 * 1000; // 5 minutes
+
 export function buildDashboardState(): DashboardState {
   // 1. Get all active sessions
   const activeSessions = getActiveSessions();
   const activeSessionIds = new Set(activeSessions.map(s => s.id));
 
-  // 2. Only show currently active sessions — no stale padding
+  // 2. Include active sessions + recently-dead sessions from same projects
+  //    This bridges the gap when "execute and clear context" kills one session
+  //    and starts another — the old session's plan stays visible briefly.
   const allSessions = new Map<string, SessionInfo>();
   for (const s of activeSessions) {
     allSessions.set(s.id, s);
   }
 
   const projects = listProjects();
+  const now = Date.now();
+
+  // For each project with active sessions, include recent inactive sessions
+  const activeProjectPaths = new Set(activeSessions.map(s => s.projectPath));
+  for (const project of projects) {
+    if (!activeProjectPaths.has(project.decodedPath)) continue;
+    const projectSessions = listSessions(project.encodedName);
+    for (const s of projectSessions) {
+      if (allSessions.has(s.id)) continue; // already active
+      // Include if modified within grace period
+      if (now - s.modifiedAt.getTime() < RECENT_GRACE_MS) {
+        allSessions.set(s.id, s);
+      }
+    }
+  }
 
   // 3. Parse all sessions
   const parsedSessions: ParsedSession[] = [];
@@ -193,6 +215,7 @@ export function buildDashboardState(): DashboardState {
     const lastTurn = parsed.turns[parsed.turns.length - 1];
     const currentTask = lastTurn?.summary ?? "idle";
     const plan = buildSessionPlan(parsed);
+    const risk = computeAgentRisk(parsed);
 
     agents.push({
       sessionId: parsed.session.id,
@@ -203,6 +226,7 @@ export function buildDashboardState(): DashboardState {
       projectPath,
       isActive,
       plan,
+      risk,
     });
   }
 
@@ -231,8 +255,10 @@ export function buildDashboardState(): DashboardState {
 
     const hasCollision = projectAgents.some(a => a.status === "conflict");
 
-    // Aggregate plans and tasks
-    const plans = projectAgents.map(a => a.plan).filter(p => p.status !== "none");
+    // Aggregate plans and tasks — skip empty drafts (session died before plan was written)
+    const plans = projectAgents.map(a => a.plan).filter(p =>
+      p.status !== "none" && !(p.status === "drafting" && !p.markdown)
+    );
     const planTasks = plans.flatMap(p => p.tasks);
 
     // Progress: use task completion if tasks exist, otherwise fall back to commit ratio
@@ -248,6 +274,8 @@ export function buildDashboardState(): DashboardState {
     const project = projects.find(p => p.decodedPath === projectPath);
     const projectId = project?.encodedName ?? projectPath.replace(/\//g, "-");
 
+    const risk = computeWorkstreamRisk(projectAgents);
+
     workstreams.push({
       projectId,
       projectPath,
@@ -261,6 +289,7 @@ export function buildDashboardState(): DashboardState {
       errors,
       plans,
       planTasks,
+      risk,
     });
   }
 
@@ -276,6 +305,7 @@ export function buildDashboardState(): DashboardState {
   const feed = buildFeed(parsedSessions, collisions, labelMap);
 
   // 8. Build summary
+  const agentsAtRisk = agents.filter(a => a.risk.overallRisk !== "nominal").length;
   const summary: DashboardSummary = {
     totalAgents: agents.length,
     activeAgents: agents.filter(a => a.isActive).length,
@@ -284,6 +314,7 @@ export function buildDashboardState(): DashboardState {
     totalWorkstreams: workstreams.length,
     totalCommits: workstreams.reduce((sum, w) => sum + w.commits, 0),
     totalErrors: workstreams.reduce((sum, w) => sum + w.errors, 0),
+    agentsAtRisk,
   };
 
   return { agents, workstreams, collisions, feed, summary };

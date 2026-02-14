@@ -11,7 +11,7 @@ import { FeedItem } from "@/components/dashboard/FeedItem";
 import { CollisionDetail } from "@/components/dashboard/CollisionDetail";
 import { PlanDetail } from "@/components/dashboard/PlanDetail";
 import { ProgressBar } from "@/components/dashboard/ProgressBar";
-import { DeviationItem } from "@/components/dashboard/DeviationItem";
+import { RiskPanel } from "@/components/dashboard/RiskPanel";
 
 export default function DashboardPage() {
   const { state, loading, error } = useDashboard(3000);
@@ -85,7 +85,7 @@ export default function DashboardPage() {
 
   if (!state) return null;
 
-  const { workstreams, collisions, feed, summary } = state;
+  const { agents, workstreams, collisions, feed, summary } = state;
 
   return (
     <div className="h-screen flex flex-col bg-dash-bg text-dash-text font-mono text-[11px] leading-relaxed overflow-hidden">
@@ -201,20 +201,18 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Deviation Log */}
+          {/* Risk Analytics */}
           <div className="flex-1 bg-dash-bg overflow-y-auto scrollbar-thin">
             <PanelHeader
-              title="Deviations"
-              count={`${collisions.length} active`}
+              title="Risk"
+              count={`${summary.agentsAtRisk} at risk`}
             />
-            {collisions.length === 0 ? (
+            {agents.length === 0 ? (
               <div className="px-3.5 py-8 text-center text-dash-text-muted text-xs">
-                No deviations detected
+                No agents to analyze
               </div>
             ) : (
-              collisions.map((col) => (
-                <DeviationItem key={col.id} collision={col} />
-              ))
+              <RiskPanel agents={agents} />
             )}
           </div>
         </div>

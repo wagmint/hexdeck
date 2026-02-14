@@ -9,7 +9,7 @@ import { computeAgentRisk, computeWorkstreamRisk } from "./risk.js";
 import type {
   ParsedSession, SessionInfo, Agent, AgentStatus,
   Workstream, DashboardState, DashboardSummary,
-  SessionPlan, PlanStatus, PlanTask,
+  SessionPlan, PlanStatus, PlanTask, TokenUsage,
 } from "../types/index.js";
 
 // ─── In-memory parse cache ──────────────────────────────────────────────────
@@ -20,11 +20,69 @@ interface CacheEntry {
 }
 
 const parseCache = new Map<string, CacheEntry>();
+
+// ─── Session accumulator — survives compaction ──────────────────────────────
+
+interface SessionAccumulator {
+  totalTurns: number;
+  totalToolCalls: number;
+  totalCommits: number;
+  totalCompactions: number;
+  totalErrorTurns: number;
+  totalCorrectionTurns: number;
+  totalTokenUsage: TokenUsage;
+  filesChanged: Set<string>;
+  toolsUsed: Record<string, number>;
+  primaryModel: string | null;
+  plan: SessionPlan | null;
+  errorHistory: boolean[];
+}
+
+const accumulators = new Map<string, SessionAccumulator>();
+
+// ─── Accumulator helpers ─────────────────────────────────────────────────────
+
+function maxTokenUsage(a: TokenUsage | undefined, b: TokenUsage): TokenUsage {
+  if (!a) return { ...b };
+  return {
+    inputTokens: Math.max(a.inputTokens, b.inputTokens),
+    outputTokens: Math.max(a.outputTokens, b.outputTokens),
+    cacheReadInputTokens: Math.max(a.cacheReadInputTokens, b.cacheReadInputTokens),
+    cacheCreationInputTokens: Math.max(a.cacheCreationInputTokens, b.cacheCreationInputTokens),
+  };
+}
+
+function addTokenUsage(a: TokenUsage, b: TokenUsage): TokenUsage {
+  return {
+    inputTokens: a.inputTokens + b.inputTokens,
+    outputTokens: a.outputTokens + b.outputTokens,
+    cacheReadInputTokens: a.cacheReadInputTokens + b.cacheReadInputTokens,
+    cacheCreationInputTokens: a.cacheCreationInputTokens + b.cacheCreationInputTokens,
+  };
+}
+
+function unionSets(a: Set<string> | undefined, b: Set<string>): Set<string> {
+  if (!a) return new Set(b);
+  return new Set([...a, ...b]);
+}
+
+function mergeToolsUsed(
+  a: Record<string, number> | undefined,
+  b: Record<string, number>
+): Record<string, number> {
+  if (!a) return { ...b };
+  const merged = { ...a };
+  for (const [tool, count] of Object.entries(b)) {
+    merged[tool] = Math.max(merged[tool] ?? 0, count);
+  }
+  return merged;
+}
+
 const AGENT_NAMES = [
-  "fox", "owl", "bear", "wolf", "hawk", "lynx", "elk", "ram",
-  "orca", "puma", "wren", "crow", "hare", "moth", "wasp", "newt",
-  "toad", "crab", "dove", "finch", "goat", "ibis", "kite", "lark",
-  "mink", "pike", "seal", "tern", "vole", "yak",
+  "neo", "morpheus", "trinity", "oracle", "cypher", "tank", "dozer", "switch",
+  "apoc", "mouse", "niobe", "link", "ghost", "zee", "lock", "merovingian",
+  "seraph", "sati", "rama", "ajax", "jue", "thadeus", "ballard", "mifune",
+  "hamann", "deus", "trainman", "persephone", "keymaker", "architect",
 ];
 
 function hashToIndex(id: string): number {
@@ -66,6 +124,61 @@ function buildLabelMap(sessionIds: string[]): Map<string, string> {
   return map;
 }
 
+function updateAccumulator(sessionId: string, parsed: ParsedSession): void {
+  const prev = accumulators.get(sessionId);
+  const { stats } = parsed;
+
+  const acc: SessionAccumulator = {
+    totalTurns: Math.max(prev?.totalTurns ?? 0, stats.totalTurns),
+    totalToolCalls: Math.max(prev?.totalToolCalls ?? 0, stats.toolCalls),
+    totalCommits: Math.max(prev?.totalCommits ?? 0, stats.commits),
+    totalCompactions: Math.max(prev?.totalCompactions ?? 0, stats.compactions),
+    totalErrorTurns: Math.max(prev?.totalErrorTurns ?? 0, stats.errorTurns),
+    totalCorrectionTurns: Math.max(prev?.totalCorrectionTurns ?? 0, stats.correctionTurns),
+    totalTokenUsage: maxTokenUsage(prev?.totalTokenUsage, stats.totalTokenUsage),
+    filesChanged: unionSets(prev?.filesChanged, new Set(stats.filesChanged)),
+    toolsUsed: mergeToolsUsed(prev?.toolsUsed, stats.toolsUsed),
+    primaryModel: stats.primaryModel ?? prev?.primaryModel ?? null,
+    plan: null,
+    errorHistory: [],
+  };
+
+  // Plan: keep the most advanced plan state
+  const currentPlan = buildSessionPlan(parsed);
+  if (currentPlan.status !== "none") {
+    acc.plan = currentPlan;
+  } else {
+    acc.plan = prev?.plan ?? null;
+  }
+
+  // Error history: extend on compaction, replace on normal growth
+  const prevHistory = prev?.errorHistory ?? [];
+  const currentErrors = parsed.turns.map(t => t.hasError);
+  if (prev && prev.totalTurns > parsed.turns.length) {
+    // Compaction: keep old history, append new post-compaction turns
+    acc.errorHistory = [...prevHistory, ...currentErrors];
+  } else {
+    // Normal: current parse is the full history
+    acc.errorHistory = currentErrors;
+  }
+
+  accumulators.set(sessionId, acc);
+}
+
+function mergeAccumulatorIntoStats(acc: SessionAccumulator, parsed: ParsedSession): void {
+  // Compaction: accumulated baseline + post-compaction delta (current parse)
+  parsed.stats.totalTurns = acc.totalTurns + parsed.stats.totalTurns;
+  parsed.stats.toolCalls = acc.totalToolCalls + parsed.stats.toolCalls;
+  parsed.stats.commits = acc.totalCommits + parsed.stats.commits;
+  parsed.stats.compactions = acc.totalCompactions; // already counted
+  parsed.stats.errorTurns = acc.totalErrorTurns + parsed.stats.errorTurns;
+  parsed.stats.correctionTurns = acc.totalCorrectionTurns + parsed.stats.correctionTurns;
+  parsed.stats.totalTokenUsage = addTokenUsage(acc.totalTokenUsage, parsed.stats.totalTokenUsage);
+  parsed.stats.filesChanged = [...new Set([...acc.filesChanged, ...parsed.stats.filesChanged])];
+  parsed.stats.toolsUsed = mergeToolsUsed(acc.toolsUsed, parsed.stats.toolsUsed);
+  parsed.stats.primaryModel = parsed.stats.primaryModel ?? acc.primaryModel;
+}
+
 function getCachedOrParse(session: SessionInfo): ParsedSession {
   const cached = parseCache.get(session.id);
   let currentMtime: number;
@@ -84,6 +197,18 @@ function getCachedOrParse(session: SessionInfo): ParsedSession {
   const events = parseSessionFile(session.path);
   const systemMeta = parseSystemLines(session.path);
   const parsed = buildParsedSession(session, events, systemMeta);
+
+  // Compaction detection: accumulator had more turns than current parse
+  const acc = accumulators.get(session.id);
+  const isCompaction = acc && acc.totalTurns > parsed.turns.length;
+
+  if (isCompaction) {
+    mergeAccumulatorIntoStats(acc, parsed);
+  }
+
+  // Always update accumulator to reflect current state
+  updateAccumulator(session.id, parsed);
+
   parseCache.set(session.id, { mtimeMs: currentMtime, parsed });
   return parsed;
 }
@@ -136,8 +261,9 @@ function buildSessionPlan(parsed: ParsedSession): SessionPlan {
     }
   }
 
-  // If plan is approved and tasks are being worked on, it's implementing
-  if (status === "approved" && tasks.some(t => t.status === "in_progress" || t.status === "completed")) {
+  // If plan is approved/drafting and tasks are being worked on, it's implementing
+  // "drafting" can have tasks when ExitPlanMode wasn't called (user approved via prompt)
+  if ((status === "approved" || status === "drafting") && tasks.some(t => t.status === "in_progress" || t.status === "completed")) {
     status = "implementing";
   }
 
@@ -214,8 +340,16 @@ export function buildDashboardState(): DashboardState {
 
     const lastTurn = parsed.turns[parsed.turns.length - 1];
     const currentTask = lastTurn?.summary ?? "idle";
-    const plan = buildSessionPlan(parsed);
-    const risk = computeAgentRisk(parsed);
+
+    // Plan: fall back to accumulator if current parse lost it (compaction)
+    const sessionAcc = accumulators.get(parsed.session.id);
+    let plan = buildSessionPlan(parsed);
+    if (plan.status === "none" && sessionAcc?.plan) {
+      plan = sessionAcc.plan;
+    }
+
+    // Risk: pass accumulated error history for trend continuity
+    const risk = computeAgentRisk(parsed, sessionAcc?.errorHistory);
 
     agents.push({
       sessionId: parsed.session.id,

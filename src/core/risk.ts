@@ -3,7 +3,7 @@ import type { ParsedSession, TurnNode, AgentRisk, WorkstreamRisk, SpinningSignal
 /**
  * Compute risk analytics for a single agent session.
  */
-export function computeAgentRisk(parsed: ParsedSession): AgentRisk {
+export function computeAgentRisk(parsed: ParsedSession, errorHistory?: boolean[]): AgentRisk {
   const { turns, stats } = parsed;
   const totalTurns = turns.length;
 
@@ -43,8 +43,10 @@ export function computeAgentRisk(parsed: ParsedSession): AgentRisk {
   // Spinning detection
   const spinningSignals = detectSpinning(turns);
 
-  // Error trend — last 10 turns
-  const errorTrend = turns.slice(-10).map(t => t.hasError);
+  // Error trend — last 10 turns (use accumulated history if available for compaction continuity)
+  const errorTrend = errorHistory
+    ? errorHistory.slice(-10)
+    : turns.slice(-10).map(t => t.hasError);
 
   // Overall risk = worst of all signals
   const overallRisk = computeOverallRisk(errorRate, correctionRatio, compactionProximity, spinningSignals, totalTurns);

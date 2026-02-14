@@ -20,6 +20,7 @@ export function buildFeed(
   sessions: ParsedSession[],
   collisions: Collision[],
   labelMap?: Map<string, string>,
+  activeSessionIds?: Set<string>,
 ): FeedEvent[] {
   // 1. Derive turn-based events — stable IDs mean they're only added once
   for (const session of sessions) {
@@ -116,6 +117,25 @@ export function buildFeed(
             message: `Completed: ${task ?? `task #${tu.taskId}`}`,
           });
         }
+      }
+    }
+  }
+
+  // 1b. Inject "session_ended" events for inactive sessions
+  if (activeSessionIds) {
+    for (const session of sessions) {
+      const sessionId = session.session.id;
+      if (!activeSessionIds.has(sessionId)) {
+        const label = labelMap?.get(sessionId) ?? sessionId.slice(0, 8);
+        addEvent({
+          id: `session-ended-${sessionId}`,
+          type: "session_ended",
+          timestamp: new Date(session.session.modifiedAt),
+          agentLabel: label,
+          sessionId,
+          projectPath: session.session.projectPath,
+          message: "Session ended",
+        });
       }
     }
   }

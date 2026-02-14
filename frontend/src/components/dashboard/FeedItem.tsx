@@ -52,6 +52,10 @@ const typeConfig: Record<
     icon: "\u2713",
     iconClass: "bg-dash-green-dim text-dash-green",
   },
+  session_ended: {
+    icon: "\u23F9",
+    iconClass: "bg-dash-text-muted/10 text-dash-text-muted",
+  },
 };
 
 export function FeedItem({ event, isNew, onClick }: FeedItemProps) {

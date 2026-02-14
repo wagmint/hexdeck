@@ -143,8 +143,8 @@ function updateAccumulator(sessionId: string, parsed: ParsedSession): void {
     errorHistory: [],
   };
 
-  // Plan: keep the most advanced plan state
-  const currentPlan = buildSessionPlan(parsed);
+  // Plan: keep the most advanced plan state (label not yet known here, set later)
+  const currentPlan = buildSessionPlan(parsed, "");
   if (currentPlan.status !== "none") {
     acc.plan = currentPlan;
   } else {
@@ -215,26 +215,33 @@ function getCachedOrParse(session: SessionInfo): ParsedSession {
 
 // ─── Plan builder ────────────────────────────────────────────────────────────
 
-function buildSessionPlan(parsed: ParsedSession): SessionPlan {
+function buildSessionPlan(parsed: ParsedSession, agentLabel: string): SessionPlan {
   let status: PlanStatus = "none";
   let markdown: string | null = null;
+  let lastPlanTs: Date = parsed.session.createdAt;
   const tasks: PlanTask[] = [];
   const taskStatuses = new Map<string, string>();
 
   for (const turn of parsed.turns) {
-    if (turn.hasPlanStart) status = "drafting";
+    if (turn.hasPlanStart) {
+      status = "drafting";
+      lastPlanTs = turn.timestamp;
+    }
     if (turn.hasPlanEnd && !turn.planRejected) {
       status = "approved";
       markdown = turn.planMarkdown;
+      lastPlanTs = turn.timestamp;
     }
     if (turn.hasPlanEnd && turn.planRejected) {
       status = "drafting";
+      lastPlanTs = turn.timestamp;
     }
 
     // Cross-session plan: planMarkdown from JSONL envelope (user approved plan in this session)
     if (turn.planMarkdown && !markdown) {
       markdown = turn.planMarkdown;
       if (status === "none") status = "implementing";
+      lastPlanTs = turn.timestamp;
     }
 
     for (const tc of turn.taskCreates) {
@@ -245,11 +252,13 @@ function buildSessionPlan(parsed: ParsedSession): SessionPlan {
           description: tc.description,
           status: "pending",
         });
+        lastPlanTs = turn.timestamp;
       }
     }
 
     for (const tu of turn.taskUpdates) {
       taskStatuses.set(tu.taskId, tu.status);
+      lastPlanTs = turn.timestamp;
     }
   }
 
@@ -273,13 +282,13 @@ function buildSessionPlan(parsed: ParsedSession): SessionPlan {
     status = "completed";
   }
 
-  return { status, markdown, tasks: activeTasks };
+  return { status, markdown, tasks: activeTasks, agentLabel, timestamp: lastPlanTs };
 }
 
 // ─── Dashboard builder ──────────────────────────────────────────────────────
 
-/** Grace period: keep recently-dead sessions visible so plans survive session transitions */
-const RECENT_GRACE_MS = 5 * 60 * 1000; // 5 minutes
+/** Grace period: keep recently-dead sessions visible so feed/plans persist across context clears */
+const RECENT_GRACE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export function buildDashboardState(): DashboardState {
   // 1. Get all active sessions
@@ -343,9 +352,9 @@ export function buildDashboardState(): DashboardState {
 
     // Plan: fall back to accumulator if current parse lost it (compaction)
     const sessionAcc = accumulators.get(parsed.session.id);
-    let plan = buildSessionPlan(parsed);
+    let plan = buildSessionPlan(parsed, label);
     if (plan.status === "none" && sessionAcc?.plan) {
-      plan = sessionAcc.plan;
+      plan = { ...sessionAcc.plan, agentLabel: label };
     }
 
     // Risk: pass accumulated error history for trend continuity
@@ -374,7 +383,8 @@ export function buildDashboardState(): DashboardState {
 
   const workstreams: Workstream[] = [];
   for (const [projectPath, sessions] of projectGroups) {
-    const projectAgents = agents.filter(a => a.projectPath === projectPath);
+    const allProjectAgents = agents.filter(a => a.projectPath === projectPath);
+    const activeProjectAgents = allProjectAgents.filter(a => a.isActive);
     let totalTurns = 0;
     let completedTurns = 0;
     let commits = 0;
@@ -387,10 +397,10 @@ export function buildDashboardState(): DashboardState {
       errors += s.turns.filter(t => t.hasError).length;
     }
 
-    const hasCollision = projectAgents.some(a => a.status === "conflict");
+    const hasCollision = activeProjectAgents.some(a => a.status === "conflict");
 
-    // Aggregate plans and tasks — skip empty drafts (session died before plan was written)
-    const plans = projectAgents.map(a => a.plan).filter(p =>
+    // Aggregate plans and tasks from ALL agents (including dead) — skip empty drafts
+    const plans = allProjectAgents.map(a => a.plan).filter(p =>
       p.status !== "none" && !(p.status === "drafting" && !p.markdown)
     );
     const planTasks = plans.flatMap(p => p.tasks);
@@ -408,13 +418,14 @@ export function buildDashboardState(): DashboardState {
     const project = projects.find(p => p.decodedPath === projectPath);
     const projectId = project?.encodedName ?? projectPath.replace(/\//g, "-");
 
-    const risk = computeWorkstreamRisk(projectAgents);
+    // Risk: only from active agents
+    const risk = computeWorkstreamRisk(activeProjectAgents);
 
     workstreams.push({
       projectId,
       projectPath,
       name: basename(projectPath) || projectPath,
-      agents: projectAgents,
+      agents: activeProjectAgents,
       completionPct,
       totalTurns,
       completedTurns,
@@ -436,13 +447,14 @@ export function buildDashboardState(): DashboardState {
   });
 
   // 8. Build feed
-  const feed = buildFeed(parsedSessions, collisions, labelMap);
+  const feed = buildFeed(parsedSessions, collisions, labelMap, activeSessionIds);
 
-  // 8. Build summary
-  const agentsAtRisk = agents.filter(a => a.risk.overallRisk !== "nominal").length;
+  // 8. Build summary — only active agents are exposed
+  const activeAgents = agents.filter(a => a.isActive);
+  const agentsAtRisk = activeAgents.filter(a => a.risk.overallRisk !== "nominal").length;
   const summary: DashboardSummary = {
-    totalAgents: agents.length,
-    activeAgents: agents.filter(a => a.isActive).length,
+    totalAgents: activeAgents.length,
+    activeAgents: activeAgents.length,
     totalCollisions: collisions.length,
     criticalCollisions: collisions.filter(c => c.severity === "critical").length,
     totalWorkstreams: workstreams.length,
@@ -451,7 +463,7 @@ export function buildDashboardState(): DashboardState {
     agentsAtRisk,
   };
 
-  return { agents, workstreams, collisions, feed, summary };
+  return { agents: activeAgents, workstreams, collisions, feed, summary };
 }
 
 function determineAgentStatus(

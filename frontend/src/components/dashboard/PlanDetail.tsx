@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { SessionPlan, Workstream } from "@/lib/dashboard-types";
+import { timeAgo } from "@/lib/utils";
 
 interface PlanDetailProps {
   workstreams: Workstream[];
@@ -96,10 +97,12 @@ function PlanOverview({
                 )}
               </div>
               <div className="flex items-center gap-2 mt-0.5 text-[9px] text-dash-text-muted">
+                <span className="font-semibold text-dash-text-dim">{entry.plan.agentLabel}</span>
                 <span>{entry.workstreamName}</span>
                 {entry.tasksTotal > 0 && (
                   <span>{entry.tasksDone}/{entry.tasksTotal} tasks</span>
                 )}
+                <span>{timeAgo(entry.plan.timestamp)}</span>
               </div>
             </div>
             <span className="text-dash-text-muted text-[10px] shrink-0">&rsaquo;</span>
@@ -142,11 +145,15 @@ function PlanMarkdownView({
             </span>
           )}
         </div>
-        {entry.tasksTotal > 0 && (
-          <span className="text-[9px] text-dash-text-muted">
-            {entry.tasksDone}/{entry.tasksTotal} tasks
-          </span>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[9px] text-dash-text-dim font-semibold">{entry.plan.agentLabel}</span>
+          <span className="text-[9px] text-dash-text-muted">{timeAgo(entry.plan.timestamp)}</span>
+          {entry.tasksTotal > 0 && (
+            <span className="text-[9px] text-dash-text-muted">
+              {entry.tasksDone}/{entry.tasksTotal} tasks
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Markdown body */}

@@ -42,6 +42,8 @@ export interface SessionPlan {
   status: PlanStatus;
   markdown: string | null;
   tasks: PlanTask[];
+  agentLabel: string;
+  timestamp: string;
 }
 
 export type AgentStatus = "idle" | "busy" | "warning" | "conflict";
@@ -98,7 +100,8 @@ export type FeedEventType =
   | "start"
   | "plan_started"
   | "plan_approved"
-  | "task_completed";
+  | "task_completed"
+  | "session_ended";
 
 export interface FeedEvent {
   id: string;

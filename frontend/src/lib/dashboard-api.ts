@@ -2,6 +2,8 @@ import type { DashboardState, FeedEvent } from "./dashboard-types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002";
 
+export const SSE_DASHBOARD_URL = `${API_BASE}/api/dashboard/stream`;
+
 async function fetchApi<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`);
   if (!res.ok) {

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { streamSSE, type SSEStreamingApi } from "hono/streaming";
 import { serve } from "@hono/node-server";
 import { listProjects, listSessions, findSession, getActiveSessions } from "../discovery/sessions.js";
 import { parseSessionFile } from "../parser/jsonl.js";
@@ -105,10 +106,9 @@ function serializeDate(d: Date): string {
   return d instanceof Date ? d.toISOString() : String(d);
 }
 
-/** Full dashboard state */
-app.get("/api/dashboard", (c) => {
+function serializeDashboardState() {
   const state = buildDashboardState();
-  return c.json({
+  return {
     ...state,
     collisions: state.collisions.map((col) => ({
       ...col,
@@ -118,6 +118,79 @@ app.get("/api/dashboard", (c) => {
       ...ev,
       timestamp: serializeDate(ev.timestamp),
     })),
+  };
+}
+
+/** Full dashboard state */
+app.get("/api/dashboard", (c) => {
+  return c.json(serializeDashboardState());
+});
+
+// ─── SSE Client Management ──────────────────────────────────────────────────
+
+interface SSEClient {
+  stream: SSEStreamingApi;
+}
+
+const clients = new Set<SSEClient>();
+let lastPushedJson = "";
+let tickerInterval: ReturnType<typeof setInterval> | null = null;
+let sseMessageId = 0;
+
+function startTicker() {
+  if (tickerInterval) return;
+  tickerInterval = setInterval(() => {
+    const data = serializeDashboardState();
+    const json = JSON.stringify(data);
+    if (json === lastPushedJson) return;
+    lastPushedJson = json;
+    sseMessageId++;
+    const id = String(sseMessageId);
+    for (const client of clients) {
+      client.stream.writeSSE({ data: json, event: "state", id }).catch(() => {
+        // Client disconnected — will be cleaned up by onAbort
+      });
+    }
+  }, 1000);
+}
+
+function stopTicker() {
+  if (tickerInterval) {
+    clearInterval(tickerInterval);
+    tickerInterval = null;
+  }
+}
+
+function addClient(client: SSEClient) {
+  clients.add(client);
+  if (clients.size === 1) startTicker();
+}
+
+function removeClient(client: SSEClient) {
+  clients.delete(client);
+  if (clients.size === 0) stopTicker();
+}
+
+/** SSE stream — pushes dashboard state on change */
+app.get("/api/dashboard/stream", (c) => {
+  return streamSSE(c, async (stream) => {
+    const client: SSEClient = { stream };
+
+    // Send current state immediately
+    const data = serializeDashboardState();
+    const json = JSON.stringify(data);
+    sseMessageId++;
+    await stream.writeSSE({ data: json, event: "state", id: String(sseMessageId) });
+
+    addClient(client);
+
+    // Block until the client disconnects
+    await new Promise<void>((resolve) => {
+      stream.onAbort(() => {
+        removeClient(client);
+        resolve();
+      });
+    });
   });
 });
 

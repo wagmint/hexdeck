@@ -14,7 +14,7 @@ import { ProgressBar } from "@/components/dashboard/ProgressBar";
 import { RiskPanel } from "@/components/dashboard/RiskPanel";
 
 export default function DashboardPage() {
-  const { state, loading, error } = useDashboard(3000);
+  const { state, loading, error, connected } = useDashboard();
   const [selectedCollision, setSelectedCollision] = useState<Collision | null>(null);
   const [seenEventIds, setSeenEventIds] = useState<Set<string>>(new Set());
   const isFirstRender = useRef(true);

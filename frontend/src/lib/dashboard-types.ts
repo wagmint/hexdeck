@@ -48,9 +48,12 @@ export interface SessionPlan {
 
 export type AgentStatus = "idle" | "busy" | "warning" | "conflict";
 
+export type AgentType = "claude" | "codex";
+
 export interface Agent {
   sessionId: string;
   label: string;
+  agentType: AgentType;
   status: AgentStatus;
   currentTask: string;
   filesChanged: string[];

@@ -1,8 +1,11 @@
 import { statSync } from "fs";
 import { basename } from "path";
 import { getActiveSessions, listProjects, listSessions } from "../discovery/sessions.js";
+import { getActiveCodexSessions, discoverCodexSessions } from "../discovery/codex.js";
 import { parseSessionFile, parseSystemLines } from "../parser/jsonl.js";
+import { parseCodexSessionFile } from "../parser/codex.js";
 import { buildParsedSession } from "./nodes.js";
+import { buildCodexParsedSession } from "./codex-nodes.js";
 import { detectCollisions } from "./collisions.js";
 import { buildFeed } from "./feed.js";
 import { computeAgentRisk, computeWorkstreamRisk } from "./risk.js";
@@ -219,6 +222,35 @@ function getCachedOrParse(session: SessionInfo): ParsedSession {
   return parsed;
 }
 
+// ─── Codex parse cache (separate from Claude) ───────────────────────────────
+
+const codexParseCache = new Map<string, CacheEntry>();
+
+function isCodexSession(session: SessionInfo): boolean {
+  return session.path.includes("/.codex/");
+}
+
+function getCachedOrParseCodex(session: SessionInfo): ParsedSession {
+  const cached = codexParseCache.get(session.id);
+  let currentMtime: number;
+
+  try {
+    currentMtime = statSync(session.path).mtimeMs;
+  } catch {
+    currentMtime = 0;
+  }
+
+  if (cached && cached.mtimeMs === currentMtime) {
+    return cached.parsed;
+  }
+
+  const events = parseCodexSessionFile(session.path);
+  const parsed = buildCodexParsedSession(session, events);
+
+  codexParseCache.set(session.id, { mtimeMs: currentMtime, parsed });
+  return parsed;
+}
+
 // ─── Plan builder ────────────────────────────────────────────────────────────
 
 function buildSessionPlan(parsed: ParsedSession, agentLabel: string): SessionPlan {
@@ -326,14 +358,39 @@ export function buildDashboardState(): DashboardState {
     }
   }
 
+  // Codex discovery — fully isolated, failure does not affect Claude
+  try {
+    const codexActiveSessions = getActiveCodexSessions();
+    const codexRecent = discoverCodexSessions(1); // 24hr grace period
+    for (const s of [...codexActiveSessions, ...codexRecent]) {
+      if (allSessions.has(s.id)) continue;
+      allSessions.set(s.id, s);
+    }
+    for (const s of codexActiveSessions) activeSessionIds.add(s.id);
+  } catch { /* Codex failure — continue Claude-only */ }
+
   // 3. Parse all sessions
   const parsedSessions: ParsedSession[] = [];
+  const claudeParsedIds = new Set<string>();
+  const codexSessionIds = new Set<string>();
   for (const session of allSessions.values()) {
+    if (isCodexSession(session)) continue; // parse Codex sessions separately below
     try {
       parsedSessions.push(getCachedOrParse(session));
+      claudeParsedIds.add(session.id);
     } catch {
       // Skip unparseable sessions
     }
+  }
+
+  // Parse Codex sessions — each wrapped in try/catch for isolation
+  for (const session of allSessions.values()) {
+    if (claudeParsedIds.has(session.id)) continue;
+    if (!isCodexSession(session)) continue;
+    try {
+      parsedSessions.push(getCachedOrParseCodex(session));
+      codexSessionIds.add(session.id);
+    } catch { /* skip broken Codex session */ }
   }
 
   // 4. Build session label map
@@ -369,6 +426,7 @@ export function buildDashboardState(): DashboardState {
     agents.push({
       sessionId: parsed.session.id,
       label,
+      agentType: codexSessionIds.has(parsed.session.id) ? "codex" : "claude",
       status,
       currentTask,
       filesChanged: parsed.stats.filesChanged,

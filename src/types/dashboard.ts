@@ -50,11 +50,15 @@ export interface SessionPlan {
 
 export type AgentStatus = "idle" | "busy" | "warning" | "conflict";
 
+export type AgentType = "claude" | "codex";
+
 export interface Agent {
   /** Session ID */
   sessionId: string;
   /** Label within its project (agent-1, agent-2...) */
   label: string;
+  /** Which CLI this agent comes from */
+  agentType: AgentType;
   /** Current status */
   status: AgentStatus;
   /** Short description of current activity */

@@ -72,6 +72,13 @@ export function WorkstreamNode({ workstream }: WorkstreamNodeProps) {
             <div key={agent.sessionId} className="flex items-center gap-1 text-[10px]">
               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${agentDot[agent.status]}`} />
               <span className="text-dash-text-dim">{agent.label}</span>
+              <span className={`text-[7px] font-semibold px-0.5 rounded font-mono ${
+                agent.agentType === "codex"
+                  ? "text-dash-green/70"
+                  : "text-dash-blue/70"
+              }`}>
+                {agent.agentType === "codex" ? "codex" : "claude"}
+              </span>
             </div>
           ))}
         </div>
@@ -114,8 +121,15 @@ export function WorkstreamNode({ workstream }: WorkstreamNodeProps) {
                     className="flex items-center justify-between py-0.5 text-[10px] text-dash-text-dim"
                   >
                     <span className="truncate">{agent.currentTask}</span>
-                    <span className="text-dash-blue shrink-0 ml-2">
-                      {agent.label}
+                    <span className="shrink-0 ml-2 flex items-center gap-1">
+                      <span className="text-dash-blue">{agent.label}</span>
+                      <span className={`text-[7px] font-semibold font-mono ${
+                        agent.agentType === "codex"
+                          ? "text-dash-green/70"
+                          : "text-dash-blue/70"
+                      }`}>
+                        {agent.agentType === "codex" ? "codex" : "claude"}
+                      </span>
                     </span>
                   </div>
                 ))}

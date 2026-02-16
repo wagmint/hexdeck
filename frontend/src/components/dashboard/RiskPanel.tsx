@@ -32,6 +32,13 @@ function RiskCard({ agent }: { agent: Agent }) {
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-1.5">
           <span className="text-dash-text font-semibold text-[11px]">{label}</span>
+          <span className={`text-[8px] font-semibold px-1 py-px rounded border font-mono ${
+            agent.agentType === "codex"
+              ? "text-dash-green border-dash-green/30 bg-dash-green/10"
+              : "text-dash-blue border-dash-blue/30 bg-dash-blue/10"
+          }`}>
+            {agent.agentType === "codex" ? "codex" : "claude"}
+          </span>
           <span className="text-dash-text-muted text-[9px]">{slug}</span>
         </div>
         <RiskBadge level={risk.overallRisk} />

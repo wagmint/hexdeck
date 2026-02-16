@@ -172,8 +172,12 @@ export default function DashboardPage() {
             {/* Drag handle */}
             <div
               onMouseDown={onResizeStart}
-              className="h-1 cursor-row-resize border-t border-dash-border hover:bg-dash-blue/30 active:bg-dash-blue/50 transition-colors"
-            />
+              className="h-5 cursor-row-resize border-t border-dash-border hover:bg-dash-surface-2 active:bg-dash-blue/20 transition-colors flex flex-col items-center justify-center gap-[3px]"
+            >
+              <span className="block w-8 border-t border-dash-text-muted/40" />
+              <span className="block w-8 border-t border-dash-text-muted/40" />
+              <span className="block w-8 border-t border-dash-text-muted/40" />
+            </div>
             {selectedCollision ? (
               <CollisionDetail collision={selectedCollision} onDismiss={() => setSelectedCollision(null)} />
             ) : (

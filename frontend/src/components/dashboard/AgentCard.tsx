@@ -2,7 +2,6 @@
 
 import type { Workstream, PlanStatus } from "@/lib/dashboard-types";
 import { AgentPip } from "./AgentPip";
-import { useRouter } from "next/navigation";
 
 interface AgentCardProps {
   workstream: Workstream;
@@ -15,7 +14,6 @@ const planBadges: Partial<Record<PlanStatus, { label: string; className: string 
 };
 
 export function AgentCard({ workstream }: AgentCardProps) {
-  const router = useRouter();
   const hasActive = workstream.agents.some((a) => a.isActive);
   const focusAgent = workstream.agents.find((a) => a.isActive);
 
@@ -31,7 +29,7 @@ export function AgentCard({ workstream }: AgentCardProps) {
 
   return (
     <div
-      className={`px-3.5 py-2.5 border-b border-dash-border cursor-pointer transition-colors hover:bg-dash-surface ${
+      className={`px-3.5 py-2.5 border-b border-dash-border ${
         hasActive ? "bg-dash-surface-2 border-l-2 border-l-dash-green" : ""
       }`}
     >
@@ -67,11 +65,17 @@ export function AgentCard({ workstream }: AgentCardProps) {
         {workstream.agents.map((agent) => (
           <div
             key={agent.sessionId}
-            className="flex items-center gap-1.5 cursor-pointer hover:bg-dash-surface transition-colors rounded px-0.5 -mx-0.5"
-            onClick={() => router.push(`/session/${agent.sessionId}`)}
+            className="flex items-center gap-1.5 rounded px-0.5 -mx-0.5"
           >
             <AgentPip status={agent.status} />
             <span className="text-[10px] text-dash-text-dim">{agent.label}</span>
+            <span className={`text-[8px] font-semibold px-1 py-px rounded border font-mono ${
+              agent.agentType === "codex"
+                ? "text-dash-green border-dash-green/30 bg-dash-green/10"
+                : "text-dash-blue border-dash-blue/30 bg-dash-blue/10"
+            }`}>
+              {agent.agentType === "codex" ? "codex" : "claude"}
+            </span>
           </div>
         ))}
       </div>

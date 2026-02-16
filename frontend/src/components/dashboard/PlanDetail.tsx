@@ -49,6 +49,13 @@ function collectPlans(workstreams: Workstream[]): PlanEntry[] {
 
 // ─── Overview ────────────────────────────────────────────────────────────────
 
+const taskIcon: Record<string, { char: string; className: string }> = {
+  completed: { char: "\u2713", className: "text-dash-green" },
+  in_progress: { char: "\u25B6", className: "text-dash-blue" },
+  pending: { char: "\u25CB", className: "text-dash-text-muted" },
+  deleted: { char: "\u2212", className: "text-dash-text-muted opacity-40" },
+};
+
 function PlanOverview({
   entries,
   onSelect,
@@ -56,6 +63,8 @@ function PlanOverview({
   entries: PlanEntry[];
   onSelect: (idx: number) => void;
 }) {
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+
   if (entries.length === 0) {
     return (
       <div className="h-full flex items-center justify-center text-dash-text-muted text-xs">
@@ -72,41 +81,71 @@ function PlanOverview({
       </div>
       {entries.map((entry, i) => {
         const cfg = statusConfig[entry.plan.status];
+        const isExpanded = expandedIdx === i;
         return (
-          <button
-            key={i}
-            onClick={() => onSelect(i)}
-            className="w-full flex items-center gap-3 px-3.5 py-2 border-b border-dash-border hover:bg-dash-surface-2 transition-colors text-left"
-          >
-            <div className={`w-[3px] h-8 rounded-sm shrink-0 ${
-              entry.plan.status === "completed" ? "bg-dash-green"
-                : entry.plan.status === "implementing" ? "bg-dash-green"
-                : entry.plan.status === "drafting" ? "bg-dash-purple"
-                : entry.plan.status === "approved" ? "bg-dash-blue"
-                : "bg-dash-text-muted"
-            }`} />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-semibold text-dash-text truncate">
-                  {entry.title}
-                </span>
-                {cfg && (
-                  <span className={`text-[7px] font-bold tracking-widest uppercase px-1 py-px rounded shrink-0 ${cfg.bg} ${cfg.color}`}>
-                    {cfg.label}
+          <div key={i} className="border-b border-dash-border">
+            <button
+              onClick={() => onSelect(i)}
+              className="w-full flex items-center gap-3 px-3.5 py-2 hover:bg-dash-surface-2 transition-colors text-left"
+            >
+              <div className={`w-[3px] h-8 rounded-sm shrink-0 ${
+                entry.plan.status === "completed" ? "bg-dash-green"
+                  : entry.plan.status === "implementing" ? "bg-dash-green"
+                  : entry.plan.status === "drafting" ? "bg-dash-purple"
+                  : entry.plan.status === "approved" ? "bg-dash-blue"
+                  : "bg-dash-text-muted"
+              }`} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-semibold text-dash-text truncate">
+                    {entry.title}
                   </span>
-                )}
+                  {cfg && (
+                    <span className={`text-[7px] font-bold tracking-widest uppercase px-1 py-px rounded shrink-0 ${cfg.bg} ${cfg.color}`}>
+                      {cfg.label}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 mt-0.5 text-[9px] text-dash-text-muted">
+                  <span className="font-semibold text-dash-text-dim">{entry.plan.agentLabel}</span>
+                  <span>{entry.workstreamName}</span>
+                  {entry.tasksTotal > 0 && (
+                    <span
+                      className="cursor-pointer transition-colors px-1 py-px rounded border border-dash-border hover:border-dash-text-muted hover:bg-dash-surface-2 text-dash-text-dim"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedIdx(isExpanded ? null : i);
+                      }}
+                    >
+                      {entry.tasksDone}/{entry.tasksTotal} tasks {isExpanded ? "\u25B4" : "\u25BE"}
+                    </span>
+                  )}
+                  <span>{timeAgo(entry.plan.timestamp)}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2 mt-0.5 text-[9px] text-dash-text-muted">
-                <span className="font-semibold text-dash-text-dim">{entry.plan.agentLabel}</span>
-                <span>{entry.workstreamName}</span>
-                {entry.tasksTotal > 0 && (
-                  <span>{entry.tasksDone}/{entry.tasksTotal} tasks</span>
-                )}
-                <span>{timeAgo(entry.plan.timestamp)}</span>
+              <span className="text-dash-text-muted text-[10px] shrink-0">&rsaquo;</span>
+            </button>
+            {isExpanded && entry.plan.tasks.length > 0 && (
+              <div className="px-3.5 pb-2 pl-8 space-y-px">
+                {entry.plan.tasks.map((task, ti) => {
+                  const icon = taskIcon[task.status] ?? taskIcon.pending;
+                  return (
+                    <div
+                      key={`${task.id}-${ti}`}
+                      className="flex items-center gap-1.5 text-[10px] text-dash-text-dim"
+                    >
+                      <span className={`text-[9px] w-3 text-center shrink-0 ${icon.className}`}>
+                        {icon.char}
+                      </span>
+                      <span className={`truncate ${task.status === "completed" ? "line-through opacity-50" : ""}`}>
+                        {task.subject}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
-            <span className="text-dash-text-muted text-[10px] shrink-0">&rsaquo;</span>
-          </button>
+            )}
+          </div>
         );
       })}
     </div>

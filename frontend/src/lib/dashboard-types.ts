@@ -27,6 +27,17 @@ export interface WorkstreamRisk {
   overallRisk: RiskLevel;
 }
 
+// ─── Operator Types ─────────────────────────────────────────────────────────
+
+export type OperatorStatus = "online" | "offline";
+
+export interface Operator {
+  id: string;
+  name: string;
+  color: string;
+  status: OperatorStatus;
+}
+
 // ─── Dashboard Types (frontend mirrors — dates as strings) ──────────────────
 
 export type PlanStatus = "drafting" | "approved" | "implementing" | "completed" | "none";
@@ -61,6 +72,7 @@ export interface Agent {
   isActive: boolean;
   plan: SessionPlan;
   risk: AgentRisk;
+  operatorId: string;
 }
 
 export interface Workstream {
@@ -89,8 +101,10 @@ export interface Collision {
     label: string;
     projectPath: string;
     lastAction: string;
+    operatorId: string;
   }[];
   severity: CollisionSeverity;
+  isCrossOperator: boolean;
   detectedAt: string;
 }
 
@@ -113,6 +127,7 @@ export interface FeedEvent {
   agentLabel: string;
   sessionId: string;
   projectPath: string;
+  operatorId: string;
   message: string;
   collisionId?: string;
 }
@@ -126,9 +141,11 @@ export interface DashboardSummary {
   totalCommits: number;
   totalErrors: number;
   agentsAtRisk: number;
+  operatorCount: number;
 }
 
 export interface DashboardState {
+  operators: Operator[];
   agents: Agent[];
   workstreams: Workstream[];
   collisions: Collision[];

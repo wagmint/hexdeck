@@ -27,6 +27,21 @@ export interface WorkstreamRisk {
   overallRisk: RiskLevel;
 }
 
+// ─── Operator Types ──────────────────────────────────────────────────────────
+
+export type OperatorStatus = "online" | "offline";
+
+export interface Operator {
+  /** "self" for local, "op-andrew" for configured */
+  id: string;
+  /** Display name: "Jake", "Andrew" */
+  name: string;
+  /** Hex color from palette */
+  color: string;
+  /** Online if any agents are active */
+  status: OperatorStatus;
+}
+
 // ─── Dashboard Types ─────────────────────────────────────────────────────────
 
 export type PlanStatus = "drafting" | "approved" | "implementing" | "completed" | "none";
@@ -73,6 +88,8 @@ export interface Agent {
   plan: SessionPlan;
   /** Risk analytics */
   risk: AgentRisk;
+  /** Operator this agent belongs to */
+  operatorId: string;
 }
 
 export interface Workstream {
@@ -118,9 +135,13 @@ export interface Collision {
     projectPath: string;
     /** What this agent last did to the file */
     lastAction: string;
+    /** Operator this agent belongs to */
+    operatorId: string;
   }[];
-  /** Severity: critical if cross-project, warning if same project */
+  /** Severity: critical if cross-project or cross-operator, warning if same project */
   severity: CollisionSeverity;
+  /** Whether this collision involves agents from different operators */
+  isCrossOperator: boolean;
   /** Display timestamp */
   detectedAt: Date;
 }
@@ -152,6 +173,8 @@ export interface FeedEvent {
   projectPath: string;
   /** Human-readable message */
   message: string;
+  /** Operator this event belongs to */
+  operatorId: string;
   /** Optional: collision ID if type is collision */
   collisionId?: string;
 }
@@ -165,9 +188,11 @@ export interface DashboardSummary {
   totalCommits: number;
   totalErrors: number;
   agentsAtRisk: number;
+  operatorCount: number;
 }
 
 export interface DashboardState {
+  operators: Operator[];
   agents: Agent[];
   workstreams: Workstream[];
   collisions: Collision[];

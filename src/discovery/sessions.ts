@@ -15,17 +15,19 @@ export function getProjectsDir(): string {
 
 /**
  * List all projects that have Claude Code sessions.
+ * @param claudeDir Optional alternative .claude directory (defaults to ~/.claude)
  */
-export function listProjects(): ProjectInfo[] {
-  if (!existsSync(CLAUDE_PROJECTS_DIR)) return [];
+export function listProjects(claudeDir?: string): ProjectInfo[] {
+  const projectsDir = claudeDir ? join(claudeDir, "projects") : CLAUDE_PROJECTS_DIR;
+  if (!existsSync(projectsDir)) return [];
 
-  const entries = readdirSync(CLAUDE_PROJECTS_DIR, { withFileTypes: true });
+  const entries = readdirSync(projectsDir, { withFileTypes: true });
   const projects: ProjectInfo[] = [];
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
 
-    const projectDir = join(CLAUDE_PROJECTS_DIR, entry.name);
+    const projectDir = join(projectsDir, entry.name);
     const sessions = listSessionsInDir(projectDir);
 
     if (sessions.length === 0) continue;
@@ -48,15 +50,17 @@ export function listProjects(): ProjectInfo[] {
 
 /**
  * List all sessions for a given project (by encoded name or original path).
+ * @param claudeDir Optional alternative .claude directory (defaults to ~/.claude)
  */
-export function listSessions(projectIdentifier: string): SessionInfo[] {
+export function listSessions(projectIdentifier: string, claudeDir?: string): SessionInfo[] {
+  const projectsDir = claudeDir ? join(claudeDir, "projects") : CLAUDE_PROJECTS_DIR;
   // Try as encoded name first
-  let projectDir = join(CLAUDE_PROJECTS_DIR, projectIdentifier);
+  let projectDir = join(projectsDir, projectIdentifier);
 
   if (!existsSync(projectDir)) {
     // Try encoding the path
     const encoded = encodeProjectPath(projectIdentifier);
-    projectDir = join(CLAUDE_PROJECTS_DIR, encoded);
+    projectDir = join(projectsDir, encoded);
   }
 
   if (!existsSync(projectDir)) return [];

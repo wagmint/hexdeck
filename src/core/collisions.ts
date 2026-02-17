@@ -60,7 +60,11 @@ function getLastCommitTime(projectPath: string): number {
  *      Any commit (from any session or manual) resets the slate globally.
  *   2. Git dirty check — only files that are currently uncommitted
  */
-export function detectCollisions(sessions: ParsedSession[], labelMap?: Map<string, string>): Collision[] {
+export function detectCollisions(
+  sessions: ParsedSession[],
+  labelMap?: Map<string, string>,
+  operatorMap?: Map<string, string>,
+): Collision[] {
   const now = Date.now();
   const recencyCutoff = now - RECENCY_MINUTES * 60 * 1000;
 
@@ -91,6 +95,7 @@ export function detectCollisions(sessions: ParsedSession[], labelMap?: Map<strin
     projectPath: string;
     label: string;
     lastAction: string;
+    operatorId: string;
   }[]>();
 
   for (const session of sessions) {
@@ -121,6 +126,7 @@ export function detectCollisions(sessions: ParsedSession[], labelMap?: Map<strin
             projectPath,
             label,
             lastAction: turn.summary || "edited file",
+            operatorId: operatorMap?.get(session.session.id) ?? "self",
           });
         } else {
           // Update with latest action
@@ -141,15 +147,19 @@ export function detectCollisions(sessions: ParsedSession[], labelMap?: Map<strin
     const uniqueSessions = new Set(agents.map(a => a.sessionId));
     if (uniqueSessions.size < 2) continue;
 
-    // Determine severity
+    // Determine cross-operator status and severity
     const uniqueProjects = new Set(agents.map(a => a.projectPath));
-    const severity: CollisionSeverity = uniqueProjects.size > 1 ? "critical" : "warning";
+    const uniqueOperators = new Set(agents.map(a => a.operatorId));
+    const isCrossOperator = uniqueOperators.size > 1;
+    const severity: CollisionSeverity =
+      uniqueProjects.size > 1 || isCrossOperator ? "critical" : "warning";
 
     collisions.push({
       id: `collision-${idx++}`,
       filePath,
       agents,
       severity,
+      isCrossOperator,
       detectedAt: new Date(),
     });
   }

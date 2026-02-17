@@ -27,19 +27,22 @@ function getCachedMeta(filePath: string, mtimeMs: number): { id: string; cwd: st
 /**
  * Discover Codex sessions from ~/.codex/sessions/ within a recency window.
  * Directory structure: YYYY/MM/DD/rollout-*.jsonl
+ * @param recencyDays How many days back to look (default 7)
+ * @param codexDir Optional alternative .codex directory root (defaults to ~/.codex)
  */
-export function discoverCodexSessions(recencyDays = 7): SessionInfo[] {
-  if (!existsSync(CODEX_SESSIONS_DIR)) return [];
+export function discoverCodexSessions(recencyDays = 7, codexDir?: string): SessionInfo[] {
+  const sessionsDir = codexDir ? join(codexDir, "sessions") : CODEX_SESSIONS_DIR;
+  if (!existsSync(sessionsDir)) return [];
 
   const sessions: SessionInfo[] = [];
   const cutoff = Date.now() - recencyDays * 24 * 60 * 60 * 1000;
 
   try {
     // Walk YYYY directories
-    const years = safeReaddir(CODEX_SESSIONS_DIR);
+    const years = safeReaddir(sessionsDir);
     for (const year of years) {
       if (!/^\d{4}$/.test(year)) continue;
-      const yearDir = join(CODEX_SESSIONS_DIR, year);
+      const yearDir = join(sessionsDir, year);
 
       // Walk MM directories
       const months = safeReaddir(yearDir);

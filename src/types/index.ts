@@ -1,5 +1,6 @@
 export type {
   RiskLevel, SpinningSignal, AgentRisk, WorkstreamRisk,
+  OperatorStatus, Operator,
   PlanStatus, PlanTask, SessionPlan,
   AgentStatus, Agent, Workstream, CollisionSeverity, Collision,
   FeedEventType, FeedEvent, DashboardSummary, DashboardState,

@@ -21,12 +21,17 @@ export function buildFeed(
   collisions: Collision[],
   labelMap?: Map<string, string>,
   activeSessionIds?: Set<string>,
+  operatorMap?: Map<string, string>,
 ): FeedEvent[] {
+  /** Resolve operatorId for a session */
+  const opId = (sessionId: string) => operatorMap?.get(sessionId) ?? "self";
+
   // 1. Derive turn-based events — stable IDs mean they're only added once
   for (const session of sessions) {
     const sessionId = session.session.id;
     const projectPath = session.session.projectPath;
     const label = labelMap?.get(sessionId) ?? sessionId.slice(0, 8);
+    const operatorId = opId(sessionId);
 
     addEvent({
       id: `start-${sessionId}`,
@@ -35,6 +40,7 @@ export function buildFeed(
       agentLabel: label,
       sessionId,
       projectPath,
+      operatorId,
       message: `Session started in ${projectName(projectPath)}`,
     });
 
@@ -50,6 +56,7 @@ export function buildFeed(
           agentLabel: label,
           sessionId,
           projectPath,
+          operatorId,
           message: turn.commitMessage
             ? `Committed: ${turn.commitMessage}`
             : `Committed changes to ${turn.filesChanged.length} file(s)`,
@@ -64,6 +71,7 @@ export function buildFeed(
           agentLabel: label,
           sessionId,
           projectPath,
+          operatorId,
           message: `Error${turn.errorCount > 1 ? ` (${turn.errorCount}x)` : ""}: ${turn.summary || "encountered an error"}`,
         });
       }
@@ -76,6 +84,7 @@ export function buildFeed(
           agentLabel: label,
           sessionId,
           projectPath,
+          operatorId,
           message: "Context compacted",
         });
       }
@@ -88,6 +97,7 @@ export function buildFeed(
           agentLabel: label,
           sessionId,
           projectPath,
+          operatorId,
           message: "Entered plan mode",
         });
       }
@@ -100,6 +110,7 @@ export function buildFeed(
           agentLabel: label,
           sessionId,
           projectPath,
+          operatorId,
           message: `Plan approved${turn.planMarkdown ? ": " + extractPlanTitle(turn.planMarkdown) : ""}`,
         });
       }
@@ -114,6 +125,7 @@ export function buildFeed(
             agentLabel: label,
             sessionId,
             projectPath,
+            operatorId,
             message: `Completed: ${task ?? `task #${tu.taskId}`}`,
           });
         }
@@ -134,6 +146,7 @@ export function buildFeed(
           agentLabel: label,
           sessionId,
           projectPath: session.session.projectPath,
+          operatorId: opId(sessionId),
           message: "Session ended",
         });
       }
@@ -160,6 +173,7 @@ export function buildFeed(
         agentLabel: agentLabels,
         sessionId: collision.agents[0]?.sessionId ?? "",
         projectPath: collision.agents[0]?.projectPath ?? "",
+        operatorId: collision.agents[0]?.operatorId ?? "self",
         message: `Collision on ${fileName(key)}: ${agentLabels} both modifying`,
         collisionId: collision.id,
       });
@@ -177,6 +191,7 @@ export function buildFeed(
         agentLabel: agentLabels,
         sessionId: data.collision.agents[0]?.sessionId ?? "",
         projectPath: data.collision.agents[0]?.projectPath ?? "",
+        operatorId: data.collision.agents[0]?.operatorId ?? "self",
         message: `Resolved collision on ${fileName(key)}`,
       });
       activeCollisions.delete(key);

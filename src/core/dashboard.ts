@@ -9,9 +9,10 @@ import { buildCodexParsedSession } from "./codex-nodes.js";
 import { detectCollisions } from "./collisions.js";
 import { buildFeed } from "./feed.js";
 import { computeAgentRisk, computeWorkstreamRisk } from "./risk.js";
+import { loadOperatorConfig, getSelfName, operatorId as makeOperatorId, getOperatorColor } from "./config.js";
 import type {
   ParsedSession, SessionInfo, Agent, AgentStatus,
-  Workstream, DashboardState, DashboardSummary,
+  Workstream, DashboardState, DashboardSummary, Operator,
   SessionPlan, PlanStatus, PlanTask, TokenUsage,
 } from "../types/index.js";
 
@@ -329,13 +330,37 @@ function buildSessionPlan(parsed: ParsedSession, agentLabel: string): SessionPla
 const RECENT_GRACE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export function buildDashboardState(): DashboardState {
-  // 1. Get all active sessions
+  // 0. Load operator config
+  const config = loadOperatorConfig();
+  const selfName = getSelfName(config);
+
+  // Build operator registry
+  const operatorRegistry: Operator[] = [
+    { id: "self", name: selfName, color: getOperatorColor(0), status: "offline" },
+  ];
+  for (let i = 0; i < config.operators.length; i++) {
+    const op = config.operators[i];
+    operatorRegistry.push({
+      id: makeOperatorId(op.name),
+      name: op.name,
+      color: getOperatorColor(i + 1),
+      status: "offline",
+    });
+  }
+
+  // Session → operator mapping
+  const sessionOperatorMap = new Map<string, string>();
+
+  // 1. Get all active sessions (self)
   const activeSessions = getActiveSessions();
   const activeSessionIds = new Set(activeSessions.map(s => s.id));
 
+  // Tag self sessions
+  for (const s of activeSessions) {
+    sessionOperatorMap.set(s.id, "self");
+  }
+
   // 2. Include active sessions + recently-dead sessions from same projects
-  //    This bridges the gap when "execute and clear context" kills one session
-  //    and starts another — the old session's plan stays visible briefly.
   const allSessions = new Map<string, SessionInfo>();
   for (const s of activeSessions) {
     allSessions.set(s.id, s);
@@ -350,31 +375,62 @@ export function buildDashboardState(): DashboardState {
     if (!activeProjectPaths.has(project.decodedPath)) continue;
     const projectSessions = listSessions(project.encodedName);
     for (const s of projectSessions) {
-      if (allSessions.has(s.id)) continue; // already active
-      // Include if modified within grace period
+      if (allSessions.has(s.id)) continue;
       if (now - s.modifiedAt.getTime() < RECENT_GRACE_MS) {
         allSessions.set(s.id, s);
+        if (!sessionOperatorMap.has(s.id)) sessionOperatorMap.set(s.id, "self");
       }
     }
   }
 
-  // Codex discovery — fully isolated, failure does not affect Claude
+  // Codex discovery (self) — fully isolated
   try {
     const codexActiveSessions = getActiveCodexSessions();
-    const codexRecent = discoverCodexSessions(1); // 24hr grace period
+    const codexRecent = discoverCodexSessions(1);
     for (const s of [...codexActiveSessions, ...codexRecent]) {
       if (allSessions.has(s.id)) continue;
       allSessions.set(s.id, s);
+      if (!sessionOperatorMap.has(s.id)) sessionOperatorMap.set(s.id, "self");
     }
     for (const s of codexActiveSessions) activeSessionIds.add(s.id);
   } catch { /* Codex failure — continue Claude-only */ }
+
+  // 2b. Discover sessions from configured operators
+  for (const op of config.operators) {
+    const opId = makeOperatorId(op.name);
+    try {
+      // Claude sessions for this operator
+      if (op.claude) {
+        const opProjects = listProjects(op.claude);
+        for (const project of opProjects) {
+          const opSessions = listSessions(project.encodedName, op.claude);
+          for (const s of opSessions) {
+            if (allSessions.has(s.id)) continue;
+            if (now - s.modifiedAt.getTime() < RECENT_GRACE_MS) {
+              allSessions.set(s.id, s);
+              sessionOperatorMap.set(s.id, opId);
+            }
+          }
+        }
+      }
+      // Codex sessions for this operator
+      if (op.codex) {
+        const opCodexSessions = discoverCodexSessions(1, op.codex);
+        for (const s of opCodexSessions) {
+          if (allSessions.has(s.id)) continue;
+          allSessions.set(s.id, s);
+          sessionOperatorMap.set(s.id, opId);
+        }
+      }
+    } catch { /* skip broken operator config */ }
+  }
 
   // 3. Parse all sessions
   const parsedSessions: ParsedSession[] = [];
   const claudeParsedIds = new Set<string>();
   const codexSessionIds = new Set<string>();
   for (const session of allSessions.values()) {
-    if (isCodexSession(session)) continue; // parse Codex sessions separately below
+    if (isCodexSession(session)) continue;
     try {
       parsedSessions.push(getCachedOrParse(session));
       claudeParsedIds.add(session.id);
@@ -383,7 +439,7 @@ export function buildDashboardState(): DashboardState {
     }
   }
 
-  // Parse Codex sessions — each wrapped in try/catch for isolation
+  // Parse Codex sessions
   for (const session of allSessions.values()) {
     if (claudeParsedIds.has(session.id)) continue;
     if (!isCodexSession(session)) continue;
@@ -398,7 +454,7 @@ export function buildDashboardState(): DashboardState {
 
   // 5. Detect collisions (only between currently active sessions)
   const activeParsed = parsedSessions.filter(p => activeSessionIds.has(p.session.id));
-  const collisions = detectCollisions(activeParsed, labelMap);
+  const collisions = detectCollisions(activeParsed, labelMap, sessionOperatorMap);
   const collisionFileSet = new Set(collisions.flatMap(c => c.agents.map(a => a.sessionId)));
 
   // 6. Build agents
@@ -434,10 +490,11 @@ export function buildDashboardState(): DashboardState {
       isActive,
       plan,
       risk,
+      operatorId: sessionOperatorMap.get(parsed.session.id) ?? "self",
     });
   }
 
-  // 6. Build workstreams (group by project)
+  // 7. Build workstreams (group by project)
   const projectGroups = new Map<string, ParsedSession[]>();
   for (const parsed of parsedSessions) {
     const key = parsed.session.projectPath;
@@ -463,13 +520,11 @@ export function buildDashboardState(): DashboardState {
 
     const hasCollision = activeProjectAgents.some(a => a.status === "conflict");
 
-    // Aggregate plans and tasks from ALL agents (including dead) — skip empty drafts
     const plans = allProjectAgents.map(a => a.plan).filter(p =>
       p.status !== "none" && !(p.status === "drafting" && !p.markdown)
     );
     const planTasks = plans.flatMap(p => p.tasks);
 
-    // Progress: use task completion if tasks exist, otherwise fall back to commit ratio
     let completionPct: number;
     if (planTasks.length > 0) {
       const done = planTasks.filter(t => t.status === "completed").length;
@@ -478,11 +533,9 @@ export function buildDashboardState(): DashboardState {
       completionPct = totalTurns > 0 ? Math.round((completedTurns / totalTurns) * 100) : 0;
     }
 
-    // Find the encoded project name for this path
     const project = projects.find(p => p.decodedPath === projectPath);
     const projectId = project?.encodedName ?? projectPath.replace(/\//g, "-");
 
-    // Risk: only from active agents
     const risk = computeWorkstreamRisk(activeProjectAgents);
 
     workstreams.push({
@@ -511,9 +564,19 @@ export function buildDashboardState(): DashboardState {
   });
 
   // 8. Build feed
-  const feed = buildFeed(parsedSessions, collisions, labelMap, activeSessionIds);
+  const feed = buildFeed(parsedSessions, collisions, labelMap, activeSessionIds, sessionOperatorMap);
 
-  // 8. Build summary — only active agents are exposed
+  // 9. Build operators — set status to "online" if any agents are active
+  const operatorActiveSet = new Set<string>();
+  for (const agent of agents) {
+    if (agent.isActive) operatorActiveSet.add(agent.operatorId);
+  }
+  const operators: Operator[] = operatorRegistry.map(op => ({
+    ...op,
+    status: operatorActiveSet.has(op.id) ? "online" as const : "offline" as const,
+  }));
+
+  // 10. Build summary — only active agents are exposed
   const activeAgents = agents.filter(a => a.isActive);
   const agentsAtRisk = activeAgents.filter(a => a.risk.overallRisk !== "nominal").length;
   const summary: DashboardSummary = {
@@ -525,9 +588,10 @@ export function buildDashboardState(): DashboardState {
     totalCommits: workstreams.reduce((sum, w) => sum + w.commits, 0),
     totalErrors: workstreams.reduce((sum, w) => sum + w.errors, 0),
     agentsAtRisk,
+    operatorCount: operators.length,
   };
 
-  return { agents: activeAgents, workstreams, collisions, feed, summary };
+  return { operators, agents: activeAgents, workstreams, collisions, feed, summary };
 }
 
 function determineAgentStatus(

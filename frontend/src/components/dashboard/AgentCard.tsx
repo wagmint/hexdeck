@@ -9,8 +9,8 @@ interface AgentCardProps {
 
 const planBadges: Partial<Record<PlanStatus, { label: string; className: string }>> = {
   drafting: { label: "PLANNING", className: "text-dash-purple bg-dash-purple/10" },
-  approved: { label: "PLANNED", className: "text-dash-blue bg-dash-blue/10" },
-  implementing: { label: "BUILDING", className: "text-dash-green bg-dash-green/10" },
+  implementing: { label: "BUILDING", className: "text-dash-yellow bg-dash-yellow/10" },
+  rejected: { label: "REJECTED", className: "text-dash-red bg-dash-red/10" },
 };
 
 export function AgentCard({ workstream }: AgentCardProps) {

@@ -335,31 +335,55 @@ function getCachedOrParseCodex(session: SessionInfo): ParsedSession {
 // ─── Plan builder ────────────────────────────────────────────────────────────
 
 function buildSessionPlan(parsed: ParsedSession, agentLabel: string): SessionPlan {
-  let status: PlanStatus = "none";
   let markdown: string | null = null;
+  let planAccepted = false;
+  let planRejected = false;
+  let inPlanMode = false;
   let lastPlanTs: Date = parsed.session.createdAt;
   const tasks: PlanTask[] = [];
   const taskStatuses = new Map<string, string>();
 
+  // Snapshot before the last EnterPlanMode — used to restore if the plan cycle is rejected
+  let savedTasks: PlanTask[] = [];
+  let savedStatuses = new Map<string, string>();
+  let savedMarkdown: string | null = null;
+
   for (const turn of parsed.turns) {
     if (turn.hasPlanStart) {
-      status = "drafting";
+      // Save current state before clearing for new plan cycle
+      savedTasks = tasks.map(t => ({ ...t }));
+      savedStatuses = new Map(taskStatuses);
+      savedMarkdown = markdown;
+      tasks.length = 0;
+      taskStatuses.clear();
+      inPlanMode = true;
+      planAccepted = false;
+      planRejected = false;
       lastPlanTs = turn.timestamp;
     }
     if (turn.hasPlanEnd && !turn.planRejected) {
-      status = "approved";
-      markdown = turn.planMarkdown;
+      inPlanMode = false;
+      planAccepted = true;
+      planRejected = false;
+      markdown = turn.planMarkdown ?? markdown;
       lastPlanTs = turn.timestamp;
     }
     if (turn.hasPlanEnd && turn.planRejected) {
-      status = "drafting";
+      // Plan rejected — restore pre-ENTER state
+      inPlanMode = false;
+      planAccepted = false;
+      planRejected = true;
+      tasks.length = 0;
+      tasks.push(...savedTasks);
+      taskStatuses.clear();
+      for (const [k, v] of savedStatuses) taskStatuses.set(k, v);
+      markdown = savedMarkdown;
       lastPlanTs = turn.timestamp;
     }
 
-    // Cross-session plan: planMarkdown from JSONL envelope (user approved plan in this session)
+    // Cross-session plan: planMarkdown from JSONL envelope
     if (turn.planMarkdown && !markdown) {
       markdown = turn.planMarkdown;
-      if (status === "none") status = "implementing";
       lastPlanTs = turn.timestamp;
     }
 
@@ -389,16 +413,26 @@ function buildSessionPlan(parsed: ParsedSession, agentLabel: string): SessionPla
     }
   }
 
-  // If plan is approved/drafting and tasks are being worked on, it's implementing
-  // "drafting" can have tasks when ExitPlanMode wasn't called (user approved via prompt)
-  if ((status === "approved" || status === "drafting") && tasks.some(t => t.status === "in_progress" || t.status === "completed")) {
-    status = "implementing";
-  }
-
-  // If all tasks are completed, plan is done
   const activeTasks = tasks.filter(t => t.status !== "deleted");
-  if (status === "implementing" && activeTasks.length > 0 && activeTasks.every(t => t.status === "completed")) {
-    status = "completed";
+
+  // Determine status — tasks are the ground truth
+  let status: PlanStatus = "none";
+
+  if (activeTasks.length > 0) {
+    if (activeTasks.every(t => t.status === "completed")) {
+      status = "completed";
+    } else if (activeTasks.some(t => t.status === "in_progress" || t.status === "completed")) {
+      status = "implementing";
+    } else {
+      status = "drafting";
+    }
+  } else if (markdown || inPlanMode || planAccepted || planRejected) {
+    // No tasks — fall back to plan mode signals
+    if (planRejected) {
+      status = "rejected";
+    } else if (inPlanMode || planAccepted || markdown) {
+      status = "drafting";
+    }
   }
 
   return { status, markdown, tasks: activeTasks, agentLabel, timestamp: lastPlanTs };

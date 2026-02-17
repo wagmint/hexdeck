@@ -40,7 +40,7 @@ export interface Operator {
 
 // ─── Dashboard Types (frontend mirrors — dates as strings) ──────────────────
 
-export type PlanStatus = "drafting" | "approved" | "implementing" | "completed" | "none";
+export type PlanStatus = "drafting" | "implementing" | "completed" | "rejected" | "none";
 
 export interface PlanTask {
   id: string;

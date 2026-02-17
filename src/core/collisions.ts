@@ -12,6 +12,7 @@ function getDirtyFiles(projectPath: string): Set<string> {
       cwd: projectPath,
       encoding: "utf-8",
       timeout: 5000,
+      stdio: ["pipe", "pipe", "pipe"],
     });
     const dirty = new Set<string>();
     for (const line of output.split("\n")) {
@@ -42,6 +43,7 @@ function getLastCommitTime(projectPath: string): number {
       cwd: projectPath,
       encoding: "utf-8",
       timeout: 5000,
+      stdio: ["pipe", "pipe", "pipe"],
     });
     const ts = new Date(output.trim()).getTime();
     return isNaN(ts) ? 0 : ts;

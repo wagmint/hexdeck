@@ -18,9 +18,9 @@ interface PlanEntry {
 
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
   drafting: { label: "DRAFTING", color: "text-dash-purple", bg: "bg-dash-purple-dim" },
-  approved: { label: "APPROVED", color: "text-dash-blue", bg: "bg-dash-blue-dim" },
-  implementing: { label: "IMPLEMENTING", color: "text-dash-green", bg: "bg-dash-green-dim" },
+  implementing: { label: "IMPLEMENTING", color: "text-dash-yellow", bg: "bg-dash-yellow-dim" },
   completed: { label: "COMPLETED", color: "text-dash-green", bg: "bg-dash-green-dim" },
+  rejected: { label: "REJECTED", color: "text-dash-red", bg: "bg-dash-red-dim" },
 };
 
 function extractTitle(md: string | null): string {
@@ -90,9 +90,9 @@ function PlanOverview({
             >
               <div className={`w-[3px] h-8 rounded-sm shrink-0 ${
                 entry.plan.status === "completed" ? "bg-dash-green"
-                  : entry.plan.status === "implementing" ? "bg-dash-green"
+                  : entry.plan.status === "implementing" ? "bg-dash-yellow"
                   : entry.plan.status === "drafting" ? "bg-dash-purple"
-                  : entry.plan.status === "approved" ? "bg-dash-blue"
+                  : entry.plan.status === "rejected" ? "bg-dash-red"
                   : "bg-dash-text-muted"
               }`} />
               <div className="flex-1 min-w-0">

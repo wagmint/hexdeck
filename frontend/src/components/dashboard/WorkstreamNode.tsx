@@ -8,9 +8,9 @@ interface WorkstreamNodeProps {
 
 const planStatusBadge: Record<string, { label: string; className: string }> = {
   drafting: { label: "PLANNING", className: "text-dash-purple bg-dash-purple/10" },
-  approved: { label: "PLANNED", className: "text-dash-blue bg-dash-blue/10" },
-  implementing: { label: "BUILDING", className: "text-dash-green bg-dash-green/10" },
+  implementing: { label: "BUILDING", className: "text-dash-yellow bg-dash-yellow/10" },
   completed: { label: "DONE", className: "text-dash-text-muted bg-dash-surface-2" },
+  rejected: { label: "REJECTED", className: "text-dash-red bg-dash-red/10" },
 };
 
 const agentDot: Record<AgentStatus, string> = {

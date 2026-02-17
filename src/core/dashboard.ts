@@ -1,5 +1,6 @@
-import { statSync } from "fs";
-import { basename } from "path";
+import { statSync, existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { basename, join } from "path";
+import { homedir } from "os";
 import { getActiveSessions, listProjects, listSessions } from "../discovery/sessions.js";
 import { getActiveCodexSessions, discoverCodexSessions } from "../discovery/codex.js";
 import { parseSessionFile, parseSystemLines } from "../parser/jsonl.js";
@@ -97,15 +98,91 @@ function hashToIndex(id: string): number {
   return Math.abs(h);
 }
 
-/** Persistent label assignments — once a session gets a name, it keeps it. */
-const persistentLabels = new Map<string, string>();
+// ─── Persistent label store (survives server restarts) ───────────────────────
 
-/** Assign unique short names. Existing assignments are preserved across cycles. */
+const PYLON_DIR = join(homedir(), ".pylon");
+const LABELS_PATH = join(PYLON_DIR, "labels.json");
+
+interface LabelEntry {
+  name: string;
+  lastSeen: number; // epoch ms
+}
+
+/** In-memory mirror of the disk-backed label store */
+let labelStore = new Map<string, LabelEntry>();
+let labelStoreLoaded = false;
+
+/** Max age before a label for a dead session gets garbage-collected */
+const LABEL_GC_AGE_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+function loadLabelStore(): void {
+  if (labelStoreLoaded) return;
+  labelStoreLoaded = true;
+  try {
+    if (!existsSync(LABELS_PATH)) return;
+    const raw = JSON.parse(readFileSync(LABELS_PATH, "utf-8"));
+    if (raw && typeof raw === "object") {
+      for (const [id, entry] of Object.entries(raw)) {
+        if (entry && typeof entry === "object" && "name" in (entry as Record<string, unknown>)) {
+          const e = entry as LabelEntry;
+          labelStore.set(id, { name: e.name, lastSeen: e.lastSeen ?? 0 });
+        }
+      }
+    }
+  } catch {
+    // Corrupt file — start fresh
+    labelStore = new Map();
+  }
+}
+
+function saveLabelStore(): void {
+  try {
+    if (!existsSync(PYLON_DIR)) mkdirSync(PYLON_DIR, { recursive: true });
+    const obj: Record<string, LabelEntry> = {};
+    for (const [id, entry] of labelStore) {
+      obj[id] = entry;
+    }
+    writeFileSync(LABELS_PATH, JSON.stringify(obj, null, 2));
+  } catch {
+    // Non-critical — labels will still work in-memory
+  }
+}
+
+/**
+ * Assign unique short names. Persisted to disk so names survive restarts.
+ * Dead sessions' names are reclaimed after LABEL_GC_AGE_MS.
+ */
 function buildLabelMap(sessionIds: string[]): Map<string, string> {
-  const usedNames = new Set(persistentLabels.values());
+  loadLabelStore();
 
+  const now = Date.now();
+  const currentIds = new Set(sessionIds);
+
+  // 1. Garbage-collect: remove labels for sessions not seen recently
+  for (const [id, entry] of labelStore) {
+    if (!currentIds.has(id) && now - entry.lastSeen > LABEL_GC_AGE_MS) {
+      labelStore.delete(id);
+    }
+  }
+
+  // 2. Touch all current sessions
   for (const id of sessionIds) {
-    if (persistentLabels.has(id)) continue;
+    const existing = labelStore.get(id);
+    if (existing) {
+      existing.lastSeen = now;
+    }
+  }
+
+  // 3. Build the set of names currently in use (only by live or recent sessions)
+  const usedNames = new Set<string>();
+  for (const entry of labelStore.values()) {
+    usedNames.add(entry.name);
+  }
+
+  // 4. Assign names to new sessions
+  let dirty = false;
+  for (const id of sessionIds) {
+    if (labelStore.has(id)) continue;
 
     let idx = hashToIndex(id) % AGENT_NAMES.length;
     let name = AGENT_NAMES[idx];
@@ -123,13 +200,16 @@ function buildLabelMap(sessionIds: string[]): Map<string, string> {
     }
 
     usedNames.add(name);
-    persistentLabels.set(id, name);
+    labelStore.set(id, { name, lastSeen: now });
+    dirty = true;
   }
 
-  // Return only the labels for requested session IDs
+  if (dirty) saveLabelStore();
+
+  // 5. Return only the labels for requested session IDs
   const map = new Map<string, string>();
   for (const id of sessionIds) {
-    map.set(id, persistentLabels.get(id)!);
+    map.set(id, labelStore.get(id)!.name);
   }
   return map;
 }

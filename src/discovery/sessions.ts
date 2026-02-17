@@ -116,12 +116,20 @@ export function findSession(sessionId: string): SessionInfo | null {
  * We map each cwd to its encoded project dir, then pick the most recently
  * modified JSONL file in that dir (the active session).
  */
+/**
+ * Sessions confirmed active in the previous poll.
+ * Used as a grace buffer — sessions stay "active" for one extra cycle
+ * to prevent flicker during session transitions (e.g., reset context).
+ */
+const previousActiveIds = new Set<string>();
+const ACTIVE_GRACE_MS = 10_000; // 10 seconds
+let lastActiveCheck = 0;
+
 export function getActiveSessions(): SessionInfo[] {
   if (!existsSync(CLAUDE_PROJECTS_DIR)) return [];
 
   try {
-    // Get cwd of all claude CLI processes
-    // lsof -c claude -Fn outputs: p<pid>\nfcwd\nn<path>\n...
+    // lsof -c claude -Fn outputs: p<pid>\nf<fd>\nn<path>\n...
     const output = execSync(
       `lsof -c claude -Fn 2>/dev/null || true`,
       { encoding: "utf-8", timeout: 5000 }
@@ -129,34 +137,62 @@ export function getActiveSessions(): SessionInfo[] {
 
     if (!output.trim()) return [];
 
-    // Parse lsof output to count distinct PIDs per cwd
+    // Parse lsof output for BOTH cwd paths AND open .jsonl files
     const cwdPids = new Map<string, Set<string>>();
+    const jsonlPids = new Map<string, Set<string>>(); // .jsonl path → PIDs
     const lines = output.split("\n");
     let currentPid: string | null = null;
     let isCwd = false;
     for (const line of lines) {
       if (line.startsWith("p")) {
         currentPid = line.slice(1);
+        isCwd = false;
       } else if (line === "fcwd") {
         isCwd = true;
-      } else if (isCwd && line.startsWith("n")) {
-        const path = line.slice(1); // strip 'n' prefix
-        if (path.startsWith("/") && !path.includes(".app/") && currentPid) {
-          if (!cwdPids.has(path)) cwdPids.set(path, new Set());
-          cwdPids.get(path)!.add(currentPid);
+      } else if (line.startsWith("n") && currentPid) {
+        const path = line.slice(1);
+        if (isCwd) {
+          if (path.startsWith("/") && !path.includes(".app/")) {
+            if (!cwdPids.has(path)) cwdPids.set(path, new Set());
+            cwdPids.get(path)!.add(currentPid);
+          }
+          isCwd = false;
+        } else if (path.endsWith(".jsonl") && path.includes(".claude/projects/")) {
+          // Direct PID → session file match
+          if (!jsonlPids.has(path)) jsonlPids.set(path, new Set());
+          jsonlPids.get(path)!.add(currentPid);
         }
-        isCwd = false;
       } else if (line.startsWith("f")) {
         isCwd = false;
       }
     }
 
-    if (cwdPids.size === 0) return [];
+    if (cwdPids.size === 0 && jsonlPids.size === 0) return [];
 
-    // For each cwd, take N most recent sessions where N = number of claude processes
     const sessions: SessionInfo[] = [];
-    const seenProjects = new Set<string>();
+    const addedIds = new Set<string>();
 
+    // Strategy 1: Use directly-matched .jsonl files (most reliable)
+    for (const jsonlPath of jsonlPids.keys()) {
+      const id = basename(jsonlPath, ".jsonl");
+      if (addedIds.has(id)) continue;
+      try {
+        const stat = statSync(jsonlPath);
+        const dir = jsonlPath.replace(/\/[^/]+\.jsonl$/, "");
+        addedIds.add(id);
+        sessions.push({
+          id,
+          path: jsonlPath,
+          projectPath: decodeProjectName(basename(dir)),
+          createdAt: stat.birthtime,
+          modifiedAt: stat.mtime,
+          sizeBytes: stat.size,
+        });
+      } catch { /* file vanished */ }
+    }
+
+    // Strategy 2: For remaining PIDs with cwd but no .jsonl match, use mtime heuristic
+    const seenProjects = new Set<string>();
     for (const [cwd, pids] of cwdPids) {
       const encoded = encodeProjectPath(cwd);
       if (seenProjects.has(encoded)) continue;
@@ -168,12 +204,39 @@ export function getActiveSessions(): SessionInfo[] {
       const projectSessions = listSessionsInDir(projectDir);
       if (projectSessions.length === 0) continue;
 
-      // Take as many recent sessions as there are active claude processes
-      const count = Math.min(pids.size, projectSessions.length);
-      for (let i = 0; i < count; i++) {
-        sessions.push(projectSessions[i]);
+      // How many sessions for this project are already matched via .jsonl?
+      const alreadyMatched = projectSessions.filter(s => addedIds.has(s.id)).length;
+      const remaining = Math.max(0, pids.size - alreadyMatched);
+
+      // Take remaining slots from most recent sessions not yet matched
+      let added = 0;
+      for (const s of projectSessions) {
+        if (added >= remaining) break;
+        if (addedIds.has(s.id)) continue;
+        addedIds.add(s.id);
+        sessions.push(s);
+        added++;
       }
     }
+
+    // Strategy 3: Grace period — keep sessions from previous poll for stability
+    const now = Date.now();
+    if (now - lastActiveCheck < ACTIVE_GRACE_MS) {
+      for (const prevId of previousActiveIds) {
+        if (addedIds.has(prevId)) continue;
+        // Session was active last poll but not this one — include if still recent
+        const session = findSession(prevId);
+        if (session && now - session.modifiedAt.getTime() < ACTIVE_GRACE_MS) {
+          addedIds.add(prevId);
+          sessions.push(session);
+        }
+      }
+    }
+
+    // Update the grace buffer
+    previousActiveIds.clear();
+    for (const id of addedIds) previousActiveIds.add(id);
+    lastActiveCheck = now;
 
     return sessions.sort((a, b) => b.modifiedAt.getTime() - a.modifiedAt.getTime());
   } catch {

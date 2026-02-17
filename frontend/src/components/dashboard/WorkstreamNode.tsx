@@ -1,6 +1,7 @@
 "use client";
 
 import type { Workstream, PlanTask, AgentStatus } from "@/lib/dashboard-types";
+import { OperatorTag } from "./OperatorTag";
 
 interface WorkstreamNodeProps {
   workstream: Workstream;
@@ -28,11 +29,10 @@ const taskStatusIcon: Record<PlanTask["status"], { char: string; className: stri
 };
 
 export function WorkstreamNode({ workstream }: WorkstreamNodeProps) {
-  const statusColor = workstream.hasCollision
-    ? "bg-dash-red"
-    : workstream.errors > 0
-      ? "bg-dash-yellow"
-      : "bg-dash-green";
+  const hasBusy = workstream.agents.some(a => a.status === "busy");
+  const statusColor = hasBusy
+    ? "bg-dash-blue animate-dash-pulse"
+    : "bg-dash-green";
 
   const activePlan = workstream.plans.find(p => p.status !== "none");
   const badge = activePlan ? planStatusBadge[activePlan.status] : null;
@@ -79,6 +79,7 @@ export function WorkstreamNode({ workstream }: WorkstreamNodeProps) {
               }`}>
                 {agent.agentType === "codex" ? "codex" : "claude"}
               </span>
+              <OperatorTag operatorId={agent.operatorId} />
             </div>
           ))}
         </div>
@@ -130,6 +131,7 @@ export function WorkstreamNode({ workstream }: WorkstreamNodeProps) {
                       }`}>
                         {agent.agentType === "codex" ? "codex" : "claude"}
                       </span>
+                      <OperatorTag operatorId={agent.operatorId} />
                     </span>
                   </div>
                 ))}

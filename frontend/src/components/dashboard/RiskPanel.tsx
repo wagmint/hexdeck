@@ -1,6 +1,7 @@
 "use client";
 
 import type { Agent, RiskLevel } from "@/lib/dashboard-types";
+import { OperatorTag } from "./OperatorTag";
 
 interface RiskPanelProps {
   agents: Agent[];
@@ -40,6 +41,7 @@ function RiskCard({ agent }: { agent: Agent }) {
             {agent.agentType === "codex" ? "codex" : "claude"}
           </span>
           <span className="text-dash-text-muted text-[9px]">{slug}</span>
+          <OperatorTag operatorId={agent.operatorId} />
         </div>
         <RiskBadge level={risk.overallRisk} />
       </div>

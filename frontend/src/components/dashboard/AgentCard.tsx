@@ -2,6 +2,7 @@
 
 import type { Workstream, PlanStatus } from "@/lib/dashboard-types";
 import { AgentPip } from "./AgentPip";
+import { OperatorTag } from "./OperatorTag";
 
 interface AgentCardProps {
   workstream: Workstream;
@@ -27,10 +28,15 @@ export function AgentCard({ workstream }: AgentCardProps) {
     ? workstream.planTasks.filter(t => t.status === "completed").length
     : 0;
 
+  const hasBusy = workstream.agents.some(a => a.status === "busy");
+  const stripColor = hasBusy
+    ? "border-l-dash-blue animate-dash-pulse"
+    : "border-l-dash-green";
+
   return (
     <div
       className={`px-3.5 py-2.5 border-b border-dash-border ${
-        hasActive ? "bg-dash-surface-2 border-l-2 border-l-dash-green" : ""
+        hasActive ? `bg-dash-surface-2 border-l-2 ${stripColor}` : ""
       }`}
     >
       <div className="flex items-center justify-between mb-1">
@@ -76,6 +82,7 @@ export function AgentCard({ workstream }: AgentCardProps) {
             }`}>
               {agent.agentType === "codex" ? "codex" : "claude"}
             </span>
+            <OperatorTag operatorId={agent.operatorId} />
           </div>
         ))}
       </div>

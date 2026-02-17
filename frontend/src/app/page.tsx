@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useDashboard } from "@/hooks/useDashboard";
 import type { Collision } from "@/lib/dashboard-types";
+import { OperatorProvider } from "@/contexts/OperatorContext";
 import { TopBar } from "@/components/dashboard/TopBar";
 import { PanelHeader } from "@/components/dashboard/PanelHeader";
 import { AgentCard } from "@/components/dashboard/AgentCard";
@@ -85,11 +86,12 @@ export default function DashboardPage() {
 
   if (!state) return null;
 
-  const { agents, workstreams, collisions, feed, summary } = state;
+  const { operators, agents, workstreams, collisions, feed, summary } = state;
 
   return (
+    <OperatorProvider operators={operators}>
     <div className="h-screen flex flex-col bg-dash-bg text-dash-text font-mono text-[11px] leading-relaxed overflow-hidden">
-      <TopBar summary={summary} />
+      <TopBar summary={summary} operators={operators} />
 
       <div
         className="flex-1 grid gap-px bg-dash-border min-h-0"
@@ -222,5 +224,6 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+    </OperatorProvider>
   );
 }

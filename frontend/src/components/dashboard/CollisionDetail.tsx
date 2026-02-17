@@ -1,6 +1,7 @@
 "use client";
 
 import type { Collision } from "@/lib/dashboard-types";
+import { useOperators } from "@/contexts/OperatorContext";
 
 interface CollisionDetailProps {
   collision: Collision | null;
@@ -8,6 +9,8 @@ interface CollisionDetailProps {
 }
 
 export function CollisionDetail({ collision, onDismiss }: CollisionDetailProps) {
+  const { isMultiOperator } = useOperators();
+
   if (!collision) {
     return (
       <div className="h-full flex items-center justify-center text-dash-text-muted text-xs">
@@ -41,6 +44,11 @@ export function CollisionDetail({ collision, onDismiss }: CollisionDetailProps) 
           >
             {collision.severity}
           </span>
+          {isMultiOperator && collision.isCrossOperator && (
+            <span className="text-[8px] font-bold tracking-widest uppercase px-1.5 py-0.5 rounded bg-dash-purple/10 text-dash-purple">
+              CROSS-OPERATOR
+            </span>
+          )}
           {onDismiss && (
             <button
               onClick={onDismiss}
@@ -59,6 +67,7 @@ export function CollisionDetail({ collision, onDismiss }: CollisionDetailProps) 
             label={agentA.label}
             sessionId={agentA.sessionId}
             lastAction={agentA.lastAction}
+            operatorId={agentA.operatorId}
           />
         )}
         <div className="flex items-center justify-center text-dash-red font-bold text-sm">
@@ -69,6 +78,7 @@ export function CollisionDetail({ collision, onDismiss }: CollisionDetailProps) 
             label={agentB.label}
             sessionId={agentB.sessionId}
             lastAction={agentB.lastAction}
+            operatorId={agentB.operatorId}
           />
         )}
       </div>
@@ -85,15 +95,33 @@ function CollisionSide({
   label,
   sessionId,
   lastAction,
+  operatorId,
 }: {
   label: string;
   sessionId: string;
   lastAction: string;
+  operatorId: string;
 }) {
+  const { getOperator, isMultiOperator } = useOperators();
+  const operator = isMultiOperator ? getOperator(operatorId) : undefined;
+
   return (
-    <div className="bg-dash-bg rounded-md p-2.5 border border-dash-border">
+    <div
+      className="bg-dash-bg rounded-md p-2.5 border border-dash-border"
+      style={operator ? { borderColor: operator.color + "80" } : undefined}
+    >
       <div className="flex items-center justify-between mb-1.5">
-        <span className="font-display font-semibold text-[11px]">{label}</span>
+        <div className="flex items-center gap-1.5">
+          <span className="font-display font-semibold text-[11px]">{label}</span>
+          {operator && (
+            <span
+              className="text-[8px] font-semibold px-1 py-px rounded font-mono"
+              style={{ color: operator.color, backgroundColor: operator.color + "20" }}
+            >
+              {operator.name}
+            </span>
+          )}
+        </div>
         <span className="text-[9px] text-dash-blue">{sessionId.slice(0, 8)}</span>
       </div>
       <div className="text-[10px] text-dash-text-dim bg-dash-surface-2 rounded p-1.5 leading-relaxed">

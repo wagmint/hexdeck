@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { SessionPlan, Workstream } from "@/lib/dashboard-types";
+import { OperatorTag } from "./OperatorTag";
 import { timeAgo } from "@/lib/utils";
 
 interface PlanDetailProps {
@@ -14,6 +15,7 @@ interface PlanEntry {
   title: string;
   tasksDone: number;
   tasksTotal: number;
+  operatorId: string;
 }
 
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
@@ -35,12 +37,14 @@ function collectPlans(workstreams: Workstream[]): PlanEntry[] {
     for (const plan of ws.plans) {
       if (plan.status === "none") continue;
       const done = plan.tasks.filter((t) => t.status === "completed").length;
+      const matchingAgent = ws.agents.find((a) => a.label === plan.agentLabel);
       entries.push({
         workstreamName: ws.name,
         plan,
         title: extractTitle(plan.markdown),
         tasksDone: done,
         tasksTotal: plan.tasks.length,
+        operatorId: matchingAgent?.operatorId ?? "self",
       });
     }
   }
@@ -108,6 +112,7 @@ function PlanOverview({
                 </div>
                 <div className="flex items-center gap-2 mt-0.5 text-[9px] text-dash-text-muted">
                   <span className="font-semibold text-dash-text-dim">{entry.plan.agentLabel}</span>
+                  <OperatorTag operatorId={entry.operatorId} />
                   <span>{entry.workstreamName}</span>
                   {entry.tasksTotal > 0 && (
                     <span
@@ -186,6 +191,7 @@ function PlanMarkdownView({
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-[9px] text-dash-text-dim font-semibold">{entry.plan.agentLabel}</span>
+          <OperatorTag operatorId={entry.operatorId} />
           <span className="text-[9px] text-dash-text-muted">{timeAgo(entry.plan.timestamp)}</span>
           {entry.tasksTotal > 0 && (
             <span className="text-[9px] text-dash-text-muted">

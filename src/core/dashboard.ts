@@ -708,6 +708,9 @@ export function buildDashboardState(): DashboardState {
   return { operators, agents: activeAgents, workstreams, collisions, feed, summary };
 }
 
+/** How long since last file modification before an active session is considered idle */
+const IDLE_THRESHOLD_MS = 30_000; // 30 seconds
+
 function determineAgentStatus(
   parsed: ParsedSession,
   isActive: boolean,
@@ -720,8 +723,11 @@ function determineAgentStatus(
   const recentTurns = parsed.turns.slice(-3);
   if (recentTurns.some(t => t.hasError)) return "warning";
 
-  // Busy: currently active process
-  if (isActive) return "busy";
+  // Active process but no recent file writes → idle (waiting for user input)
+  if (isActive) {
+    const mtime = parsed.session.modifiedAt.getTime();
+    return Date.now() - mtime > IDLE_THRESHOLD_MS ? "idle" : "busy";
+  }
 
   return "idle";
 }

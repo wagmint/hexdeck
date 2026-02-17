@@ -1,6 +1,7 @@
 "use client";
 
 import type { FeedEvent } from "@/lib/dashboard-types";
+import { useOperators } from "@/contexts/OperatorContext";
 import { timeAgo } from "@/lib/utils";
 
 interface FeedItemProps {
@@ -60,9 +61,19 @@ const typeConfig: Record<
 
 export function FeedItem({ event, isNew, onClick }: FeedItemProps) {
   const config = typeConfig[event.type];
+  const { getOperator, isMultiOperator } = useOperators();
+  const operator = isMultiOperator ? getOperator(event.operatorId) : undefined;
+
+  // Operator-colored left border when no type-specific border exists
+  const borderStyle =
+    isMultiOperator && !config.rowClass && operator
+      ? { borderLeftWidth: 2, borderLeftColor: operator.color }
+      : undefined;
+
   return (
     <div
       onClick={onClick}
+      style={borderStyle}
       className={`flex gap-2 px-3.5 py-2 border-b border-dash-border text-[10px] transition-colors hover:bg-dash-surface ${config.rowClass ?? ""} ${isNew ? "animate-flash-in" : ""} ${onClick ? "cursor-pointer" : ""}`}
     >
       <div className="text-[9px] text-dash-text-muted whitespace-nowrap min-w-[40px]">
@@ -75,6 +86,11 @@ export function FeedItem({ event, isNew, onClick }: FeedItemProps) {
       </div>
       <div className="flex-1 leading-relaxed text-dash-text-dim">
         <span className="text-dash-text font-semibold">{event.agentLabel}</span>
+        {operator && (
+          <span className="text-[8px] font-mono ml-0.5" style={{ color: operator.color }}>
+            [{operator.name}]
+          </span>
+        )}
         {" "}
         {event.message}
       </div>

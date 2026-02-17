@@ -1,12 +1,13 @@
 "use client";
 
-import type { DashboardSummary } from "@/lib/dashboard-types";
+import type { DashboardSummary, Operator } from "@/lib/dashboard-types";
 
 interface TopBarProps {
   summary: DashboardSummary;
+  operators: Operator[];
 }
 
-export function TopBar({ summary }: TopBarProps) {
+export function TopBar({ summary, operators }: TopBarProps) {
   return (
     <div className="flex items-center justify-between px-4 h-10 bg-dash-surface border-b border-dash-border">
       <div className="font-display font-bold text-sm tracking-tight text-dash-green">
@@ -18,6 +19,19 @@ export function TopBar({ summary }: TopBarProps) {
           <span className="w-1 h-1 rounded-full bg-dash-green animate-dash-pulse" />
           LIVE
         </div>
+        {operators.length > 1 && (
+          <div className="flex items-center gap-2 px-2 border-l border-r border-dash-border">
+            {operators.map((op) => (
+              <div key={op.id} className="flex items-center gap-1">
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${op.status === "online" ? "animate-dash-pulse" : "opacity-40"}`}
+                  style={{ backgroundColor: op.color }}
+                />
+                <span className="text-[9px] text-dash-text-dim font-mono">{op.name}</span>
+              </div>
+            ))}
+          </div>
+        )}
         <StatusItem
           color="green"
           text={`${summary.activeAgents} agent${summary.activeAgents !== 1 ? "s" : ""} active`}

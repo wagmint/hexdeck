@@ -8,9 +8,11 @@ FRONTEND_PORT = 3000
 .PHONY: help
 help:
 	@echo "Available commands:"
-	@echo "  make start          - Start API server (port $(API_PORT))"
-	@echo "  make stop           - Stop API server"
-	@echo "  make restart        - Restart API server"
+	@echo "  make pylon          - Start Pylon (API + dashboard) in foreground"
+	@echo "  make start          - Start Pylon server in background"
+	@echo "  make stop           - Stop Pylon server"
+	@echo "  make restart        - Restart Pylon server"
+	@echo "  make status         - Show Pylon server status"
 	@echo "  make install        - Install all dependencies"
 	@echo "  make build          - Build frontend"
 	@echo "  make checkpoint NOTE='my note' - Create a checkpoint"
@@ -20,21 +22,26 @@ help:
 	@echo "  make typecheck      - Run TypeScript type checking"
 	@echo "  make clean          - Remove build artifacts and node_modules"
 
-# API server
+# Pylon (API + dashboard)
+.PHONY: pylon
+pylon:
+	cd packages/cli && $(NPX) tsx src/index.ts start --foreground
+
 .PHONY: start
 start:
-	@echo "Starting Pylon API on port $(API_PORT)..."
-	cd packages/server && $(NPX) tsx src/server/index.ts &
-	@echo "API running at http://localhost:$(API_PORT)"
+	cd packages/cli && $(NPX) tsx src/index.ts start
 
 .PHONY: stop
 stop:
-	@echo "Stopping Pylon API..."
-	@lsof -i :$(API_PORT) -t | xargs kill -9 2>/dev/null || true
-	@echo "Stopped."
+	cd packages/cli && $(NPX) tsx src/index.ts stop
 
 .PHONY: restart
-restart: stop start
+restart:
+	cd packages/cli && $(NPX) tsx src/index.ts restart
+
+.PHONY: status
+status:
+	cd packages/cli && $(NPX) tsx src/index.ts status
 
 # Checkpoints
 .PHONY: checkpoint
@@ -62,7 +69,7 @@ install:
 # Build
 .PHONY: build
 build:
-	$(NPM) run build --workspace=packages/local
+	$(NPM) run build
 
 .PHONY: typecheck
 typecheck:
@@ -71,4 +78,4 @@ typecheck:
 # Cleanup
 .PHONY: clean
 clean:
-	rm -rf node_modules packages/*/node_modules packages/server/dist packages/local/.next
+	rm -rf node_modules packages/*/node_modules packages/server/dist packages/cli/dist packages/local/.next packages/local/out

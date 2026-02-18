@@ -5,8 +5,8 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsx watch src/server/index.ts",
-    "serve": "tsx src/server/index.ts",
+    "dev": "tsx watch src/server/main.ts",
+    "serve": "tsx src/server/main.ts",
     "pylon": "tsx src/cli/index.ts",
     "parse": "tsx src/cli/parse.ts",
     "build": "tsc",

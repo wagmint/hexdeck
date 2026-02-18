@@ -1,32 +1,12 @@
 {
   "name": "pylon",
-  "version": "0.1.0",
-  "description": "Git for AI decision trees — branch, rewind, and resume Claude Code sessions",
-  "type": "module",
-  "main": "dist/index.js",
+  "private": true,
+  "workspaces": ["packages/*"],
   "scripts": {
-    "build": "tsc",
-    "dev": "tsx watch src/server/index.ts",
-    "serve": "tsx src/server/index.ts",
-    "pylon": "tsx src/cli/index.ts",
-    "parse": "tsx src/cli/parse.ts",
-    "test": "vitest"
-  },
-  "keywords": [
-    "claude-code",
-    "ai",
-    "decision-tree",
-    "session-management"
-  ],
-  "license": "MIT",
-  "devDependencies": {
-    "@types/node": "^25.2.1",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.18"
-  },
-  "dependencies": {
-    "@hono/node-server": "^1.19.9",
-    "hono": "^4.11.8"
+    "dev": "npm run dev --workspace=packages/server & npm run dev --workspace=packages/local",
+    "dev:server": "npm run dev --workspace=packages/server",
+    "dev:local": "npm run dev --workspace=packages/local",
+    "build": "npm run build --workspace=packages/local",
+    "test": "npm run test --workspace=packages/server"
   }
 }

@@ -48,7 +48,9 @@ function collectPlans(workstreams: Workstream[]): PlanEntry[] {
       });
     }
   }
-  return entries;
+  return entries.sort((a, b) =>
+    new Date(b.plan.timestamp).getTime() - new Date(a.plan.timestamp).getTime()
+  );
 }
 
 // ─── Overview ────────────────────────────────────────────────────────────────

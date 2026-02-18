@@ -102,16 +102,6 @@ function RiskCard({ agent }: { agent: Agent }) {
         </div>
       )}
 
-      {/* File Hotspots */}
-      {risk.fileHotspots.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {risk.fileHotspots.map((h, i) => (
-            <span key={i} className="text-[8px] text-dash-text-muted bg-dash-surface px-1 py-px rounded">
-              {h.file.split("/").pop()}({h.count})
-            </span>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

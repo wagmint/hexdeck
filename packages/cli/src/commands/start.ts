@@ -1,11 +1,7 @@
 import { spawn, exec } from "node:child_process";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { loadPid, savePid, clearPid, isProcessRunning, isPortInUse } from "../lib/process.js";
-import { resolveDashboardDir } from "../lib/resolve.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { resolveDashboardDir, findPackageRoot } from "../lib/resolve.js";
 
 export async function startCommand(options: { port: number; foreground: boolean }): Promise<void> {
   const { port, foreground } = options;
@@ -54,13 +50,19 @@ export async function startCommand(options: { port: number; foreground: boolean 
     process.on("SIGTERM", cleanup);
   } else {
     // Spawn detached background process
-    const launcherPath = join(__dirname, "..", "lib", "launcher.js");
-    const tsLauncherPath = join(__dirname, "..", "lib", "launcher.ts");
-
-    // Determine whether to use tsx (dev) or node (compiled)
+    const pkgRoot = findPackageRoot();
     const isTsx = process.argv[1]?.endsWith(".ts") || process.argv[0]?.includes("tsx");
-    const cmd = isTsx ? "tsx" : "node";
-    const script = isTsx ? tsLauncherPath : launcherPath;
+
+    let cmd: string;
+    let script: string;
+
+    if (isTsx) {
+      cmd = "tsx";
+      script = join(pkgRoot, "src", "lib", "launcher.ts");
+    } else {
+      cmd = "node";
+      script = join(pkgRoot, "dist", "lib", "launcher.js");
+    }
 
     const args = [script, "--port", String(port)];
     if (dashboardDir) {

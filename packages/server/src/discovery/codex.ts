@@ -137,8 +137,8 @@ export function getActiveCodexSessions(): SessionInfo[] {
 
     if (cwdPids.size === 0) return [];
 
-    // Discover recent sessions and match against active cwds
-    const allSessions = discoverCodexSessions(1); // 24hr window for active matching
+    // Discover sessions — no recency limit for active matching
+    const allSessions = discoverCodexSessions(365);
     const activeSessions: SessionInfo[] = [];
     const seenCwds = new Set<string>();
 

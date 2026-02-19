@@ -1,6 +1,7 @@
 "use client";
 
 import type { Agent, RiskLevel } from "@/lib/dashboard-types";
+import { formatDuration } from "@/lib/utils";
 import { OperatorTag } from "./OperatorTag";
 
 interface RiskPanelProps {
@@ -80,6 +81,20 @@ function RiskCard({ agent }: { agent: Agent }) {
           </span>
         )}
       </div>
+
+      {/* Timing */}
+      {risk.sessionDurationMs > 0 && (
+        <div className="flex items-center gap-3 mb-1">
+          <span className="text-[9px] text-dash-text-muted">
+            {formatDuration(risk.sessionDurationMs)} session
+          </span>
+          {risk.avgTurnTimeMs != null && (
+            <span className="text-[9px] text-dash-text-muted">
+              ~{formatDuration(risk.avgTurnTimeMs)}/turn
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Cost */}
       {risk.costPerSession > 0 && (

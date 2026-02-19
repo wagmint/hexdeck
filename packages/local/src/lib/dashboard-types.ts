@@ -30,6 +30,8 @@ export interface AgentRisk {
   modelBreakdown: ModelCost[];
   contextUsagePct: number;
   contextTokens: number;
+  avgTurnTimeMs: number | null;
+  sessionDurationMs: number;
 }
 
 export interface WorkstreamRisk {
@@ -61,12 +63,23 @@ export interface PlanTask {
   status: "pending" | "in_progress" | "completed" | "deleted";
 }
 
+export interface DraftingActivity {
+  filesExplored: string[];
+  searches: string[];
+  toolCounts: Record<string, number>;
+  approachSummary: string;
+  lastActivityAt: string;
+  turnCount: number;
+}
+
 export interface SessionPlan {
   status: PlanStatus;
   markdown: string | null;
   tasks: PlanTask[];
   agentLabel: string;
   timestamp: string;
+  planDurationMs: number | null;
+  draftingActivity: DraftingActivity | null;
 }
 
 export type AgentStatus = "idle" | "busy" | "warning" | "conflict";
@@ -130,7 +143,8 @@ export type FeedEventType =
   | "plan_started"
   | "plan_approved"
   | "task_completed"
-  | "session_ended";
+  | "session_ended"
+  | "stall";
 
 export interface FeedEvent {
   id: string;

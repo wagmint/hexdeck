@@ -57,6 +57,11 @@ const typeConfig: Record<
     icon: "\u23F9",
     iconClass: "bg-dash-text-muted/10 text-dash-text-muted",
   },
+  stall: {
+    icon: "\u23F8",
+    iconClass: "bg-dash-yellow-dim text-dash-yellow",
+    rowClass: "bg-dash-yellow-dim border-l-2 border-l-dash-yellow",
+  },
 };
 
 export function FeedItem({ event, isNew, onClick }: FeedItemProps) {

@@ -1,7 +1,7 @@
 export type {
   RiskLevel, SpinningSignal, ModelCost, AgentRisk, WorkstreamRisk,
   OperatorStatus, Operator,
-  PlanStatus, PlanTask, SessionPlan,
+  PlanStatus, PlanTask, DraftingActivity, SessionPlan,
   AgentStatus, Agent, Workstream, CollisionSeverity, Collision,
   FeedEventType, FeedEvent, DashboardSummary, DashboardState,
 } from "./dashboard.js";

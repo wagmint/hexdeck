@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import type { SessionPlan, Workstream } from "@/lib/dashboard-types";
+import type { SessionPlan, Workstream, DraftingActivity } from "@/lib/dashboard-types";
 import { OperatorTag } from "./OperatorTag";
-import { timeAgo } from "@/lib/utils";
+import { timeAgo, formatDuration } from "@/lib/utils";
 
 interface PlanDetailProps {
   workstreams: Workstream[];
@@ -50,6 +50,104 @@ function collectPlans(workstreams: Workstream[]): PlanEntry[] {
   }
   return entries.sort((a, b) =>
     new Date(b.plan.timestamp).getTime() - new Date(a.plan.timestamp).getTime()
+  );
+}
+
+// ─── Drafting Activity ────────────────────────────────────────────────────────
+
+function draftingSummaryLine(activity: DraftingActivity): string {
+  const parts: string[] = [];
+  if (activity.filesExplored.length > 0)
+    parts.push(`${activity.filesExplored.length} files read`);
+  if (activity.searches.length > 0)
+    parts.push(`${activity.searches.length} searches`);
+  if (activity.turnCount > 0)
+    parts.push(`${activity.turnCount} turns`);
+  return parts.length > 0 ? `Exploring \u2014 ${parts.join(", ")}` : "Exploring codebase\u2026";
+}
+
+function DraftingActivityPanel({ activity, planTimestamp }: { activity: DraftingActivity; planTimestamp: string }) {
+  const [showFiles, setShowFiles] = useState(false);
+  const [showSearches, setShowSearches] = useState(false);
+
+  const elapsed = new Date(activity.lastActivityAt).getTime() - new Date(planTimestamp).getTime();
+
+  // Top tool counts sorted by count descending
+  const toolEntries = Object.entries(activity.toolCounts).sort((a, b) => b[1] - a[1]);
+
+  return (
+    <div className="space-y-2.5">
+      {/* Activity indicator */}
+      <div className="flex items-center gap-2">
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-dash-purple opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-dash-purple" />
+        </span>
+        <span className="text-[11px] text-dash-text">
+          {activity.approachSummary || "Exploring codebase\u2026"}
+        </span>
+      </div>
+
+      {/* Stats row */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-dash-text-dim">
+        {elapsed > 0 && (
+          <span>Drafting for {formatDuration(elapsed)}</span>
+        )}
+        <span>{activity.turnCount} turns</span>
+      </div>
+
+      {/* Tool breakdown */}
+      {toolEntries.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {toolEntries.map(([tool, count]) => (
+            <span
+              key={tool}
+              className="text-[9px] px-1.5 py-0.5 rounded bg-dash-surface-2 text-dash-text-dim"
+            >
+              {tool}: {count}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Files explored */}
+      {activity.filesExplored.length > 0 && (
+        <div>
+          <button
+            onClick={() => setShowFiles(!showFiles)}
+            className="text-[10px] text-dash-text-dim hover:text-dash-text transition-colors"
+          >
+            Read {activity.filesExplored.length} files {showFiles ? "\u25B4" : "\u25BE"}
+          </button>
+          {showFiles && (
+            <div className="mt-1 pl-2 space-y-px max-h-32 overflow-y-auto">
+              {activity.filesExplored.map((f, i) => (
+                <div key={i} className="text-[9px] text-dash-text-muted truncate">{f}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Searches */}
+      {activity.searches.length > 0 && (
+        <div>
+          <button
+            onClick={() => setShowSearches(!showSearches)}
+            className="text-[10px] text-dash-text-dim hover:text-dash-text transition-colors"
+          >
+            {activity.searches.length} searches {showSearches ? "\u25B4" : "\u25BE"}
+          </button>
+          {showSearches && (
+            <div className="mt-1 pl-2 space-y-px max-h-32 overflow-y-auto">
+              {activity.searches.map((s, i) => (
+                <div key={i} className="text-[9px] text-dash-text-muted truncate">{s}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -127,8 +225,16 @@ function PlanOverview({
                       {entry.tasksDone}/{entry.tasksTotal} tasks {isExpanded ? "\u25B4" : "\u25BE"}
                     </span>
                   )}
+                  {entry.plan.planDurationMs != null && (
+                    <span>planned in {formatDuration(entry.plan.planDurationMs)}</span>
+                  )}
                   <span>{timeAgo(entry.plan.timestamp)}</span>
                 </div>
+                {entry.plan.status === "drafting" && entry.plan.draftingActivity && (
+                  <div className="text-[9px] text-dash-purple mt-0.5 truncate">
+                    {draftingSummaryLine(entry.plan.draftingActivity)}
+                  </div>
+                )}
               </div>
               <span className="text-dash-text-muted text-[10px] shrink-0">&rsaquo;</span>
             </button>
@@ -203,11 +309,14 @@ function PlanMarkdownView({
         </div>
       </div>
 
-      {/* Markdown body */}
+      {/* Markdown body or drafting activity */}
       <div className="px-3.5 py-2.5 text-[11px] text-dash-text-dim">
-        {entry.plan.markdown ? renderMarkdown(entry.plan.markdown) : (
-          <div className="text-dash-text-muted text-xs">No plan content</div>
-        )}
+        {entry.plan.markdown ? renderMarkdown(entry.plan.markdown)
+          : entry.plan.status === "drafting" && entry.plan.draftingActivity ? (
+            <DraftingActivityPanel activity={entry.plan.draftingActivity} planTimestamp={entry.plan.timestamp} />
+          ) : (
+            <div className="text-dash-text-muted text-xs">No plan content</div>
+          )}
       </div>
     </div>
   );

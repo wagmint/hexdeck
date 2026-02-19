@@ -153,6 +153,30 @@ export function buildFeed(
     }
   }
 
+  // 1c. Stall events — active sessions with extended silence
+  const STALL_FEED_MS = 5 * 60 * 1000;
+  if (activeSessionIds) {
+    const nowMs = Date.now();
+    for (const session of sessions) {
+      const sessionId = session.session.id;
+      if (!activeSessionIds.has(sessionId)) continue;
+      const silenceMs = nowMs - session.session.modifiedAt.getTime();
+      if (silenceMs > STALL_FEED_MS) {
+        const label = labelMap?.get(sessionId) ?? sessionId.slice(0, 8);
+        addEvent({
+          id: `stall-${sessionId}`,
+          type: "stall",
+          timestamp: new Date(session.session.modifiedAt),
+          agentLabel: label,
+          sessionId,
+          projectPath: session.session.projectPath,
+          operatorId: opId(sessionId),
+          message: `Stalled: no activity for ${Math.round(silenceMs / 60000)}m`,
+        });
+      }
+    }
+  }
+
   // 2. Diff collisions — detect new and resolved
   const currentCollisionKeys = new Set<string>();
 

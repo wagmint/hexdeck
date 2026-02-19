@@ -15,7 +15,7 @@ import { loadOperatorConfig, getSelfName, operatorId as makeOperatorId, getOpera
 import type {
   ParsedSession, SessionInfo, Agent, AgentStatus,
   Workstream, DashboardState, DashboardSummary, Operator,
-  SessionPlan, PlanStatus, PlanTask, TokenUsage,
+  SessionPlan, PlanStatus, PlanTask, TokenUsage, DraftingActivity,
 } from "../types/index.js";
 
 // ─── In-memory parse cache ──────────────────────────────────────────────────
@@ -352,6 +352,8 @@ function finalizePlan(
   planRejected: boolean,
   agentLabel: string,
   timestamp: Date,
+  planDurationMs: number | null,
+  draftingActivity: DraftingActivity | null,
 ): SessionPlan | null {
   // Apply final statuses
   for (const task of tasks) {
@@ -383,7 +385,11 @@ function finalizePlan(
   }
 
   if (status === "none") return null;
-  return { status, markdown, tasks: activeTasks, agentLabel, timestamp };
+
+  // Only attach drafting activity when status is "drafting"
+  const activity = status === "drafting" ? draftingActivity : null;
+
+  return { status, markdown, tasks: activeTasks, agentLabel, timestamp, planDurationMs, draftingActivity: activity };
 }
 
 function buildSessionPlans(parsed: ParsedSession, agentLabel: string): SessionPlan[] {
@@ -395,13 +401,44 @@ function buildSessionPlans(parsed: ParsedSession, agentLabel: string): SessionPl
   let planRejected = false;
   let inPlanMode = false;
   let lastPlanTs: Date = parsed.session.createdAt;
+  let planStartTs: Date | null = null;
+  let planDurationMs: number | null = null;
   let tasks: PlanTask[] = [];
   let taskStatuses = new Map<string, string>();
+
+  // Drafting activity accumulator
+  let draftFiles: Set<string> = new Set();
+  let draftSearches: string[] = [];
+  let draftToolCounts: Record<string, number> = {};
+  let draftApproach = "";
+  let draftLastActivity: Date | null = null;
+  let draftTurnCount = 0;
+
+  function resetDraftingActivity(): void {
+    draftFiles = new Set();
+    draftSearches = [];
+    draftToolCounts = {};
+    draftApproach = "";
+    draftLastActivity = null;
+    draftTurnCount = 0;
+  }
+
+  function buildDraftingActivity(): DraftingActivity | null {
+    if (draftTurnCount === 0) return null;
+    return {
+      filesExplored: [...draftFiles],
+      searches: draftSearches,
+      toolCounts: { ...draftToolCounts },
+      approachSummary: draftApproach,
+      lastActivityAt: draftLastActivity!,
+      turnCount: draftTurnCount,
+    };
+  }
 
   for (const turn of parsed.turns) {
     if (turn.hasPlanStart) {
       // Finalize current plan cycle (if it has any content)
-      const plan = finalizePlan(tasks, taskStatuses, markdown, inPlanMode, planAccepted, planRejected, agentLabel, lastPlanTs);
+      const plan = finalizePlan(tasks, taskStatuses, markdown, inPlanMode, planAccepted, planRejected, agentLabel, lastPlanTs, planDurationMs, buildDraftingActivity());
       if (plan) finalized.push(plan);
 
       // Start fresh cycle
@@ -412,6 +449,9 @@ function buildSessionPlans(parsed: ParsedSession, agentLabel: string): SessionPl
       planAccepted = false;
       planRejected = false;
       lastPlanTs = turn.timestamp;
+      planStartTs = turn.timestamp;
+      planDurationMs = null;
+      resetDraftingActivity();
     }
     if (turn.hasPlanEnd && !turn.planRejected) {
       inPlanMode = false;
@@ -419,12 +459,34 @@ function buildSessionPlans(parsed: ParsedSession, agentLabel: string): SessionPl
       planRejected = false;
       markdown = turn.planMarkdown ?? markdown;
       lastPlanTs = turn.timestamp;
+      if (planStartTs) {
+        planDurationMs = turn.timestamp.getTime() - planStartTs.getTime();
+      }
     }
     if (turn.hasPlanEnd && turn.planRejected) {
       inPlanMode = false;
       planAccepted = false;
       planRejected = true;
       lastPlanTs = turn.timestamp;
+      planDurationMs = null;
+    }
+
+    // Accumulate drafting activity while in plan mode
+    if (inPlanMode) {
+      draftTurnCount++;
+      draftLastActivity = turn.timestamp;
+
+      for (const f of turn.filesRead) draftFiles.add(f);
+
+      for (const s of turn.sections.research.searches) draftSearches.push(s);
+
+      for (const [tool, count] of Object.entries(turn.toolCounts)) {
+        draftToolCounts[tool] = (draftToolCounts[tool] ?? 0) + count;
+      }
+
+      if (turn.sections.approach.summary) {
+        draftApproach = turn.sections.approach.summary;
+      }
     }
 
     // Cross-session plan: planMarkdown from JSONL envelope
@@ -452,7 +514,7 @@ function buildSessionPlans(parsed: ParsedSession, agentLabel: string): SessionPl
   }
 
   // Finalize the last plan cycle
-  const lastPlan = finalizePlan(tasks, taskStatuses, markdown, inPlanMode, planAccepted, planRejected, agentLabel, lastPlanTs);
+  const lastPlan = finalizePlan(tasks, taskStatuses, markdown, inPlanMode, planAccepted, planRejected, agentLabel, lastPlanTs, planDurationMs, buildDraftingActivity());
   if (lastPlan) finalized.push(lastPlan);
 
   return finalized;
@@ -628,6 +690,36 @@ export function buildDashboardState(): DashboardState {
     });
   }
 
+  // ─── Stall detection (post-pass, no existing code modified) ─────────
+  const STALL_WARN_MS = 5 * 60 * 1000;   // 5 min → elevated
+  const STALL_CRIT_MS = 15 * 60 * 1000;  // 15 min → critical
+
+  for (const agent of agents) {
+    if (!agent.isActive) continue;
+    const session = allSessions.get(agent.sessionId);
+    if (!session) continue;
+    const silenceMs = now - session.modifiedAt.getTime();
+    if (silenceMs > STALL_CRIT_MS) {
+      agent.risk.spinningSignals.push({
+        pattern: "stalled",
+        level: "critical",
+        detail: `No activity for ${Math.round(silenceMs / 60000)}m`,
+      });
+    } else if (silenceMs > STALL_WARN_MS) {
+      agent.risk.spinningSignals.push({
+        pattern: "stalled",
+        level: "elevated",
+        detail: `No activity for ${Math.round(silenceMs / 60000)}m`,
+      });
+    }
+    // Recompute overallRisk if stall signal was injected
+    if (agent.risk.spinningSignals.some(s => s.level === "critical")) {
+      agent.risk.overallRisk = "critical";
+    } else if (agent.risk.overallRisk === "nominal" && agent.risk.spinningSignals.some(s => s.level === "elevated")) {
+      agent.risk.overallRisk = "elevated";
+    }
+  }
+
   // 7. Build workstreams (group by project)
   const projectGroups = new Map<string, ParsedSession[]>();
   for (const parsed of parsedSessions) {
@@ -657,7 +749,7 @@ export function buildDashboardState(): DashboardState {
     const plans = allProjectAgents.flatMap(a => a.plans).filter(p =>
       p.status !== "none"
       && p.status !== "rejected"
-      && !(p.status === "drafting" && !p.markdown)
+      && !(p.status === "drafting" && !p.markdown && !p.draftingActivity)
     );
     const planTasks = plans.flatMap(p => p.tasks);
 

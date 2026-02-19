@@ -30,6 +30,8 @@ export interface AgentRisk {
   modelBreakdown: ModelCost[];  // Per-model cost split
   contextUsagePct: number;      // 0-100, % of context window used
   contextTokens: number;        // Raw avg input tokens (last 5 turns)
+  avgTurnTimeMs: number | null; // avg of turn-to-turn deltas
+  sessionDurationMs: number;    // last turn ts - first turn ts
 }
 
 export interface WorkstreamRisk {
@@ -65,6 +67,15 @@ export interface PlanTask {
   status: "pending" | "in_progress" | "completed" | "deleted";
 }
 
+export interface DraftingActivity {
+  filesExplored: string[];
+  searches: string[];
+  toolCounts: Record<string, number>;
+  approachSummary: string;
+  lastActivityAt: Date;
+  turnCount: number;
+}
+
 export interface SessionPlan {
   status: PlanStatus;
   markdown: string | null;
@@ -73,6 +84,10 @@ export interface SessionPlan {
   agentLabel: string;
   /** When this plan was last updated (latest relevant turn timestamp) */
   timestamp: Date;
+  /** Duration from plan start to plan end/approved (ms) */
+  planDurationMs: number | null;
+  /** Activity data accumulated during drafting phase (only when status === "drafting") */
+  draftingActivity: DraftingActivity | null;
 }
 
 export type AgentStatus = "idle" | "busy" | "warning" | "conflict";
@@ -168,7 +183,8 @@ export type FeedEventType =
   | "plan_started"
   | "plan_approved"
   | "task_completed"
-  | "session_ended";
+  | "session_ended"
+  | "stall";
 
 export interface FeedEvent {
   /** Unique ID for deduplication */

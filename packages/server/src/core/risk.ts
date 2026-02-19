@@ -78,6 +78,23 @@ export function computeAgentRisk(parsed: ParsedSession, errorHistory?: boolean[]
 
   const costPerTurn = totalTurns > 0 ? sessionCost / totalTurns : 0;
 
+  // ─── Time metrics ─────────────────────────────────────────────────────────
+  // sessionDurationMs: use session.createdAt as start (survives compaction)
+  // avgTurnTimeMs: computed from visible turn deltas (still useful post-compaction)
+  let avgTurnTimeMs: number | null = null;
+  const lastTurnTs = turns.length > 0 ? turns[turns.length - 1].timestamp.getTime() : 0;
+  const sessionDurationMs = lastTurnTs > 0
+    ? lastTurnTs - parsed.session.createdAt.getTime()
+    : 0;
+
+  if (turns.length >= 2) {
+    const deltas: number[] = [];
+    for (let i = 1; i < turns.length; i++) {
+      deltas.push(turns[i].timestamp.getTime() - turns[i - 1].timestamp.getTime());
+    }
+    avgTurnTimeMs = deltas.reduce((a, b) => a + b, 0) / deltas.length;
+  }
+
   // ─── Context usage % — use the most recent turn's last API call as the best
   // approximation of current context window size (averaging dilutes the signal,
   // especially after compaction when older turns have small context)
@@ -100,6 +117,8 @@ export function computeAgentRisk(parsed: ParsedSession, errorHistory?: boolean[]
     modelBreakdown,
     contextUsagePct,
     contextTokens: currentContextTokens,
+    avgTurnTimeMs,
+    sessionDurationMs,
   };
 }
 

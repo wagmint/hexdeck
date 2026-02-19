@@ -11,6 +11,23 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
 
+export function formatDuration(ms: number): string {
+  const totalSeconds = Math.round(ms / 1000);
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (totalMinutes < 60) return `${totalMinutes}m ${seconds}s`;
+
+  const totalHours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (totalHours < 24) return `${totalHours}h ${minutes}m`;
+
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  return `${days}d ${hours}h`;
+}
+
 export function timeAgo(date: string): string {
   const now = new Date();
   const then = new Date(date);

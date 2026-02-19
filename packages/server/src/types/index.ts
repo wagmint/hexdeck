@@ -1,5 +1,6 @@
 export type {
   RiskLevel, SpinningSignal, ModelCost, AgentRisk, WorkstreamRisk,
+  IntentEvidence, IntentTaskView, IntentLanes,
   OperatorStatus, Operator,
   PlanStatus, PlanTask, DraftingActivity, SessionPlan,
   AgentStatus, Agent, Workstream, CollisionSeverity, Collision,

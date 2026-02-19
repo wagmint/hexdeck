@@ -15,7 +15,7 @@ import { loadOperatorConfig, getSelfName, operatorId as makeOperatorId, getOpera
 import type {
   ParsedSession, SessionInfo, Agent, AgentStatus,
   Workstream, DashboardState, DashboardSummary, Operator,
-  SessionPlan, PlanStatus, PlanTask, TokenUsage, DraftingActivity,
+  SessionPlan, PlanStatus, PlanTask, TokenUsage, DraftingActivity, IntentTaskView,
 } from "../types/index.js";
 
 // ─── In-memory parse cache ──────────────────────────────────────────────────
@@ -520,6 +520,191 @@ function buildSessionPlans(parsed: ParsedSession, agentLabel: string): SessionPl
   return finalized;
 }
 
+// ─── Intent map helpers ─────────────────────────────────────────────────────
+
+interface IntentInsights {
+  intentCoveragePct: number;
+  driftPct: number;
+  intentConfidence: "high" | "medium" | "low";
+  intentStatus: "on_plan" | "drifting" | "blocked" | "no_clear_intent";
+  lastIntentUpdateAt: Date | null;
+  intentLanes: {
+    inProgress: IntentTaskView[];
+    done: IntentTaskView[];
+    unplanned: IntentTaskView[];
+  };
+  driftReasons: string[];
+}
+
+function hasEvidence(task: IntentTaskView): boolean {
+  return task.evidence.edits > 0 || task.evidence.commits > 0 || task.evidence.lastTouchedAt !== null;
+}
+
+function buildIntentInsights(
+  sessions: ParsedSession[],
+  allProjectAgents: Agent[],
+  plans: SessionPlan[],
+  hasCollision: boolean,
+): IntentInsights {
+  const agentBySession = new Map(allProjectAgents.map(a => [a.sessionId, a]));
+  const agentByLabel = new Map(allProjectAgents.map(a => [a.label, a]));
+  const parsedBySession = new Map(sessions.map(s => [s.session.id, s]));
+
+  const plannedTasks: IntentTaskView[] = [];
+  const plannedTaskIds = new Set<string>();
+  const mappedTurnKeys = new Set<string>();
+  const driftReasons: string[] = [];
+  const intentUpdateTimes: number[] = [];
+
+  for (const plan of plans) {
+    intentUpdateTimes.push(plan.timestamp.getTime());
+
+    const owner = agentByLabel.get(plan.agentLabel) ?? null;
+    const ownerSessionId = owner?.sessionId ?? null;
+    const parsed = ownerSessionId ? parsedBySession.get(ownerSessionId) : undefined;
+
+    for (let i = 0; i < plan.tasks.length; i++) {
+      const task = plan.tasks[i];
+      if (task.id) plannedTaskIds.add(task.id);
+
+      const linkedTurns = parsed
+        ? parsed.turns.filter(t =>
+            t.taskCreates.some(tc => tc.taskId && tc.taskId === task.id)
+            || t.taskUpdates.some(tu => tu.taskId && tu.taskId === task.id)
+          )
+        : [];
+
+      let edits = 0;
+      let commits = 0;
+      let lastTouchedAt: Date | null = null;
+      for (const turn of linkedTurns) {
+        mappedTurnKeys.add(`${parsed!.session.id}:${turn.index}`);
+        edits += turn.filesChanged.length;
+        if (turn.hasCommit) commits += 1;
+        if (!lastTouchedAt || turn.timestamp.getTime() > lastTouchedAt.getTime()) {
+          lastTouchedAt = turn.timestamp;
+        }
+      }
+      if (lastTouchedAt) intentUpdateTimes.push(lastTouchedAt.getTime());
+
+      let state: IntentTaskView["state"];
+      if (task.status === "completed") state = "completed";
+      else if (task.status === "in_progress") state = "in_progress";
+      else state = "pending";
+      if (hasCollision && state === "in_progress") state = "blocked";
+
+      plannedTasks.push({
+        id: `planned-${ownerSessionId ?? plan.agentLabel}-${task.id || i}`,
+        subject: task.subject || "(untitled task)",
+        state,
+        ownerLabel: owner?.label ?? plan.agentLabel ?? null,
+        ownerSessionId,
+        evidence: { edits, commits, lastTouchedAt },
+      });
+    }
+  }
+
+  const unplanned: IntentTaskView[] = [];
+  let unplannedTurns = 0;
+
+  for (const session of sessions) {
+    const owner = agentBySession.get(session.session.id);
+    for (const turn of session.turns) {
+      if (turn.filesChanged.length === 0 && !turn.hasCommit) continue;
+
+      const turnKey = `${session.session.id}:${turn.index}`;
+      const hasPlannedTaskLink =
+        mappedTurnKeys.has(turnKey)
+        || turn.taskCreates.some(tc => tc.taskId && plannedTaskIds.has(tc.taskId))
+        || turn.taskUpdates.some(tu => tu.taskId && plannedTaskIds.has(tu.taskId));
+
+      if (hasPlannedTaskLink) continue;
+
+      unplannedTurns++;
+      intentUpdateTimes.push(turn.timestamp.getTime());
+      const subject = turn.commitMessage ? `Commit: ${turn.commitMessage}` : (turn.summary || "Unplanned implementation");
+      unplanned.push({
+        id: `unplanned-${session.session.id}-${turn.index}`,
+        subject,
+        state: "unplanned",
+        ownerLabel: owner?.label ?? null,
+        ownerSessionId: session.session.id,
+        evidence: {
+          edits: turn.filesChanged.length,
+          commits: turn.hasCommit ? 1 : 0,
+          lastTouchedAt: turn.timestamp,
+        },
+      });
+    }
+  }
+
+  unplanned.sort((a, b) => {
+    const aTs = a.evidence.lastTouchedAt?.getTime() ?? 0;
+    const bTs = b.evidence.lastTouchedAt?.getTime() ?? 0;
+    return bTs - aTs;
+  });
+
+  const inProgress = plannedTasks.filter(t => t.state === "in_progress" || t.state === "blocked" || t.state === "pending");
+  const done = plannedTasks.filter(t => t.state === "completed");
+
+  const plannedTotal = plannedTasks.length;
+  const executingCount = plannedTasks.filter(t => t.state === "in_progress" || t.state === "blocked" || t.state === "completed").length;
+  const intentCoveragePct = plannedTotal > 0 ? Math.round((executingCount / plannedTotal) * 100) : 0;
+
+  const driftDenominator = plannedTotal + unplannedTurns;
+  const driftPct = driftDenominator > 0 ? Math.round((unplannedTurns / driftDenominator) * 100) : 0;
+
+  const evidenceRatio = plannedTotal > 0
+    ? plannedTasks.filter(hasEvidence).length / plannedTotal
+    : 0;
+  let intentConfidence: "high" | "medium" | "low";
+  if (plannedTotal === 0) {
+    intentConfidence = unplannedTurns > 0 ? "low" : "medium";
+  } else if (evidenceRatio >= 0.67) {
+    intentConfidence = "high";
+  } else if (evidenceRatio >= 0.34) {
+    intentConfidence = "medium";
+  } else {
+    intentConfidence = "low";
+  }
+
+  const blockedCount = plannedTasks.filter(t => t.state === "blocked").length;
+  let intentStatus: IntentInsights["intentStatus"];
+  if (plannedTotal === 0) intentStatus = "no_clear_intent";
+  else if (blockedCount > 0) intentStatus = "blocked";
+  else if (driftPct >= 30 || unplannedTurns >= 2) intentStatus = "drifting";
+  else intentStatus = "on_plan";
+
+  if (unplannedTurns > 0) {
+    driftReasons.push(`${unplannedTurns} unplanned implementation turn${unplannedTurns !== 1 ? "s" : ""}`);
+  }
+  const untouchedPlanned = plannedTasks.filter(t => t.state === "pending" && !hasEvidence(t)).length;
+  if (untouchedPlanned > 0 && unplannedTurns > 0) {
+    driftReasons.push(`${untouchedPlanned} planned task${untouchedPlanned !== 1 ? "s" : ""} untouched while other work continued`);
+  }
+  if (blockedCount > 0) {
+    driftReasons.push(`${blockedCount} task${blockedCount !== 1 ? "s" : ""} blocked by active collisions`);
+  }
+
+  const lastIntentUpdateAt = intentUpdateTimes.length > 0
+    ? new Date(Math.max(...intentUpdateTimes))
+    : null;
+
+  return {
+    intentCoveragePct,
+    driftPct,
+    intentConfidence,
+    intentStatus,
+    lastIntentUpdateAt,
+    intentLanes: {
+      inProgress,
+      done,
+      unplanned,
+    },
+    driftReasons,
+  };
+}
+
 // ─── Dashboard builder ──────────────────────────────────────────────────────
 
 /** Grace period: keep recently-dead sessions visible so feed/plans persist across context clears */
@@ -690,33 +875,57 @@ export function buildDashboardState(): DashboardState {
     });
   }
 
-  // ─── Stall detection (post-pass, no existing code modified) ─────────
+  // ─── Stall / idle detection (post-pass, no existing code modified) ──
   const STALL_WARN_MS = 5 * 60 * 1000;   // 5 min → elevated
   const STALL_CRIT_MS = 15 * 60 * 1000;  // 15 min → critical
+  const IDLE_MS = 5 * 60 * 1000;         // 5 min with no active work → idle
+
+  /** Sessions that are stalled (have active work but went silent) */
+  const stalledSessionIds = new Set<string>();
 
   for (const agent of agents) {
     if (!agent.isActive) continue;
     const session = allSessions.get(agent.sessionId);
     if (!session) continue;
     const silenceMs = now - session.modifiedAt.getTime();
-    if (silenceMs > STALL_CRIT_MS) {
+    if (silenceMs < IDLE_MS) continue;
+
+    // Determine if this agent has active work (plans being drafted/implemented, or pending/in-progress tasks)
+    const hasActiveWork = agent.plans.some(p =>
+      p.status === "drafting" || p.status === "implementing"
+    ) || agent.plans.some(p =>
+      p.tasks.some(t => t.status === "in_progress" || t.status === "pending")
+    );
+
+    if (hasActiveWork) {
+      // Stalled: was working towards a goal but went silent
+      stalledSessionIds.add(agent.sessionId);
+      if (silenceMs > STALL_CRIT_MS) {
+        agent.risk.spinningSignals.push({
+          pattern: "stalled",
+          level: "critical",
+          detail: `No activity for ${Math.round(silenceMs / 60000)}m`,
+        });
+      } else {
+        agent.risk.spinningSignals.push({
+          pattern: "stalled",
+          level: "elevated",
+          detail: `No activity for ${Math.round(silenceMs / 60000)}m`,
+        });
+      }
+      // Recompute overallRisk for stall signals
+      if (agent.risk.spinningSignals.some(s => s.level === "critical")) {
+        agent.risk.overallRisk = "critical";
+      } else if (agent.risk.overallRisk === "nominal" && agent.risk.spinningSignals.some(s => s.level === "elevated")) {
+        agent.risk.overallRisk = "elevated";
+      }
+    } else {
+      // Idle: session alive but no active work — soft signal, no risk escalation
       agent.risk.spinningSignals.push({
-        pattern: "stalled",
-        level: "critical",
-        detail: `No activity for ${Math.round(silenceMs / 60000)}m`,
+        pattern: "idle",
+        level: "nominal",
+        detail: `Idle for ${Math.round(silenceMs / 60000)}m`,
       });
-    } else if (silenceMs > STALL_WARN_MS) {
-      agent.risk.spinningSignals.push({
-        pattern: "stalled",
-        level: "elevated",
-        detail: `No activity for ${Math.round(silenceMs / 60000)}m`,
-      });
-    }
-    // Recompute overallRisk if stall signal was injected
-    if (agent.risk.spinningSignals.some(s => s.level === "critical")) {
-      agent.risk.overallRisk = "critical";
-    } else if (agent.risk.overallRisk === "nominal" && agent.risk.spinningSignals.some(s => s.level === "elevated")) {
-      agent.risk.overallRisk = "elevated";
     }
   }
 
@@ -765,6 +974,7 @@ export function buildDashboardState(): DashboardState {
     const projectId = project?.encodedName ?? projectPath.replace(/\//g, "-");
 
     const risk = computeWorkstreamRisk(activeProjectAgents);
+    const intent = buildIntentInsights(sessions, allProjectAgents, plans, hasCollision);
 
     workstreams.push({
       projectId,
@@ -780,6 +990,13 @@ export function buildDashboardState(): DashboardState {
       plans,
       planTasks,
       risk,
+      intentCoveragePct: intent.intentCoveragePct,
+      driftPct: intent.driftPct,
+      intentConfidence: intent.intentConfidence,
+      intentStatus: intent.intentStatus,
+      lastIntentUpdateAt: intent.lastIntentUpdateAt,
+      intentLanes: intent.intentLanes,
+      driftReasons: intent.driftReasons,
     });
   }
 
@@ -792,7 +1009,7 @@ export function buildDashboardState(): DashboardState {
   });
 
   // 8. Build feed
-  const feed = buildFeed(parsedSessions, collisions, labelMap, activeSessionIds, sessionOperatorMap);
+  const feed = buildFeed(parsedSessions, collisions, labelMap, activeSessionIds, sessionOperatorMap, stalledSessionIds);
 
   // 9. Build operators — set status to "online" if any agents are active
   const operatorActiveSet = new Set<string>();

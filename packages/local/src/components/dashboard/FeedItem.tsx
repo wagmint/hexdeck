@@ -62,6 +62,10 @@ const typeConfig: Record<
     iconClass: "bg-dash-yellow-dim text-dash-yellow",
     rowClass: "bg-dash-yellow-dim border-l-2 border-l-dash-yellow",
   },
+  idle: {
+    icon: "\u23F3",
+    iconClass: "bg-dash-text-muted/10 text-dash-text-muted",
+  },
 };
 
 export function FeedItem({ event, isNew, onClick }: FeedItemProps) {

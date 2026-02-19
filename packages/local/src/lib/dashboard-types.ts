@@ -41,6 +41,27 @@ export interface WorkstreamRisk {
   overallRisk: RiskLevel;
 }
 
+export interface IntentEvidence {
+  edits: number;
+  commits: number;
+  lastTouchedAt: string | null;
+}
+
+export interface IntentTaskView {
+  id: string;
+  subject: string;
+  state: "pending" | "in_progress" | "completed" | "blocked" | "unplanned";
+  ownerLabel: string | null;
+  ownerSessionId: string | null;
+  evidence: IntentEvidence;
+}
+
+export interface IntentLanes {
+  inProgress: IntentTaskView[];
+  done: IntentTaskView[];
+  unplanned: IntentTaskView[];
+}
+
 // ─── Operator Types ─────────────────────────────────────────────────────────
 
 export type OperatorStatus = "online" | "offline";
@@ -114,6 +135,13 @@ export interface Workstream {
   plans: SessionPlan[];
   planTasks: PlanTask[];
   risk: WorkstreamRisk;
+  intentCoveragePct: number;
+  driftPct: number;
+  intentConfidence: "high" | "medium" | "low";
+  intentStatus: "on_plan" | "drifting" | "blocked" | "no_clear_intent";
+  lastIntentUpdateAt: string | null;
+  intentLanes: IntentLanes;
+  driftReasons: string[];
 }
 
 export type CollisionSeverity = "warning" | "critical";
@@ -144,7 +172,8 @@ export type FeedEventType =
   | "plan_approved"
   | "task_completed"
   | "session_ended"
-  | "stall";
+  | "stall"
+  | "idle";
 
 export interface FeedEvent {
   id: string;

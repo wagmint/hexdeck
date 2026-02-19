@@ -139,7 +139,7 @@ export default function DashboardPage() {
         style={{ gridTemplateColumns: "260px 1fr 320px", gridTemplateRows: "1fr" }}
       >
         {/* LEFT PANEL: Workstream / Agent cards */}
-        <div className="bg-dash-bg overflow-y-auto scrollbar-thin">
+        <div className="relative z-20 bg-dash-bg overflow-y-auto scrollbar-thin">
           <PanelHeader
             title={isFiltered && selectedName ? `Filtered: ${selectedName}` : "Workstreams"}
             count={isFiltered ? undefined : `${workstreams.length} project${workstreams.length !== 1 ? "s" : ""}`}

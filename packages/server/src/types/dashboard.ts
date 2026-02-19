@@ -41,6 +41,27 @@ export interface WorkstreamRisk {
   overallRisk: RiskLevel;
 }
 
+export interface IntentEvidence {
+  edits: number;
+  commits: number;
+  lastTouchedAt: Date | null;
+}
+
+export interface IntentTaskView {
+  id: string;
+  subject: string;
+  state: "pending" | "in_progress" | "completed" | "blocked" | "unplanned";
+  ownerLabel: string | null;
+  ownerSessionId: string | null;
+  evidence: IntentEvidence;
+}
+
+export interface IntentLanes {
+  inProgress: IntentTaskView[];
+  done: IntentTaskView[];
+  unplanned: IntentTaskView[];
+}
+
 // ─── Operator Types ──────────────────────────────────────────────────────────
 
 export type OperatorStatus = "online" | "offline";
@@ -146,6 +167,20 @@ export interface Workstream {
   planTasks: PlanTask[];
   /** Workstream-level risk aggregation */
   risk: WorkstreamRisk;
+  /** Planned task execution coverage (0-100) */
+  intentCoveragePct: number;
+  /** Estimated unplanned work share (0-100) */
+  driftPct: number;
+  /** Confidence in intent mapping quality */
+  intentConfidence: "high" | "medium" | "low";
+  /** Plan vs reality classification */
+  intentStatus: "on_plan" | "drifting" | "blocked" | "no_clear_intent";
+  /** Most recent intent-relevant update */
+  lastIntentUpdateAt: Date | null;
+  /** Plan vs reality lanes for intent map rendering */
+  intentLanes: IntentLanes;
+  /** Human-readable drift indicators */
+  driftReasons: string[];
 }
 
 export type CollisionSeverity = "warning" | "critical";
@@ -184,7 +219,8 @@ export type FeedEventType =
   | "plan_approved"
   | "task_completed"
   | "session_ended"
-  | "stall";
+  | "stall"
+  | "idle";
 
 export interface FeedEvent {
   /** Unique ID for deduplication */

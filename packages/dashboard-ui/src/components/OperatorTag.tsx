@@ -1,6 +1,6 @@
 "use client";
 
-import { useOperators } from "@/contexts/OperatorContext";
+import { useOperators } from "./OperatorContext";
 
 interface OperatorTagProps {
   operatorId: string;

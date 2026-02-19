@@ -6,7 +6,7 @@
     "dev": "npm run dev --workspace=packages/server & npm run dev --workspace=packages/local",
     "dev:server": "npm run dev --workspace=packages/server",
     "dev:local": "npm run dev --workspace=packages/local",
-    "build": "npm run build --workspace=packages/local && npm run build --workspace=packages/server && npm run build --workspace=packages/cli",
+    "build": "npm run build --workspace=packages/dashboard-ui && npm run build --workspace=packages/local && npm run build --workspace=packages/server && npm run build --workspace=packages/cli",
     "build:dashboard": "npm run build --workspace=packages/local",
     "build:cli": "npm run build --workspace=packages/cli",
     "test": "npm run test --workspace=packages/server"

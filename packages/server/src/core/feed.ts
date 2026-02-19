@@ -155,8 +155,14 @@ export function buildFeed(
   }
 
   // 1c. Stall / idle events — active sessions with extended silence
+  //     These are transient: clear previous entries each cycle, re-add only if still silent.
   const SILENCE_FEED_MS = 5 * 60 * 1000;
   if (activeSessionIds) {
+    // Remove stale idle/stall entries so they disappear when session resumes
+    for (const sessionId of activeSessionIds) {
+      feedLog.delete(`idle-${sessionId}`);
+      feedLog.delete(`stall-${sessionId}`);
+    }
     const nowMs = Date.now();
     for (const session of sessions) {
       const sessionId = session.session.id;
@@ -165,7 +171,7 @@ export function buildFeed(
       if (silenceMs > SILENCE_FEED_MS) {
         const label = labelMap?.get(sessionId) ?? sessionId.slice(0, 8);
         const isStalled = stalledSessionIds?.has(sessionId) ?? false;
-        addEvent({
+        feedLog.set(`${isStalled ? "stall" : "idle"}-${sessionId}`, {
           id: `${isStalled ? "stall" : "idle"}-${sessionId}`,
           type: isStalled ? "stall" : "idle",
           timestamp: new Date(session.session.modifiedAt),

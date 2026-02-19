@@ -1,6 +1,6 @@
 "use client";
 
-import type { DashboardSummary, Operator } from "@/lib/dashboard-types";
+import type { DashboardSummary, Operator } from "../types";
 
 interface TopBarProps {
   summary: DashboardSummary;

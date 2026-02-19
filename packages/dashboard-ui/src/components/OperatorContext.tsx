@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useMemo } from "react";
-import type { Operator } from "@/lib/dashboard-types";
+import type { Operator } from "../types";
 
 interface OperatorContextValue {
   operators: Operator[];

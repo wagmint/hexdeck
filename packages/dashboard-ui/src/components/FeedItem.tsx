@@ -1,8 +1,8 @@
 "use client";
 
-import type { FeedEvent } from "@/lib/dashboard-types";
-import { useOperators } from "@/contexts/OperatorContext";
-import { timeAgo } from "@/lib/utils";
+import type { FeedEvent } from "../types";
+import { useOperators } from "./OperatorContext";
+import { timeAgo } from "../utils";
 
 interface FeedItemProps {
   event: FeedEvent;
@@ -63,8 +63,8 @@ const typeConfig: Record<
     rowClass: "bg-dash-yellow-dim border-l-2 border-l-dash-yellow",
   },
   idle: {
-    icon: "\u23F3",
-    iconClass: "bg-dash-text-muted/10 text-dash-text-muted",
+    icon: "\u2013",
+    iconClass: "bg-dash-border text-dash-text-muted",
   },
 };
 
@@ -73,7 +73,6 @@ export function FeedItem({ event, isNew, onClick }: FeedItemProps) {
   const { getOperator, isMultiOperator } = useOperators();
   const operator = isMultiOperator ? getOperator(event.operatorId) : undefined;
 
-  // Operator-colored left border when no type-specific border exists
   const borderStyle =
     isMultiOperator && !config.rowClass && operator
       ? { borderLeftWidth: 2, borderLeftColor: operator.color }

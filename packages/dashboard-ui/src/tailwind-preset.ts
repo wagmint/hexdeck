@@ -1,11 +1,11 @@
-import type { Config } from "tailwindcss";
-
+/**
+ * Tailwind CSS preset for the Pylon dashboard theme.
+ * Consuming apps should add this to their tailwind.config.ts:
+ *
+ *   import pylonPreset from "@pylon/dashboard-ui/tailwind-preset";
+ *   export default { presets: [pylonPreset], ... }
+ */
 export default {
-  darkMode: ["class"],
-  content: [
-    "./src/**/*.{js,ts,jsx,tsx,mdx}",
-    "../dashboard-ui/dist/**/*.{js,mjs}",
-  ],
   theme: {
     extend: {
       fontFamily: {
@@ -14,38 +14,6 @@ export default {
         display: ["DM Sans", "Inter", "system-ui", "sans-serif"],
       },
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-        },
-        secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
-        },
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
-        },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
-        },
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
-        },
-        node: {
-          user: "hsl(var(--node-user))",
-          commit: "hsl(var(--node-commit))",
-          error: "hsl(var(--node-error))",
-          compaction: "hsl(var(--node-compaction))",
-          default: "hsl(var(--node-default))",
-        },
         dash: {
           bg: "var(--dash-bg)",
           surface: "var(--dash-surface)",
@@ -67,16 +35,6 @@ export default {
           purple: "var(--dash-purple)",
           "purple-dim": "var(--dash-purple-dim)",
         },
-      },
-      borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
-      },
-      boxShadow: {
-        soft: "0 2px 8px -2px hsl(220 20% 10% / 0.1)",
-        card: "0 1px 3px hsl(220 20% 10% / 0.06), 0 4px 12px hsl(220 20% 10% / 0.08)",
-        elevated: "0 8px 32px -8px hsl(220 20% 10% / 0.15)",
       },
       keyframes: {
         "fade-in": {
@@ -104,5 +62,4 @@ export default {
       },
     },
   },
-  plugins: [],
-} satisfies Config;
+};

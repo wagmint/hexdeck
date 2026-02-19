@@ -1,6 +1,6 @@
 "use client";
 
-import type { Workstream } from "@/lib/dashboard-types";
+import type { Workstream } from "../types";
 
 interface ProgressBarProps {
   workstream: Workstream;

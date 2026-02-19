@@ -540,6 +540,40 @@ function hasEvidence(task: IntentTaskView): boolean {
   return task.evidence.edits > 0 || task.evidence.commits > 0 || task.evidence.lastTouchedAt !== null;
 }
 
+const INTENT_STOP_WORDS = new Set([
+  "the", "and", "for", "with", "from", "into", "this", "that", "then", "than",
+  "task", "work", "update", "fix", "add", "make", "build", "implement", "create",
+  "file", "files", "code", "route", "logic", "test", "tests", "use", "using",
+]);
+
+function tokenizeIntentText(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(/[^a-z0-9_]+/)
+    .map(t => t.trim())
+    .filter(t => t.length >= 3 && !INTENT_STOP_WORDS.has(t));
+}
+
+function tokenDiceScore(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let overlap = 0;
+  for (const tok of a) {
+    if (b.has(tok)) overlap++;
+  }
+  return (2 * overlap) / (a.size + b.size);
+}
+
+function fileNameTokens(paths: string[]): Set<string> {
+  const out = new Set<string>();
+  for (const p of paths) {
+    const file = p.split("/").pop() ?? p;
+    for (const tok of tokenizeIntentText(file.replace(/\.[a-z0-9]+$/i, ""))) {
+      out.add(tok);
+    }
+  }
+  return out;
+}
+
 function buildIntentInsights(
   sessions: ParsedSession[],
   allProjectAgents: Agent[],
@@ -551,6 +585,7 @@ function buildIntentInsights(
   const parsedBySession = new Map(sessions.map(s => [s.session.id, s]));
 
   const plannedTasks: IntentTaskView[] = [];
+  const plannedTaskTokens = new Map<string, Set<string>>();
   const plannedTaskIds = new Set<string>();
   const mappedTurnKeys = new Set<string>();
   const driftReasons: string[] = [];
@@ -601,11 +636,16 @@ function buildIntentInsights(
         ownerSessionId,
         evidence: { edits, commits, lastTouchedAt },
       });
+      plannedTaskTokens.set(
+        `planned-${ownerSessionId ?? plan.agentLabel}-${task.id || i}`,
+        new Set(tokenizeIntentText(task.subject || ""))
+      );
     }
   }
 
   const unplanned: IntentTaskView[] = [];
   let unplannedTurns = 0;
+  let fallbackMappedTurns = 0;
 
   for (const session of sessions) {
     const owner = agentBySession.get(session.session.id);
@@ -619,6 +659,40 @@ function buildIntentInsights(
         || turn.taskUpdates.some(tu => tu.taskId && plannedTaskIds.has(tu.taskId));
 
       if (hasPlannedTaskLink) continue;
+
+      // Fallback mapping: semantic match by subject/summary/file tokens when taskId is missing.
+      const turnText = [turn.summary, turn.commitMessage ?? "", ...turn.filesChanged].join(" ");
+      const turnTokens = new Set(tokenizeIntentText(turnText));
+      const turnFileTokens = fileNameTokens(turn.filesChanged);
+      let bestIdx = -1;
+      let bestScore = 0;
+
+      for (let i = 0; i < plannedTasks.length; i++) {
+        const task = plannedTasks[i];
+        const taskTokens = plannedTaskTokens.get(task.id) ?? new Set<string>();
+        const subjectScore = tokenDiceScore(turnTokens, taskTokens);
+        const fileScore = tokenDiceScore(turnFileTokens, taskTokens);
+        const score = (subjectScore * 0.8) + (fileScore * 0.2);
+        if (score > bestScore) {
+          bestScore = score;
+          bestIdx = i;
+        }
+      }
+
+      if (bestIdx >= 0 && bestScore >= 0.45) {
+        const matched = plannedTasks[bestIdx];
+        matched.evidence.edits += turn.filesChanged.length;
+        if (turn.hasCommit) matched.evidence.commits += 1;
+        if (!matched.evidence.lastTouchedAt || turn.timestamp.getTime() > matched.evidence.lastTouchedAt.getTime()) {
+          matched.evidence.lastTouchedAt = turn.timestamp;
+        }
+        // If explicit task status is still pending but we found implementation evidence, mark as in progress.
+        if (matched.state === "pending") matched.state = "in_progress";
+        mappedTurnKeys.add(turnKey);
+        fallbackMappedTurns++;
+        intentUpdateTimes.push(turn.timestamp.getTime());
+        continue;
+      }
 
       unplannedTurns++;
       intentUpdateTimes.push(turn.timestamp.getTime());
@@ -677,6 +751,9 @@ function buildIntentInsights(
 
   if (unplannedTurns > 0) {
     driftReasons.push(`${unplannedTurns} unplanned implementation turn${unplannedTurns !== 1 ? "s" : ""}`);
+  }
+  if (fallbackMappedTurns > 0) {
+    driftReasons.push(`${fallbackMappedTurns} turn${fallbackMappedTurns !== 1 ? "s" : ""} matched to plan by subject`);
   }
   const untouchedPlanned = plannedTasks.filter(t => t.state === "pending" && !hasEvidence(t)).length;
   if (untouchedPlanned > 0 && unplannedTurns > 0) {

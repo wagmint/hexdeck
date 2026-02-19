@@ -1,8 +1,8 @@
 "use client";
 
-import type { Workstream, IntentTaskView, AgentStatus } from "@/lib/dashboard-types";
+import type { Workstream, IntentTaskView, AgentStatus } from "../types";
 import { OperatorTag } from "./OperatorTag";
-import { timeAgo } from "@/lib/utils";
+import { timeAgo } from "../utils";
 
 interface WorkstreamNodeProps {
   workstream: Workstream;
@@ -120,7 +120,6 @@ export function WorkstreamNode({ workstream }: WorkstreamNodeProps) {
           )}
         </div>
 
-        {/* Agent names */}
         <div className="flex flex-wrap gap-x-2.5 gap-y-0.5 mt-1">
           {workstream.agents.map((agent) => (
             <div key={agent.sessionId} className="flex items-center gap-1 text-[10px]">

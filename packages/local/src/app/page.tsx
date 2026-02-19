@@ -2,16 +2,18 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useDashboard } from "@/hooks/useDashboard";
-import type { Collision } from "@/lib/dashboard-types";
-import { OperatorProvider } from "@/contexts/OperatorContext";
-import { TopBar } from "@/components/dashboard/TopBar";
-import { PanelHeader } from "@/components/dashboard/PanelHeader";
-import { AgentCard } from "@/components/dashboard/AgentCard";
-import { WorkstreamNode } from "@/components/dashboard/WorkstreamNode";
-import { FeedItem } from "@/components/dashboard/FeedItem";
-import { CollisionDetail } from "@/components/dashboard/CollisionDetail";
-import { PlanDetail } from "@/components/dashboard/PlanDetail";
-import { RiskPanel } from "@/components/dashboard/RiskPanel";
+import type { Collision } from "@pylon/dashboard-ui";
+import {
+  OperatorProvider,
+  TopBar,
+  PanelHeader,
+  AgentCard,
+  WorkstreamNode,
+  FeedItem,
+  CollisionDetail,
+  PlanDetail,
+  RiskPanel,
+} from "@pylon/dashboard-ui";
 
 export default function DashboardPage() {
   const { state, loading, error, connected } = useDashboard();

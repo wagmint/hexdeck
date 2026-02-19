@@ -1,7 +1,7 @@
 "use client";
 
-import type { Agent, RiskLevel } from "@/lib/dashboard-types";
-import { formatDuration } from "@/lib/utils";
+import type { Agent, RiskLevel } from "../types";
+import { formatDuration } from "../utils";
 import { OperatorTag } from "./OperatorTag";
 
 interface RiskPanelProps {
@@ -9,7 +9,6 @@ interface RiskPanelProps {
 }
 
 export function RiskPanel({ agents }: RiskPanelProps) {
-  // Sort: critical first, then elevated, then nominal
   const sorted = [...agents].sort((a, b) => {
     const order: Record<RiskLevel, number> = { critical: 0, elevated: 1, nominal: 2 };
     return order[a.risk.overallRisk] - order[b.risk.overallRisk];
@@ -30,7 +29,6 @@ function RiskCard({ agent }: { agent: Agent }) {
 
   return (
     <div className="px-3.5 py-2.5 border-b border-dash-border">
-      {/* Header */}
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-1.5">
           <span className="text-dash-text font-semibold text-[11px]">{label}</span>
@@ -47,7 +45,6 @@ function RiskCard({ agent }: { agent: Agent }) {
         <RiskBadge level={risk.overallRisk} />
       </div>
 
-      {/* Context Gauge */}
       {risk.contextUsagePct > 0 && (
         <div className="flex items-center gap-2 mb-1">
           <span className="text-[9px] text-dash-text-muted w-16 shrink-0">Context</span>
@@ -56,21 +53,18 @@ function RiskCard({ agent }: { agent: Agent }) {
         </div>
       )}
 
-      {/* Error Rate */}
       <div className="flex items-center gap-2 mb-1">
         <span className="text-[9px] text-dash-text-muted w-16 shrink-0">Err rate</span>
         <MiniBar value={risk.errorRate} thresholds={[0.15, 0.35]} />
         <span className="text-[9px] text-dash-text-dim w-8 text-right">{pct(risk.errorRate)}</span>
       </div>
 
-      {/* Correction Ratio */}
       <div className="flex items-center gap-2 mb-1">
         <span className="text-[9px] text-dash-text-muted w-16 shrink-0">Fixes</span>
         <MiniBar value={risk.correctionRatio} thresholds={[0.4, 0.7]} invert />
         <span className="text-[9px] text-dash-text-dim w-8 text-right">{pct(risk.correctionRatio)}</span>
       </div>
 
-      {/* Tokens + Compactions */}
       <div className="flex items-center gap-3 mb-1">
         <span className="text-[9px] text-dash-text-muted">
           {formatTokens(risk.totalTokens)} tokens
@@ -82,7 +76,6 @@ function RiskCard({ agent }: { agent: Agent }) {
         )}
       </div>
 
-      {/* Timing */}
       {risk.sessionDurationMs > 0 && (
         <div className="flex items-center gap-3 mb-1">
           <span className="text-[9px] text-dash-text-muted">
@@ -96,7 +89,6 @@ function RiskCard({ agent }: { agent: Agent }) {
         </div>
       )}
 
-      {/* Cost */}
       {risk.costPerSession > 0 && (
         <div className="flex items-center gap-3 mb-1">
           <span className="text-[9px] text-dash-text-muted">
@@ -108,7 +100,6 @@ function RiskCard({ agent }: { agent: Agent }) {
         </div>
       )}
 
-      {/* Model Breakdown */}
       {risk.modelBreakdown.length >= 1 && (
         <div className="flex items-center gap-3 mb-1 flex-wrap">
           {risk.modelBreakdown.map((m) => (
@@ -119,14 +110,12 @@ function RiskCard({ agent }: { agent: Agent }) {
         </div>
       )}
 
-      {/* Error Trend Sparkline */}
       {risk.errorTrend.length > 0 && (
         <div className="mb-1">
           <ErrorTrendLine trend={risk.errorTrend} />
         </div>
       )}
 
-      {/* Spinning Signals */}
       {risk.spinningSignals.length > 0 && (
         <div className="space-y-0.5 mb-1">
           {risk.spinningSignals.map((sig, i) => (
@@ -139,7 +128,6 @@ function RiskCard({ agent }: { agent: Agent }) {
           ))}
         </div>
       )}
-
     </div>
   );
 }
@@ -164,12 +152,10 @@ function MiniBar({ value, thresholds, invert }: { value: number; thresholds: [nu
 
   let color: string;
   if (invert) {
-    // Higher is better (green > threshold[1], yellow > threshold[0], red below)
     if (value >= thresholds[1]) color = "bg-dash-green";
     else if (value >= thresholds[0]) color = "bg-dash-yellow";
     else color = "bg-dash-red";
   } else {
-    // Lower is better
     if (value <= thresholds[0]) color = "bg-dash-green";
     else if (value <= thresholds[1]) color = "bg-dash-yellow";
     else color = "bg-dash-red";

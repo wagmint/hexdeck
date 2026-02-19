@@ -1,6 +1,6 @@
 "use client";
 
-import type { Workstream, PlanStatus } from "@/lib/dashboard-types";
+import type { Workstream, PlanStatus } from "../types";
 import { AgentPip } from "./AgentPip";
 import { OperatorTag } from "./OperatorTag";
 
@@ -20,11 +20,9 @@ export function AgentCard({ workstream, isSelected, onSelect }: AgentCardProps) 
   const hasActive = workstream.agents.some((a) => a.isActive);
   const focusAgent = workstream.agents.find((a) => a.isActive);
 
-  // Find the most advanced plan status across agents
   const activePlan = workstream.plans.find(p => p.status !== "none");
   const badge = activePlan ? planBadges[activePlan.status] : null;
 
-  // Task progress
   const hasTasks = workstream.planTasks.length > 0;
   const tasksDone = hasTasks
     ? workstream.planTasks.filter(t => t.status === "completed").length

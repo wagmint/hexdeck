@@ -1,6 +1,6 @@
 "use client";
 
-import type { AgentStatus } from "@/lib/dashboard-types";
+import type { AgentStatus } from "../types";
 
 interface AgentPipProps {
   status: AgentStatus;

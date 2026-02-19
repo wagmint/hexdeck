@@ -73,7 +73,7 @@ export interface Operator {
   status: OperatorStatus;
 }
 
-// ─── Dashboard Types (frontend mirrors — dates as strings) ──────────────────
+// ─── Dashboard Types ────────────────────────────────────────────────────────
 
 export type PlanStatus = "drafting" | "implementing" | "completed" | "rejected" | "none";
 

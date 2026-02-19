@@ -1,7 +1,7 @@
 "use client";
 
-import type { Collision } from "@/lib/dashboard-types";
-import { useOperators } from "@/contexts/OperatorContext";
+import type { Collision } from "../types";
+import { useOperators } from "./OperatorContext";
 
 interface CollisionDetailProps {
   collision: Collision | null;
@@ -24,7 +24,6 @@ export function CollisionDetail({ collision, onDismiss }: CollisionDetailProps) 
 
   return (
     <div className="h-full overflow-y-auto">
-      {/* Banner */}
       <div className="flex items-center justify-between px-3.5 py-2.5 bg-dash-red-dim border-b border-dash-red">
         <div className="flex items-center gap-2">
           <div className="w-5 h-5 bg-dash-red text-dash-bg rounded flex items-center justify-center font-bold text-xs">
@@ -60,7 +59,6 @@ export function CollisionDetail({ collision, onDismiss }: CollisionDetailProps) 
         </div>
       </div>
 
-      {/* Side-by-side */}
       <div className="grid grid-cols-[1fr_40px_1fr] gap-2.5 p-3.5">
         {agentA && (
           <CollisionSide
@@ -83,7 +81,6 @@ export function CollisionDetail({ collision, onDismiss }: CollisionDetailProps) 
         )}
       </div>
 
-      {/* Full file path */}
       <div className="px-3.5 pb-2 text-[9px] text-dash-text-muted font-mono truncate">
         {collision.filePath}
       </div>

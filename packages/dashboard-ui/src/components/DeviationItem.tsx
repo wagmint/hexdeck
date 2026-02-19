@@ -1,8 +1,8 @@
 "use client";
 
-import type { Collision } from "@/lib/dashboard-types";
-import { useOperators } from "@/contexts/OperatorContext";
-import { timeAgo } from "@/lib/utils";
+import type { Collision } from "../types";
+import { useOperators } from "./OperatorContext";
+import { timeAgo } from "../utils";
 
 interface DeviationItemProps {
   collision: Collision;

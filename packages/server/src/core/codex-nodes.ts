@@ -206,6 +206,21 @@ function buildSingleCodexTurn(events: CodexEvent[], index: number, sessionModel:
   // Build corrections from error→fix sequences
   const corrections = buildCodexCorrections(events);
 
+  // Infer task lifecycle for Codex turns so intent mapping can treat Codex
+  // sessions similarly to Claude sessions (which have TaskCreate/TaskUpdate).
+  const shouldCreateTask = category === "task" || category === "feedback";
+  const inferredTaskId = `codex-${index + 1}`;
+  const inferredSubject = summary || userInstruction.slice(0, 80) || `Codex task ${index + 1}`;
+  const taskCreates = shouldCreateTask
+    ? [{ taskId: inferredTaskId, subject: inferredSubject, description: userInstruction.slice(0, 240) }]
+    : [];
+  const taskUpdates = shouldCreateTask
+    ? [{
+        taskId: inferredTaskId,
+        status: hasCommit ? "completed" : (filesChanged.length > 0 || commands.length > 0 ? "in_progress" : "pending"),
+      }]
+    : [];
+
   // Sections — simplified for Codex
   const sections: TurnSections = {
     goal: { summary: summary || "(no instruction)", fullInstruction: userInstruction },
@@ -253,8 +268,8 @@ function buildSingleCodexTurn(events: CodexEvent[], index: number, sessionModel:
     hasPlanEnd: false,
     planMarkdown: null,
     planRejected: false,
-    taskCreates: [],
-    taskUpdates: [],
+    taskCreates,
+    taskUpdates,
     tokenUsage,
     model: sessionModel ?? "codex",
     durationMs,

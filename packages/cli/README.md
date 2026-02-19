@@ -1,9 +1,9 @@
-# @pylon/cli
+# @pylon-dev/cli
 
 Local observability for Claude Code sessions.
 
 ```bash
-npm install -g @pylon/cli
+npm install -g @pylon-dev/cli
 pylon start
 ```
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { SSE_DASHBOARD_URL } from "@/lib/dashboard-api";
-import type { DashboardState } from "@pylon/dashboard-ui";
+import type { DashboardState } from "@pylon-dev/dashboard-ui";
 
 interface UseDashboardResult {
   state: DashboardState | null;

@@ -31,7 +31,7 @@ export async function startCommand(options: { port: number; foreground: boolean 
 
   if (foreground) {
     // Import and run directly
-    const { startServer } = await import("@pylon/server");
+    const { startServer } = await import("@pylon-dev/server");
     startServer({ port, dashboardDir: dashboardDir ?? undefined });
 
     savePid({

@@ -2,7 +2,7 @@
  * Tailwind CSS preset for the Pylon dashboard theme.
  * Consuming apps should add this to their tailwind.config.ts:
  *
- *   import pylonPreset from "@pylon/dashboard-ui/tailwind-preset";
+ *   import pylonPreset from "@pylon-dev/dashboard-ui/tailwind-preset";
  *   export default { presets: [pylonPreset], ... }
  */
 export default {

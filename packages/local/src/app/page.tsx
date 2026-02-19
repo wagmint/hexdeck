@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useDashboard } from "@/hooks/useDashboard";
-import type { Collision } from "@pylon/dashboard-ui";
+import type { Collision } from "@pylon-dev/dashboard-ui";
 import {
   OperatorProvider,
   TopBar,
@@ -13,7 +13,7 @@ import {
   CollisionDetail,
   PlanDetail,
   RiskPanel,
-} from "@pylon/dashboard-ui";
+} from "@pylon-dev/dashboard-ui";
 
 export default function DashboardPage() {
   const { state, loading, error, connected } = useDashboard();

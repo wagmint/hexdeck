@@ -7,7 +7,7 @@ Pylon reads the JSONL session files Claude Code creates (`~/.claude/projects/`),
 ## Quick Start
 
 ```bash
-npm install -g @pylon/cli
+npm install -g @pylon-dev/cli
 pylon start
 ```
 

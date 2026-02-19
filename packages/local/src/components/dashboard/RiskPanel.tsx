@@ -46,6 +46,15 @@ function RiskCard({ agent }: { agent: Agent }) {
         <RiskBadge level={risk.overallRisk} />
       </div>
 
+      {/* Context Gauge */}
+      {risk.contextUsagePct > 0 && (
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-[9px] text-dash-text-muted w-16 shrink-0">Context</span>
+          <ContextGauge pct={risk.contextUsagePct} />
+          <span className="text-[9px] text-dash-text-dim w-8 text-right">{risk.contextUsagePct}%</span>
+        </div>
+      )}
+
       {/* Error Rate */}
       <div className="flex items-center gap-2 mb-1">
         <span className="text-[9px] text-dash-text-muted w-16 shrink-0">Err rate</span>
@@ -70,16 +79,30 @@ function RiskCard({ agent }: { agent: Agent }) {
             {risk.compactions} compaction{risk.compactions !== 1 ? "s" : ""}
           </span>
         )}
-        {risk.compactionProximity !== "nominal" && (
-          <span className={`text-[8px] font-bold tracking-widest uppercase px-1 py-px rounded ${
-            risk.compactionProximity === "critical"
-              ? "bg-dash-red-dim text-dash-red"
-              : "bg-dash-yellow-dim text-dash-yellow"
-          }`}>
-            CTX {risk.compactionProximity.toUpperCase()}
-          </span>
-        )}
       </div>
+
+      {/* Cost */}
+      {risk.costPerSession > 0 && (
+        <div className="flex items-center gap-3 mb-1">
+          <span className="text-[9px] text-dash-text-muted">
+            ${risk.costPerSession.toFixed(2)} session
+          </span>
+          <span className="text-[9px] text-dash-text-muted">
+            ~${risk.costPerTurn.toFixed(3)}/turn
+          </span>
+        </div>
+      )}
+
+      {/* Model Breakdown */}
+      {risk.modelBreakdown.length >= 1 && (
+        <div className="flex items-center gap-3 mb-1 flex-wrap">
+          {risk.modelBreakdown.map((m) => (
+            <span key={m.model} className="text-[9px] text-dash-text-muted">
+              {m.model} ${m.cost.toFixed(2)}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Error Trend Sparkline */}
       {risk.errorTrend.length > 0 && (
@@ -140,6 +163,20 @@ function MiniBar({ value, thresholds, invert }: { value: number; thresholds: [nu
   return (
     <div className="flex-1 h-1.5 bg-dash-surface-3 rounded-sm overflow-hidden">
       <div className={`h-full rounded-sm ${color}`} style={{ width: `${pctWidth}%` }} />
+    </div>
+  );
+}
+
+function ContextGauge({ pct }: { pct: number }) {
+  const clamped = Math.max(0, Math.min(100, pct));
+  let color: string;
+  if (clamped < 50) color = "bg-dash-green";
+  else if (clamped <= 75) color = "bg-dash-yellow";
+  else color = "bg-dash-red";
+
+  return (
+    <div className="flex-1 h-1.5 bg-dash-surface-3 rounded-sm overflow-hidden">
+      <div className={`h-full rounded-sm ${color}`} style={{ width: `${clamped}%` }} />
     </div>
   );
 }

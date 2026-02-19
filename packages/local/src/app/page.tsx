@@ -11,45 +11,69 @@ import { WorkstreamNode } from "@/components/dashboard/WorkstreamNode";
 import { FeedItem } from "@/components/dashboard/FeedItem";
 import { CollisionDetail } from "@/components/dashboard/CollisionDetail";
 import { PlanDetail } from "@/components/dashboard/PlanDetail";
-import { ProgressBar } from "@/components/dashboard/ProgressBar";
 import { RiskPanel } from "@/components/dashboard/RiskPanel";
 
 export default function DashboardPage() {
   const { state, loading, error, connected } = useDashboard();
   const [selectedCollision, setSelectedCollision] = useState<Collision | null>(null);
+  const [selectedProjectPath, setSelectedProjectPath] = useState<string | null>(null);
   const [seenEventIds, setSeenEventIds] = useState<Set<string>>(new Set());
   const isFirstRender = useRef(true);
-  const [bottomPanelHeight, setBottomPanelHeight] = useState(200);
+  const [bottomPanelHeight, setBottomPanelHeight] = useState(400);
   const isDragging = useRef(false);
   const dragStartY = useRef(0);
   const dragStartHeight = useRef(0);
 
-  const onResizeStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isDragging.current = true;
-    dragStartY.current = e.clientY;
-    dragStartHeight.current = bottomPanelHeight;
+  const makeResizeHandler = useCallback(
+    (setter: (h: number) => void, currentHeight: number, min = 80) =>
+      (e: React.MouseEvent) => {
+        e.preventDefault();
+        isDragging.current = true;
+        dragStartY.current = e.clientY;
+        dragStartHeight.current = currentHeight;
+        const maxH = Math.floor(window.innerHeight * 0.9);
 
-    const onMouseMove = (ev: MouseEvent) => {
-      if (!isDragging.current) return;
-      const delta = dragStartY.current - ev.clientY;
-      const newHeight = Math.min(Math.max(dragStartHeight.current + delta, 80), 600);
-      setBottomPanelHeight(newHeight);
+        const onMouseMove = (ev: MouseEvent) => {
+          if (!isDragging.current) return;
+          const delta = dragStartY.current - ev.clientY;
+          setter(Math.min(Math.max(dragStartHeight.current + delta, min), maxH));
+        };
+
+        const onMouseUp = () => {
+          isDragging.current = false;
+          document.removeEventListener("mousemove", onMouseMove);
+          document.removeEventListener("mouseup", onMouseUp);
+          document.body.style.cursor = "";
+          document.body.style.userSelect = "";
+        };
+
+        document.addEventListener("mousemove", onMouseMove);
+        document.addEventListener("mouseup", onMouseUp);
+        document.body.style.cursor = "row-resize";
+        document.body.style.userSelect = "none";
+      },
+    []
+  );
+
+  const onResizeStart = useCallback(
+    (e: React.MouseEvent) => makeResizeHandler(setBottomPanelHeight, bottomPanelHeight)(e),
+    [bottomPanelHeight, makeResizeHandler]
+  );
+
+
+  // Workstream focus filter
+  const toggleWorkstream = useCallback((projectPath: string) => {
+    setSelectedProjectPath(prev => prev === projectPath ? null : projectPath);
+  }, []);
+
+  // Escape key clears workstream filter
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedProjectPath(null);
     };
-
-    const onMouseUp = () => {
-      isDragging.current = false;
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
-
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-    document.body.style.cursor = "row-resize";
-    document.body.style.userSelect = "none";
-  }, [bottomPanelHeight]);
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   // Track seen event IDs for flash-in animation
   useEffect(() => {
@@ -88,6 +112,23 @@ export default function DashboardPage() {
 
   const { operators, agents, workstreams, collisions, feed, summary } = state;
 
+  const isFiltered = selectedProjectPath !== null;
+  const filteredWorkstreams = isFiltered
+    ? workstreams.filter(ws => ws.projectPath === selectedProjectPath)
+    : workstreams;
+  const filteredFeed = isFiltered
+    ? feed.filter(e => e.projectPath === selectedProjectPath)
+    : feed;
+  const filteredAgents = isFiltered
+    ? agents.filter(a => a.projectPath === selectedProjectPath)
+    : agents;
+  const filteredCollisions = isFiltered
+    ? collisions.filter(c => c.agents.some(a => a.projectPath === selectedProjectPath))
+    : collisions;
+  const selectedName = isFiltered
+    ? workstreams.find(ws => ws.projectPath === selectedProjectPath)?.name
+    : null;
+
   return (
     <OperatorProvider operators={operators}>
     <div className="h-screen flex flex-col bg-dash-bg text-dash-text font-mono text-[11px] leading-relaxed overflow-hidden">
@@ -100,16 +141,30 @@ export default function DashboardPage() {
         {/* LEFT PANEL: Workstream / Agent cards */}
         <div className="bg-dash-bg overflow-y-auto scrollbar-thin">
           <PanelHeader
-            title="Workstreams"
-            count={`${workstreams.length} project${workstreams.length !== 1 ? "s" : ""}`}
-          />
+            title={isFiltered && selectedName ? `Filtered: ${selectedName}` : "Workstreams"}
+            count={isFiltered ? undefined : `${workstreams.length} project${workstreams.length !== 1 ? "s" : ""}`}
+          >
+            {isFiltered && (
+              <button
+                onClick={() => setSelectedProjectPath(null)}
+                className="bg-dash-surface-3 px-1.5 py-0.5 rounded text-dash-text-dim font-normal tracking-normal normal-case hover:text-dash-text transition-colors"
+              >
+                ✕ clear
+              </button>
+            )}
+          </PanelHeader>
           {workstreams.length === 0 ? (
             <div className="px-3.5 py-8 text-center text-dash-text-muted text-xs">
               No active projects
             </div>
           ) : (
             workstreams.map((ws) => (
-              <AgentCard key={ws.projectId} workstream={ws} />
+              <AgentCard
+                key={ws.projectId}
+                workstream={ws}
+                isSelected={selectedProjectPath === ws.projectPath}
+                onSelect={toggleWorkstream}
+              />
             ))
           )}
         </div>
@@ -122,14 +177,14 @@ export default function DashboardPage() {
             <div className="bg-dash-bg overflow-y-auto scrollbar-thin">
               <PanelHeader
                 title="Intent Map"
-                count={`${workstreams.length} workstream${workstreams.length !== 1 ? "s" : ""}`}
+                count={`${filteredWorkstreams.length} workstream${filteredWorkstreams.length !== 1 ? "s" : ""}`}
               />
-              {workstreams.length === 0 ? (
+              {filteredWorkstreams.length === 0 ? (
                 <div className="px-3.5 py-8 text-center text-dash-text-muted text-xs">
                   No workstreams
                 </div>
               ) : (
-                workstreams.map((ws) => (
+                filteredWorkstreams.map((ws) => (
                   <WorkstreamNode key={ws.projectId} workstream={ws} />
                 ))
               )}
@@ -143,12 +198,12 @@ export default function DashboardPage() {
                   streaming
                 </span>
               </PanelHeader>
-              {feed.length === 0 ? (
+              {filteredFeed.length === 0 ? (
                 <div className="px-3.5 py-8 text-center text-dash-text-muted text-xs">
                   No events yet
                 </div>
               ) : (
-                feed.map((event) => (
+                filteredFeed.map((event) => (
                   <FeedItem
                     key={event.id}
                     event={event}
@@ -156,7 +211,7 @@ export default function DashboardPage() {
                     onClick={
                       event.collisionId
                         ? () => {
-                            const col = collisions.find(
+                            const col = filteredCollisions.find(
                               (c) => c.id === event.collisionId
                             );
                             if (col) setSelectedCollision(col);
@@ -183,44 +238,24 @@ export default function DashboardPage() {
             {selectedCollision ? (
               <CollisionDetail collision={selectedCollision} onDismiss={() => setSelectedCollision(null)} />
             ) : (
-              <PlanDetail workstreams={workstreams} />
+              <PlanDetail workstreams={filteredWorkstreams} />
             )}
           </div>
         </div>
 
-        {/* RIGHT PANEL */}
-        <div className="flex flex-col gap-px bg-dash-border">
-          {/* Sprint Progress */}
-          <div className="flex-1 bg-dash-bg overflow-y-auto scrollbar-thin">
-            <PanelHeader
-              title="Progress"
-              count={`${summary.totalCommits} commit${summary.totalCommits !== 1 ? "s" : ""}`}
-            />
-            {workstreams.length === 0 ? (
-              <div className="px-3.5 py-8 text-center text-dash-text-muted text-xs">
-                No workstreams
-              </div>
-            ) : (
-              workstreams.map((ws) => (
-                <ProgressBar key={ws.projectId} workstream={ws} />
-              ))
-            )}
-          </div>
-
-          {/* Risk Analytics */}
-          <div className="flex-1 bg-dash-bg overflow-y-auto scrollbar-thin">
-            <PanelHeader
-              title="Risk"
-              count={`${summary.agentsAtRisk} at risk`}
-            />
-            {agents.length === 0 ? (
-              <div className="px-3.5 py-8 text-center text-dash-text-muted text-xs">
-                No agents to analyze
-              </div>
-            ) : (
-              <RiskPanel agents={agents} />
-            )}
-          </div>
+        {/* RIGHT PANEL: Risk Analytics */}
+        <div className="bg-dash-bg overflow-y-auto scrollbar-thin">
+          <PanelHeader
+            title="Risk"
+            count={`${summary.agentsAtRisk} at risk`}
+          />
+          {filteredAgents.length === 0 ? (
+            <div className="px-3.5 py-8 text-center text-dash-text-muted text-xs">
+              No agents to analyze
+            </div>
+          ) : (
+            <RiskPanel agents={filteredAgents} />
+          )}
         </div>
       </div>
     </div>

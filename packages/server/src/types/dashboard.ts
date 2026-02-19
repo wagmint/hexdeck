@@ -8,6 +8,13 @@ export interface SpinningSignal {
   detail: string;
 }
 
+export interface ModelCost {
+  model: string;       // Short name ("Sonnet 4")
+  cost: number;        // $ for this model
+  tokenCount: number;  // input+output tokens
+  turnCount: number;   // turns using this model
+}
+
 export interface AgentRisk {
   errorRate: number;
   correctionRatio: number;
@@ -18,6 +25,11 @@ export interface AgentRisk {
   spinningSignals: SpinningSignal[];
   overallRisk: RiskLevel;
   errorTrend: boolean[];
+  costPerSession: number;       // Total $ for this session
+  costPerTurn: number;          // Average $/turn
+  modelBreakdown: ModelCost[];  // Per-model cost split
+  contextUsagePct: number;      // 0-100, % of context window used
+  contextTokens: number;        // Raw avg input tokens (last 5 turns)
 }
 
 export interface WorkstreamRisk {
@@ -84,8 +96,8 @@ export interface Agent {
   projectPath: string;
   /** Whether this agent is currently active (has running process) */
   isActive: boolean;
-  /** Plan state for this agent's session */
-  plan: SessionPlan;
+  /** Plan states for this agent's session (one per plan cycle) */
+  plans: SessionPlan[];
   /** Risk analytics */
   risk: AgentRisk;
   /** Operator this agent belongs to */
@@ -189,6 +201,7 @@ export interface DashboardSummary {
   totalErrors: number;
   agentsAtRisk: number;
   operatorCount: number;
+  totalCost: number;  // Sum across all active agents
 }
 
 export interface DashboardState {

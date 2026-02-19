@@ -1,5 +1,5 @@
 export type {
-  RiskLevel, SpinningSignal, AgentRisk, WorkstreamRisk,
+  RiskLevel, SpinningSignal, ModelCost, AgentRisk, WorkstreamRisk,
   OperatorStatus, Operator,
   PlanStatus, PlanTask, SessionPlan,
   AgentStatus, Agent, Workstream, CollisionSeverity, Collision,

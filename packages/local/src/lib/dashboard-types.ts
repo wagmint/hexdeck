@@ -8,6 +8,13 @@ export interface SpinningSignal {
   detail: string;
 }
 
+export interface ModelCost {
+  model: string;
+  cost: number;
+  tokenCount: number;
+  turnCount: number;
+}
+
 export interface AgentRisk {
   errorRate: number;
   correctionRatio: number;
@@ -18,6 +25,11 @@ export interface AgentRisk {
   spinningSignals: SpinningSignal[];
   overallRisk: RiskLevel;
   errorTrend: boolean[];
+  costPerSession: number;
+  costPerTurn: number;
+  modelBreakdown: ModelCost[];
+  contextUsagePct: number;
+  contextTokens: number;
 }
 
 export interface WorkstreamRisk {
@@ -70,7 +82,7 @@ export interface Agent {
   filesChanged: string[];
   projectPath: string;
   isActive: boolean;
-  plan: SessionPlan;
+  plans: SessionPlan[];
   risk: AgentRisk;
   operatorId: string;
 }
@@ -142,6 +154,7 @@ export interface DashboardSummary {
   totalErrors: number;
   agentsAtRisk: number;
   operatorCount: number;
+  totalCost: number;
 }
 
 export interface DashboardState {

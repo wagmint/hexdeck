@@ -6,6 +6,8 @@ import { OperatorTag } from "./OperatorTag";
 
 interface AgentCardProps {
   workstream: Workstream;
+  isSelected?: boolean;
+  onSelect?: (projectPath: string) => void;
 }
 
 const planBadges: Partial<Record<PlanStatus, { label: string; className: string }>> = {
@@ -14,7 +16,7 @@ const planBadges: Partial<Record<PlanStatus, { label: string; className: string 
   rejected: { label: "REJECTED", className: "text-dash-red bg-dash-red/10" },
 };
 
-export function AgentCard({ workstream }: AgentCardProps) {
+export function AgentCard({ workstream, isSelected, onSelect }: AgentCardProps) {
   const hasActive = workstream.agents.some((a) => a.isActive);
   const focusAgent = workstream.agents.find((a) => a.isActive);
 
@@ -35,8 +37,11 @@ export function AgentCard({ workstream }: AgentCardProps) {
 
   return (
     <div
-      className={`px-3.5 py-2.5 border-b border-dash-border ${
-        hasActive ? `bg-dash-surface-2 border-l-2 ${stripColor}` : ""
+      onClick={() => onSelect?.(workstream.projectPath)}
+      className={`px-3.5 py-2.5 border-b border-dash-border cursor-pointer transition-colors ${
+        isSelected
+          ? "bg-dash-blue/10 border-l-2 border-l-dash-blue"
+          : hasActive ? `bg-dash-surface-2 border-l-2 ${stripColor}` : "hover:bg-dash-surface-2"
       }`}
     >
       <div className="flex items-center justify-between mb-1">

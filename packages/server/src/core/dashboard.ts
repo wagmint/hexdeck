@@ -10,6 +10,7 @@ import { buildCodexParsedSession } from "./codex-nodes.js";
 import { detectCollisions } from "./collisions.js";
 import { buildFeed } from "./feed.js";
 import { computeAgentRisk, computeWorkstreamRisk } from "./risk.js";
+import { computeTurnCost } from "./pricing.js";
 import { loadOperatorConfig, getSelfName, operatorId as makeOperatorId, getOperatorColor } from "./config.js";
 import type {
   ParsedSession, SessionInfo, Agent, AgentStatus,
@@ -39,8 +40,9 @@ interface SessionAccumulator {
   filesChanged: Set<string>;
   toolsUsed: Record<string, number>;
   primaryModel: string | null;
-  plan: SessionPlan | null;
+  plans: SessionPlan[];
   errorHistory: boolean[];
+  totalCost: number;
 }
 
 const accumulators = new Map<string, SessionAccumulator>();
@@ -218,6 +220,12 @@ function updateAccumulator(sessionId: string, parsed: ParsedSession): void {
   const prev = accumulators.get(sessionId);
   const { stats } = parsed;
 
+  // Compute current cost from visible turns
+  let currentCost = 0;
+  for (const turn of parsed.turns) {
+    currentCost += computeTurnCost(turn.model, turn.tokenUsage);
+  }
+
   const acc: SessionAccumulator = {
     totalTurns: Math.max(prev?.totalTurns ?? 0, stats.totalTurns),
     totalToolCalls: Math.max(prev?.totalToolCalls ?? 0, stats.toolCalls),
@@ -229,16 +237,17 @@ function updateAccumulator(sessionId: string, parsed: ParsedSession): void {
     filesChanged: unionSets(prev?.filesChanged, new Set(stats.filesChanged)),
     toolsUsed: mergeToolsUsed(prev?.toolsUsed, stats.toolsUsed),
     primaryModel: stats.primaryModel ?? prev?.primaryModel ?? null,
-    plan: null,
+    plans: [],
     errorHistory: [],
+    totalCost: Math.max(prev?.totalCost ?? 0, currentCost),
   };
 
-  // Plan: keep the most advanced plan state (label not yet known here, set later)
-  const currentPlan = buildSessionPlan(parsed, "");
-  if (currentPlan.status !== "none") {
-    acc.plan = currentPlan;
+  // Plans: keep all plan cycles; fall back to accumulator if current parse yields nothing
+  const currentPlans = buildSessionPlans(parsed, "");
+  if (currentPlans.length > 0) {
+    acc.plans = currentPlans;
   } else {
-    acc.plan = prev?.plan ?? null;
+    acc.plans = prev?.plans ?? [];
   }
 
   // Error history: extend on compaction, replace on normal growth
@@ -334,28 +343,71 @@ function getCachedOrParseCodex(session: SessionInfo): ParsedSession {
 
 // ─── Plan builder ────────────────────────────────────────────────────────────
 
-function buildSessionPlan(parsed: ParsedSession, agentLabel: string): SessionPlan {
+function finalizePlan(
+  tasks: PlanTask[],
+  taskStatuses: Map<string, string>,
+  markdown: string | null,
+  inPlanMode: boolean,
+  planAccepted: boolean,
+  planRejected: boolean,
+  agentLabel: string,
+  timestamp: Date,
+): SessionPlan | null {
+  // Apply final statuses
+  for (const task of tasks) {
+    const latest = taskStatuses.get(task.id);
+    if (latest === "completed" || latest === "in_progress" || latest === "pending" || latest === "deleted") {
+      task.status = latest;
+    }
+  }
+
+  const activeTasks = tasks.filter(t => t.status !== "deleted");
+
+  // Determine status — tasks are the ground truth
+  let status: PlanStatus = "none";
+
+  if (activeTasks.length > 0) {
+    if (activeTasks.every(t => t.status === "completed")) {
+      status = "completed";
+    } else if (activeTasks.some(t => t.status === "in_progress" || t.status === "completed")) {
+      status = "implementing";
+    } else {
+      status = "drafting";
+    }
+  } else if (markdown || inPlanMode || planAccepted || planRejected) {
+    if (planRejected) {
+      status = "rejected";
+    } else if (inPlanMode || planAccepted || markdown) {
+      status = "drafting";
+    }
+  }
+
+  if (status === "none") return null;
+  return { status, markdown, tasks: activeTasks, agentLabel, timestamp };
+}
+
+function buildSessionPlans(parsed: ParsedSession, agentLabel: string): SessionPlan[] {
+  const finalized: SessionPlan[] = [];
+
+  // Current plan cycle accumulator
   let markdown: string | null = null;
   let planAccepted = false;
   let planRejected = false;
   let inPlanMode = false;
   let lastPlanTs: Date = parsed.session.createdAt;
-  const tasks: PlanTask[] = [];
-  const taskStatuses = new Map<string, string>();
-
-  // Snapshot before the last EnterPlanMode — used to restore if the plan cycle is rejected
-  let savedTasks: PlanTask[] = [];
-  let savedStatuses = new Map<string, string>();
-  let savedMarkdown: string | null = null;
+  let tasks: PlanTask[] = [];
+  let taskStatuses = new Map<string, string>();
 
   for (const turn of parsed.turns) {
     if (turn.hasPlanStart) {
-      // Save current state before clearing for new plan cycle
-      savedTasks = tasks.map(t => ({ ...t }));
-      savedStatuses = new Map(taskStatuses);
-      savedMarkdown = markdown;
-      tasks.length = 0;
-      taskStatuses.clear();
+      // Finalize current plan cycle (if it has any content)
+      const plan = finalizePlan(tasks, taskStatuses, markdown, inPlanMode, planAccepted, planRejected, agentLabel, lastPlanTs);
+      if (plan) finalized.push(plan);
+
+      // Start fresh cycle
+      tasks = [];
+      taskStatuses = new Map();
+      markdown = null;
       inPlanMode = true;
       planAccepted = false;
       planRejected = false;
@@ -369,15 +421,9 @@ function buildSessionPlan(parsed: ParsedSession, agentLabel: string): SessionPla
       lastPlanTs = turn.timestamp;
     }
     if (turn.hasPlanEnd && turn.planRejected) {
-      // Plan rejected — restore pre-ENTER state
       inPlanMode = false;
       planAccepted = false;
       planRejected = true;
-      tasks.length = 0;
-      tasks.push(...savedTasks);
-      taskStatuses.clear();
-      for (const [k, v] of savedStatuses) taskStatuses.set(k, v);
-      markdown = savedMarkdown;
       lastPlanTs = turn.timestamp;
     }
 
@@ -405,37 +451,11 @@ function buildSessionPlan(parsed: ParsedSession, agentLabel: string): SessionPla
     }
   }
 
-  // Apply final statuses
-  for (const task of tasks) {
-    const latest = taskStatuses.get(task.id);
-    if (latest === "completed" || latest === "in_progress" || latest === "pending" || latest === "deleted") {
-      task.status = latest;
-    }
-  }
+  // Finalize the last plan cycle
+  const lastPlan = finalizePlan(tasks, taskStatuses, markdown, inPlanMode, planAccepted, planRejected, agentLabel, lastPlanTs);
+  if (lastPlan) finalized.push(lastPlan);
 
-  const activeTasks = tasks.filter(t => t.status !== "deleted");
-
-  // Determine status — tasks are the ground truth
-  let status: PlanStatus = "none";
-
-  if (activeTasks.length > 0) {
-    if (activeTasks.every(t => t.status === "completed")) {
-      status = "completed";
-    } else if (activeTasks.some(t => t.status === "in_progress" || t.status === "completed")) {
-      status = "implementing";
-    } else {
-      status = "drafting";
-    }
-  } else if (markdown || inPlanMode || planAccepted || planRejected) {
-    // No tasks — fall back to plan mode signals
-    if (planRejected) {
-      status = "rejected";
-    } else if (inPlanMode || planAccepted || markdown) {
-      status = "drafting";
-    }
-  }
-
-  return { status, markdown, tasks: activeTasks, agentLabel, timestamp: lastPlanTs };
+  return finalized;
 }
 
 // ─── Dashboard builder ──────────────────────────────────────────────────────
@@ -583,15 +603,15 @@ export function buildDashboardState(): DashboardState {
     const lastTurn = parsed.turns[parsed.turns.length - 1];
     const currentTask = lastTurn?.summary ?? "idle";
 
-    // Plan: fall back to accumulator if current parse lost it (compaction)
+    // Plans: fall back to accumulator if current parse lost them (compaction)
     const sessionAcc = accumulators.get(parsed.session.id);
-    let plan = buildSessionPlan(parsed, label);
-    if (plan.status === "none" && sessionAcc?.plan) {
-      plan = { ...sessionAcc.plan, agentLabel: label };
+    let plans = buildSessionPlans(parsed, label);
+    if (plans.length === 0 && sessionAcc?.plans?.length) {
+      plans = sessionAcc.plans.map(p => ({ ...p, agentLabel: label }));
     }
 
-    // Risk: pass accumulated error history for trend continuity
-    const risk = computeAgentRisk(parsed, sessionAcc?.errorHistory);
+    // Risk: pass accumulated error history for trend continuity, and accumulated cost for compaction
+    const risk = computeAgentRisk(parsed, sessionAcc?.errorHistory, sessionAcc?.totalCost);
 
     agents.push({
       sessionId: parsed.session.id,
@@ -602,7 +622,7 @@ export function buildDashboardState(): DashboardState {
       filesChanged: parsed.stats.filesChanged,
       projectPath,
       isActive,
-      plan,
+      plans,
       risk,
       operatorId: sessionOperatorMap.get(parsed.session.id) ?? "self",
     });
@@ -634,8 +654,10 @@ export function buildDashboardState(): DashboardState {
 
     const hasCollision = activeProjectAgents.some(a => a.status === "conflict");
 
-    const plans = allProjectAgents.map(a => a.plan).filter(p =>
-      p.status !== "none" && !(p.status === "drafting" && !p.markdown)
+    const plans = allProjectAgents.flatMap(a => a.plans).filter(p =>
+      p.status !== "none"
+      && p.status !== "rejected"
+      && !(p.status === "drafting" && !p.markdown)
     );
     const planTasks = plans.flatMap(p => p.tasks);
 
@@ -693,6 +715,7 @@ export function buildDashboardState(): DashboardState {
   // 10. Build summary — only active agents are exposed
   const activeAgents = agents.filter(a => a.isActive);
   const agentsAtRisk = activeAgents.filter(a => a.risk.overallRisk !== "nominal").length;
+  const totalCost = activeAgents.reduce((sum, a) => sum + a.risk.costPerSession, 0);
   const summary: DashboardSummary = {
     totalAgents: activeAgents.length,
     activeAgents: activeAgents.length,
@@ -703,6 +726,7 @@ export function buildDashboardState(): DashboardState {
     totalErrors: workstreams.reduce((sum, w) => sum + w.errors, 0),
     agentsAtRisk,
     operatorCount: operators.length,
+    totalCost,
   };
 
   return { operators, agents: activeAgents, workstreams, collisions, feed, summary };

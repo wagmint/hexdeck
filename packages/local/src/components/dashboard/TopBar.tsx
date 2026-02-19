@@ -59,6 +59,11 @@ export function TopBar({ summary, operators }: TopBarProps) {
           {" / "}
           {summary.totalCommits} commit{summary.totalCommits !== 1 ? "s" : ""}
         </span>
+        {summary.totalCost > 0 && (
+          <span className="text-dash-text-muted text-[11px] font-mono" title="Estimated cost (May 2025 rates)">
+            ${summary.totalCost.toFixed(2)} spend
+          </span>
+        )}
       </div>
     </div>
   );

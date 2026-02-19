@@ -1,9 +1,10 @@
-import type { ParsedSession, TurnNode, AgentRisk, WorkstreamRisk, SpinningSignal, RiskLevel, Agent } from "../types/index.js";
+import type { ParsedSession, TurnNode, AgentRisk, WorkstreamRisk, SpinningSignal, RiskLevel, Agent, ModelCost } from "../types/index.js";
+import { computeTurnCost, shortModelName } from "./pricing.js";
 
 /**
  * Compute risk analytics for a single agent session.
  */
-export function computeAgentRisk(parsed: ParsedSession, errorHistory?: boolean[]): AgentRisk {
+export function computeAgentRisk(parsed: ParsedSession, errorHistory?: boolean[], accumulatedCost?: number): AgentRisk {
   const { turns, stats } = parsed;
   const totalTurns = turns.length;
 
@@ -51,6 +52,39 @@ export function computeAgentRisk(parsed: ParsedSession, errorHistory?: boolean[]
   // Overall risk = worst of all signals
   const overallRisk = computeOverallRisk(errorRate, correctionRatio, compactionProximity, spinningSignals, totalTurns);
 
+  // ─── Cost computation ───────────────────────────────────────────────────
+  const modelMap = new Map<string, { cost: number; tokens: number; turns: number }>();
+  let sessionCost = 0;
+  for (const turn of turns) {
+    const cost = computeTurnCost(turn.model, turn.tokenUsage);
+    sessionCost += cost;
+    if (turn.model) {
+      const name = shortModelName(turn.model);
+      const entry = modelMap.get(name) ?? { cost: 0, tokens: 0, turns: 0 };
+      entry.cost += cost;
+      entry.tokens += turn.tokenUsage.inputTokens + turn.tokenUsage.outputTokens;
+      entry.turns += 1;
+      modelMap.set(name, entry);
+    }
+  }
+  // Add accumulated cost from pre-compaction turns
+  if (accumulatedCost != null && accumulatedCost > 0) {
+    sessionCost += accumulatedCost;
+  }
+
+  const modelBreakdown: ModelCost[] = [...modelMap.entries()]
+    .sort((a, b) => b[1].cost - a[1].cost)
+    .map(([model, data]) => ({ model, cost: data.cost, tokenCount: data.tokens, turnCount: data.turns }));
+
+  const costPerTurn = totalTurns > 0 ? sessionCost / totalTurns : 0;
+
+  // ─── Context usage % — use the most recent turn's last API call as the best
+  // approximation of current context window size (averaging dilutes the signal,
+  // especially after compaction when older turns have small context)
+  const lastTurn = turns[turns.length - 1];
+  const currentContextTokens = lastTurn ? getLastCallContextSize(lastTurn) : 0;
+  const contextUsagePct = Math.min(100, Math.round(currentContextTokens / 200_000 * 100));
+
   return {
     errorRate,
     correctionRatio,
@@ -61,6 +95,11 @@ export function computeAgentRisk(parsed: ParsedSession, errorHistory?: boolean[]
     spinningSignals,
     overallRisk,
     errorTrend,
+    costPerSession: sessionCost,
+    costPerTurn,
+    modelBreakdown,
+    contextUsagePct,
+    contextTokens: currentContextTokens,
   };
 }
 
@@ -201,6 +240,19 @@ function computeOverallRisk(
   if (compactionProximity === "elevated") return "elevated";
 
   return "nominal";
+}
+
+/** Get context window size from the last API call in a turn (avoids aggregation inflation). */
+function getLastCallContextSize(turn: TurnNode): number {
+  for (let i = turn.events.length - 1; i >= 0; i--) {
+    const evt = turn.events[i];
+    if (evt.message.role === "assistant" && evt.usage) {
+      return evt.usage.inputTokens + evt.usage.cacheReadInputTokens + evt.usage.cacheCreationInputTokens;
+    }
+  }
+  // Fallback: no individual event usage — use aggregated (better than 0)
+  const u = turn.tokenUsage;
+  return u.inputTokens + u.cacheReadInputTokens + u.cacheCreationInputTokens;
 }
 
 function shortPath(filePath: string): string {

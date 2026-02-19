@@ -35,7 +35,7 @@ function collectPlans(workstreams: Workstream[]): PlanEntry[] {
   const entries: PlanEntry[] = [];
   for (const ws of workstreams) {
     for (const plan of ws.plans) {
-      if (plan.status === "none") continue;
+      if (plan.status === "none" || plan.status === "rejected") continue;
       const done = plan.tasks.filter((t) => t.status === "completed").length;
       const matchingAgent = ws.agents.find((a) => a.label === plan.agentLabel);
       entries.push({

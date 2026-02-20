@@ -208,3 +208,20 @@ export interface DashboardState {
   feed: FeedEvent[];
   summary: DashboardSummary;
 }
+
+// ─── Relay Types ─────────────────────────────────────────────────────────────
+
+export type RelayConnectionStatus = "connected" | "connecting" | "disconnected";
+
+export interface RelayTargetInfo {
+  pylonId: string;
+  pylonName: string;
+  status: RelayConnectionStatus;
+  projects: string[];
+  addedAt: string;
+}
+
+export interface ActiveProject {
+  projectPath: string;
+  sessionCount: number;
+}

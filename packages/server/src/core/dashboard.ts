@@ -1018,6 +1018,9 @@ export function buildDashboardState(): DashboardState {
   for (const [projectPath, sessions] of projectGroups) {
     const allProjectAgents = agents.filter(a => a.projectPath === projectPath);
     const activeProjectAgents = allProjectAgents.filter(a => a.isActive);
+    const orderedActiveProjectAgents = [...activeProjectAgents].sort((a, b) => (
+      a.label.localeCompare(b.label) || a.sessionId.localeCompare(b.sessionId)
+    ));
     let totalTurns = 0;
     let completedTurns = 0;
     let commits = 0;
@@ -1030,7 +1033,7 @@ export function buildDashboardState(): DashboardState {
       errors += s.turns.filter(t => t.hasError).length;
     }
 
-    const hasCollision = activeProjectAgents.some(a => a.status === "conflict");
+    const hasCollision = orderedActiveProjectAgents.some(a => a.status === "conflict");
 
     const plans = allProjectAgents.flatMap(a => a.plans).filter(p =>
       p.status !== "none"
@@ -1050,14 +1053,14 @@ export function buildDashboardState(): DashboardState {
     const project = projects.find(p => p.decodedPath === projectPath);
     const projectId = project?.encodedName ?? projectPath.replace(/\//g, "-");
 
-    const risk = computeWorkstreamRisk(activeProjectAgents);
+    const risk = computeWorkstreamRisk(orderedActiveProjectAgents);
     const intent = buildIntentInsights(sessions, allProjectAgents, plans, hasCollision);
 
     workstreams.push({
       projectId,
       projectPath,
       name: basename(projectPath) || projectPath,
-      agents: activeProjectAgents,
+      agents: orderedActiveProjectAgents,
       completionPct,
       totalTurns,
       completedTurns,
@@ -1077,12 +1080,9 @@ export function buildDashboardState(): DashboardState {
     });
   }
 
-  // Sort workstreams: active first, then by name
+  // Stable sort workstreams by name to avoid visual jumpiness when activity shifts.
   workstreams.sort((a, b) => {
-    const aActive = a.agents.some(ag => ag.isActive);
-    const bActive = b.agents.some(ag => ag.isActive);
-    if (aActive !== bActive) return aActive ? -1 : 1;
-    return a.name.localeCompare(b.name);
+    return a.name.localeCompare(b.name) || a.projectPath.localeCompare(b.projectPath);
   });
 
   // 8. Build feed
@@ -1099,7 +1099,13 @@ export function buildDashboardState(): DashboardState {
   }));
 
   // 10. Build summary — only active agents are exposed
-  const activeAgents = agents.filter(a => a.isActive);
+  const activeAgents = agents
+    .filter(a => a.isActive)
+    .sort((a, b) => (
+      a.projectPath.localeCompare(b.projectPath)
+      || a.label.localeCompare(b.label)
+      || a.sessionId.localeCompare(b.sessionId)
+    ));
   const agentsAtRisk = activeAgents.filter(a => a.risk.overallRisk !== "nominal").length;
   const totalCost = activeAgents.reduce((sum, a) => sum + a.risk.costPerSession, 0);
   const summary: DashboardSummary = {

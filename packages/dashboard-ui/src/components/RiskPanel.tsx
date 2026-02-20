@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useLayoutEffect, useRef } from "react";
 import type { Agent, RiskLevel } from "../types";
 import { formatDuration } from "../utils";
 import { OperatorTag } from "./OperatorTag";
@@ -9,15 +10,64 @@ interface RiskPanelProps {
 }
 
 export function RiskPanel({ agents }: RiskPanelProps) {
+  const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const previousRects = useRef<Map<string, DOMRect>>(new Map());
+
   const sorted = [...agents].sort((a, b) => {
     const order: Record<RiskLevel, number> = { critical: 0, elevated: 1, nominal: 2 };
-    return order[a.risk.overallRisk] - order[b.risk.overallRisk];
+    return (
+      order[a.risk.overallRisk] - order[b.risk.overallRisk]
+      || a.label.localeCompare(b.label)
+      || a.sessionId.localeCompare(b.sessionId)
+    );
   });
+
+  const setItemRef = useCallback(
+    (id: string) => (el: HTMLDivElement | null) => {
+      if (el) {
+        itemRefs.current.set(id, el);
+      } else {
+        itemRefs.current.delete(id);
+      }
+    },
+    []
+  );
+
+  useLayoutEffect(() => {
+    const nextRects = new Map<string, DOMRect>();
+
+    for (const agent of sorted) {
+      const el = itemRefs.current.get(agent.sessionId);
+      if (!el) continue;
+
+      const next = el.getBoundingClientRect();
+      const prev = previousRects.current.get(agent.sessionId);
+
+      if (prev) {
+        const dx = prev.left - next.left;
+        const dy = prev.top - next.top;
+
+        if (dx !== 0 || dy !== 0) {
+          el.style.transition = "none";
+          el.style.transform = `translate(${dx}px, ${dy}px)`;
+          void el.offsetWidth;
+          el.style.transition = "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)";
+          el.style.transform = "";
+        }
+      }
+
+      nextRects.set(agent.sessionId, next);
+    }
+
+    previousRects.current = nextRects;
+  }, [sorted]);
 
   return (
     <div>
       {sorted.map((agent) => (
-        <RiskCard key={agent.sessionId} agent={agent} />
+        <div key={agent.sessionId} ref={setItemRef(agent.sessionId)} className="will-change-transform">
+          <RiskCard agent={agent} />
+        </div>
       ))}
     </div>
   );

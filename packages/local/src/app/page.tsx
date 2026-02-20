@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useLayoutEffect } from "react";
 import { useDashboard } from "@/hooks/useDashboard";
-import type { Collision } from "@pylon-dev/dashboard-ui";
+import { useRelay } from "@/hooks/useRelay";
+import type { Collision, RelayStatus } from "@pylon-dev/dashboard-ui";
 import {
   OperatorProvider,
   TopBar,
@@ -13,10 +14,13 @@ import {
   CollisionDetail,
   PlanDetail,
   RiskPanel,
+  RelayPanel,
 } from "@pylon-dev/dashboard-ui";
 
 export default function DashboardPage() {
   const { state, loading, error, connected } = useDashboard();
+  const [relayOpen, setRelayOpen] = useState(false);
+  const relay = useRelay(relayOpen);
   const [selectedCollision, setSelectedCollision] = useState<Collision | null>(null);
   const [selectedProjectPath, setSelectedProjectPath] = useState<string | null>(null);
   const [seenEventIds, setSeenEventIds] = useState<Set<string>>(new Set());
@@ -25,6 +29,9 @@ export default function DashboardPage() {
   const isDragging = useRef(false);
   const dragStartY = useRef(0);
   const dragStartHeight = useRef(0);
+  const workstreamItemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const previousWorkstreamRects = useRef<Map<string, DOMRect>>(new Map());
+  const workstreamsForAnimation = state?.workstreams ?? [];
 
   const makeResizeHandler = useCallback(
     (setter: (h: number) => void, currentHeight: number, min = 80) =>
@@ -94,6 +101,46 @@ export default function DashboardPage() {
     });
   }, [state]);
 
+  const setWorkstreamItemRef = useCallback(
+    (id: string) => (el: HTMLDivElement | null) => {
+      if (el) {
+        workstreamItemRefs.current.set(id, el);
+      } else {
+        workstreamItemRefs.current.delete(id);
+      }
+    },
+    []
+  );
+
+  useLayoutEffect(() => {
+    const nextRects = new Map<string, DOMRect>();
+
+    for (const ws of workstreamsForAnimation) {
+      const el = workstreamItemRefs.current.get(ws.projectId);
+      if (!el) continue;
+
+      const next = el.getBoundingClientRect();
+      const prev = previousWorkstreamRects.current.get(ws.projectId);
+
+      if (prev) {
+        const dx = prev.left - next.left;
+        const dy = prev.top - next.top;
+
+        if (dx !== 0 || dy !== 0) {
+          el.style.transition = "none";
+          el.style.transform = `translate(${dx}px, ${dy}px)`;
+          void el.offsetWidth;
+          el.style.transition = "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)";
+          el.style.transform = "";
+        }
+      }
+
+      nextRects.set(ws.projectId, next);
+    }
+
+    previousWorkstreamRects.current = nextRects;
+  }, [workstreamsForAnimation]);
+
   if (loading && !state) {
     return (
       <div className="h-screen bg-dash-bg flex items-center justify-center text-dash-text-muted text-sm font-mono">
@@ -113,6 +160,14 @@ export default function DashboardPage() {
   if (!state) return null;
 
   const { operators, agents, workstreams, collisions, feed, summary } = state;
+
+  const relayStatus: RelayStatus | null =
+    relay.targets.length > 0
+      ? {
+          targetCount: relay.targets.length,
+          connectedCount: relay.targets.filter((t) => t.status === "connected").length,
+        }
+      : null;
 
   const isFiltered = selectedProjectPath !== null;
   const filteredWorkstreams = isFiltered
@@ -134,7 +189,12 @@ export default function DashboardPage() {
   return (
     <OperatorProvider operators={operators}>
     <div className="h-screen flex flex-col bg-dash-bg text-dash-text font-mono text-[11px] leading-relaxed overflow-hidden">
-      <TopBar summary={summary} operators={operators} />
+      <TopBar
+        summary={summary}
+        operators={operators}
+        relayStatus={relayStatus}
+        onRelayClick={() => setRelayOpen((prev) => !prev)}
+      />
 
       <div
         className="flex-1 grid gap-px bg-dash-border min-h-0"
@@ -161,12 +221,13 @@ export default function DashboardPage() {
             </div>
           ) : (
             workstreams.map((ws) => (
-              <AgentCard
-                key={ws.projectId}
-                workstream={ws}
-                isSelected={selectedProjectPath === ws.projectPath}
-                onSelect={toggleWorkstream}
-              />
+              <div key={ws.projectId} ref={setWorkstreamItemRef(ws.projectId)} className="will-change-transform">
+                <AgentCard
+                  workstream={ws}
+                  isSelected={selectedProjectPath === ws.projectPath}
+                  onSelect={toggleWorkstream}
+                />
+              </div>
             ))
           )}
         </div>
@@ -260,6 +321,26 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Relay Panel overlay */}
+      {relayOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-30"
+            onClick={() => setRelayOpen(false)}
+          />
+          <div className="fixed top-0 right-0 z-30 h-full w-[480px] shadow-lg">
+            <RelayPanel
+              targets={relay.targets}
+              activeProjects={relay.activeProjects}
+              onConnect={relay.connect}
+              onRemove={relay.remove}
+              onToggleProject={relay.toggleProject}
+              onClose={() => setRelayOpen(false)}
+            />
+          </div>
+        </>
+      )}
     </div>
     </OperatorProvider>
   );

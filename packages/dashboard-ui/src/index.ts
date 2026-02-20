@@ -24,6 +24,9 @@ export type {
   FeedEvent,
   DashboardSummary,
   DashboardState,
+  RelayConnectionStatus,
+  RelayTargetInfo,
+  ActiveProject,
 } from "./types";
 
 // Utils
@@ -34,6 +37,9 @@ export { OperatorProvider, useOperators } from "./components/OperatorContext";
 
 // Components
 export { TopBar } from "./components/TopBar";
+export type { RelayStatus } from "./components/TopBar";
+export { RelayPanel } from "./components/RelayPanel";
+export type { RelayPanelProps } from "./components/RelayPanel";
 export { PanelHeader } from "./components/PanelHeader";
 export { AgentPip } from "./components/AgentPip";
 export { OperatorTag } from "./components/OperatorTag";

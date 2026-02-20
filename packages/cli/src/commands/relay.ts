@@ -1,4 +1,4 @@
-import type { RelayTarget, RelayConfig } from "@pylon-dev/server";
+import type { RelayTarget, RelayConfig, ParsedConnectLink } from "@pylon-dev/server";
 
 export async function relayCommand(args: string[]): Promise<void> {
   const subcommand = args[0];
@@ -30,32 +30,17 @@ export async function relayCommand(args: string[]): Promise<void> {
 // ─── Connect ────────────────────────────────────────────────────────────────
 
 async function connectRelay(link: string): Promise<void> {
-  // Parse: pylon+wss://relay.pylon.dev/ws?p=<pylonId>&t=<token>&r=<refreshToken>&n=<name>
-  let url: URL;
+  const { parseConnectLink, loadRelayConfig, saveRelayConfig } = await import("@pylon-dev/server");
+
+  let parsed: ParsedConnectLink;
   try {
-    // Convert pylon+wss:// → wss:// for URL parsing
-    const normalized = link.replace(/^pylon\+/, "");
-    url = new URL(normalized);
-  } catch {
-    console.error("Error: Invalid connect link format.");
-    console.error("Expected: pylon+wss://<host>/ws?p=<pylonId>&t=<token>&r=<refreshToken>&n=<name>");
+    parsed = parseConnectLink(link);
+  } catch (err: unknown) {
+    console.error(`Error: ${err instanceof Error ? err.message : "Invalid connect link"}`);
     process.exit(1);
   }
 
-  const pylonId = url.searchParams.get("p");
-  const token = url.searchParams.get("t");
-  const refreshToken = url.searchParams.get("r");
-  const pylonName = url.searchParams.get("n") || "Unnamed Relay";
-
-  if (!pylonId || !token || !refreshToken) {
-    console.error("Error: Connect link missing required parameters (p, t, r).");
-    process.exit(1);
-  }
-
-  // Reconstruct the WebSocket URL (without query params)
-  const wsUrl = `${url.protocol}//${url.host}${url.pathname}`;
-
-  const { loadRelayConfig, saveRelayConfig } = await import("@pylon-dev/server");
+  const { pylonId, pylonName, wsUrl, token, refreshToken } = parsed;
   const config = loadRelayConfig();
 
   // Check for existing target with same pylonId

@@ -10,6 +10,7 @@ import { parseSessionFile } from "../parser/jsonl.js";
 import { buildParsedSession } from "../core/nodes.js";
 import { buildDashboardState } from "../core/dashboard.js";
 import { relayManager } from "../relay/manager.js";
+import { parseConnectLink } from "../relay/link.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -241,6 +242,69 @@ export function createApp(options?: { dashboardDir?: string }): Hono {
         detectedAt: serializeDate(col.detectedAt),
       }))
     );
+  });
+
+  // ─── Relay API Routes ─────────────────────────────────────────────────────
+
+  /** List relay targets with live connection status */
+  app.get("/api/relay/targets", (c) => {
+    return c.json(relayManager.getStatus());
+  });
+
+  /** Parse connect link and add/update relay target */
+  app.post("/api/relay/connect", async (c) => {
+    const body = await c.req.json<{ link?: string }>();
+    if (!body.link) {
+      return c.json({ error: "Missing 'link' field" }, 400);
+    }
+    try {
+      const parsed = parseConnectLink(body.link);
+      relayManager.addTarget(parsed);
+      if (shouldTickerRun()) startTicker();
+      return c.json({ ok: true, pylonId: parsed.pylonId, pylonName: parsed.pylonName });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Invalid connect link";
+      return c.json({ error: message }, 400);
+    }
+  });
+
+  /** Remove a relay target */
+  app.delete("/api/relay/targets/:pylonId", (c) => {
+    const { pylonId } = c.req.param();
+    const removed = relayManager.removeTarget(pylonId);
+    if (!removed) {
+      return c.json({ error: "Target not found" }, 404);
+    }
+    if (!shouldTickerRun()) stopTicker();
+    return c.json({ ok: true });
+  });
+
+  /** Include a project in a relay target */
+  app.post("/api/relay/targets/:pylonId/include", async (c) => {
+    const { pylonId } = c.req.param();
+    const body = await c.req.json<{ projectPath?: string }>();
+    if (!body.projectPath) {
+      return c.json({ error: "Missing 'projectPath' field" }, 400);
+    }
+    const ok = relayManager.includeProject(pylonId, body.projectPath);
+    if (!ok) {
+      return c.json({ error: "Target not found" }, 404);
+    }
+    return c.json({ ok: true });
+  });
+
+  /** Exclude a project from a relay target */
+  app.post("/api/relay/targets/:pylonId/exclude", async (c) => {
+    const { pylonId } = c.req.param();
+    const body = await c.req.json<{ projectPath?: string }>();
+    if (!body.projectPath) {
+      return c.json({ error: "Missing 'projectPath' field" }, 400);
+    }
+    const ok = relayManager.excludeProject(pylonId, body.projectPath);
+    if (!ok) {
+      return c.json({ error: "Target not found" }, 404);
+    }
+    return c.json({ ok: true });
   });
 
   /** Health check */

@@ -2,12 +2,19 @@
 
 import type { DashboardSummary, Operator } from "../types";
 
+export interface RelayStatus {
+  targetCount: number;
+  connectedCount: number;
+}
+
 interface TopBarProps {
   summary: DashboardSummary;
   operators: Operator[];
+  relayStatus?: RelayStatus | null;
+  onRelayClick?: () => void;
 }
 
-export function TopBar({ summary, operators }: TopBarProps) {
+export function TopBar({ summary, operators, relayStatus, onRelayClick }: TopBarProps) {
   return (
     <div className="flex items-center justify-between px-4 h-10 bg-dash-surface border-b border-dash-border">
       <div className="font-display font-bold text-sm tracking-tight text-dash-green">
@@ -19,6 +26,7 @@ export function TopBar({ summary, operators }: TopBarProps) {
           <span className="w-1 h-1 rounded-full bg-dash-green animate-dash-pulse" />
           LIVE
         </div>
+        <RelayIndicator relayStatus={relayStatus} onRelayClick={onRelayClick} />
         {operators.length > 1 && (
           <div className="flex items-center gap-2 px-2 border-l border-r border-dash-border">
             {operators.map((op) => (
@@ -66,6 +74,45 @@ export function TopBar({ summary, operators }: TopBarProps) {
         )}
       </div>
     </div>
+  );
+}
+
+function RelayIndicator({
+  relayStatus,
+  onRelayClick,
+}: {
+  relayStatus?: RelayStatus | null;
+  onRelayClick?: () => void;
+}) {
+  if (!relayStatus || relayStatus.targetCount === 0) {
+    return (
+      <button
+        onClick={onRelayClick}
+        className="text-[8px] font-bold tracking-widest uppercase text-dash-text-muted/40 hover:text-dash-text-muted transition-colors cursor-pointer"
+      >
+        RELAY
+      </button>
+    );
+  }
+
+  const { targetCount, connectedCount } = relayStatus;
+  let dotClass: string;
+  if (connectedCount === targetCount) {
+    dotClass = "bg-dash-green animate-dash-pulse";
+  } else if (connectedCount > 0) {
+    dotClass = "bg-dash-yellow animate-dash-pulse";
+  } else {
+    dotClass = "bg-dash-text-muted";
+  }
+
+  return (
+    <button
+      onClick={onRelayClick}
+      className="inline-flex items-center gap-1 text-[11px] font-mono text-dash-text-dim hover:text-dash-text transition-colors cursor-pointer"
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
+      {targetCount} relay
+    </button>
   );
 }
 

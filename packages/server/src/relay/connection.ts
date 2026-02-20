@@ -11,6 +11,8 @@ const HEARTBEAT_INTERVAL_MS = 20_000;
 const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_MAX_MS = 30_000;
 
+export type RelayConnectionStatus = "connected" | "connecting" | "disconnected";
+
 export class RelayConnection {
   readonly pylonId: string;
 
@@ -33,6 +35,12 @@ export class RelayConnection {
 
   get isConnected(): boolean {
     return this.ws?.readyState === WebSocket.OPEN && this.authenticated;
+  }
+
+  get status(): RelayConnectionStatus {
+    if (this.intentionalClose) return "disconnected";
+    if (this.authenticated && this.ws?.readyState === WebSocket.OPEN) return "connected";
+    return "connecting";
   }
 
   /** Update token (e.g. after refresh). Takes effect on next reconnect. */

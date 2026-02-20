@@ -1,8 +1,18 @@
 import type { DashboardState } from "../types/index.js";
 import { loadOperatorConfig, getSelfName, getOperatorColor } from "../core/config.js";
-import { loadRelayConfig } from "./config.js";
+import { loadRelayConfig, saveRelayConfig } from "./config.js";
 import { transformToOperatorState } from "./transform.js";
 import { RelayConnection } from "./connection.js";
+import type { RelayConnectionStatus } from "./connection.js";
+import type { RelayTarget } from "./types.js";
+
+export interface RelayTargetStatus {
+  pylonId: string;
+  pylonName: string;
+  status: RelayConnectionStatus;
+  projects: string[];
+  addedAt: string;
+}
 
 class RelayManager {
   private connections = new Map<string, RelayConnection>();
@@ -28,6 +38,84 @@ class RelayManager {
       conn.disconnect();
     }
     this.connections.clear();
+  }
+
+  /** Get status for all configured targets with live connection info. */
+  getStatus(): RelayTargetStatus[] {
+    const config = loadRelayConfig();
+    return config.targets.map((t) => {
+      const conn = this.connections.get(t.pylonId);
+      return {
+        pylonId: t.pylonId,
+        pylonName: t.pylonName,
+        status: conn ? conn.status : "disconnected",
+        projects: t.projects,
+        addedAt: t.addedAt,
+      };
+    });
+  }
+
+  /** Add or update a relay target from parsed connect link fields. */
+  addTarget(fields: { pylonId: string; pylonName: string; wsUrl: string; token: string; refreshToken: string }): void {
+    const config = loadRelayConfig();
+    const existing = config.targets.find((t) => t.pylonId === fields.pylonId);
+    if (existing) {
+      existing.token = fields.token;
+      existing.refreshToken = fields.refreshToken;
+      existing.pylonName = fields.pylonName;
+      existing.wsUrl = fields.wsUrl;
+    } else {
+      const target: RelayTarget = {
+        pylonId: fields.pylonId,
+        pylonName: fields.pylonName,
+        wsUrl: fields.wsUrl,
+        token: fields.token,
+        refreshToken: fields.refreshToken,
+        projects: [],
+        addedAt: new Date().toISOString(),
+      };
+      config.targets.push(target);
+    }
+    saveRelayConfig(config);
+    if (this.started) this.syncConnections();
+  }
+
+  /** Remove a relay target and disconnect. */
+  removeTarget(pylonId: string): boolean {
+    const config = loadRelayConfig();
+    const idx = config.targets.findIndex((t) => t.pylonId === pylonId);
+    if (idx === -1) return false;
+    config.targets.splice(idx, 1);
+    saveRelayConfig(config);
+    const conn = this.connections.get(pylonId);
+    if (conn) {
+      conn.disconnect();
+      this.connections.delete(pylonId);
+    }
+    return true;
+  }
+
+  /** Add a project to a relay target. */
+  includeProject(pylonId: string, projectPath: string): boolean {
+    const config = loadRelayConfig();
+    const target = config.targets.find((t) => t.pylonId === pylonId);
+    if (!target) return false;
+    if (target.projects.includes(projectPath)) return true;
+    target.projects.push(projectPath);
+    saveRelayConfig(config);
+    return true;
+  }
+
+  /** Remove a project from a relay target. */
+  excludeProject(pylonId: string, projectPath: string): boolean {
+    const config = loadRelayConfig();
+    const target = config.targets.find((t) => t.pylonId === pylonId);
+    if (!target) return false;
+    const idx = target.projects.indexOf(projectPath);
+    if (idx === -1) return true;
+    target.projects.splice(idx, 1);
+    saveRelayConfig(config);
+    return true;
   }
 
   /**

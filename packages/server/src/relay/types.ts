@@ -3,6 +3,51 @@
 
 // ─── Relay State Types ──────────────────────────────────────────────────────
 
+export interface RelayAgentRisk {
+  errorRate: number;
+  correctionRatio: number;
+  totalTokens: number;
+  compactions: number;
+  compactionProximity: "nominal" | "elevated" | "critical";
+  fileHotspots: { file: string; count: number }[];
+  spinningSignals: { pattern: string; level: string; detail: string }[];
+  overallRisk: "nominal" | "elevated" | "critical";
+  errorTrend: boolean[];
+  costPerSession: number;
+  costPerTurn: number;
+  modelBreakdown: { model: string; cost: number; tokenCount: number; turnCount: number }[];
+  contextUsagePct: number;
+  contextTokens: number;
+  avgTurnTimeMs: number | null;
+  sessionDurationMs: number;
+}
+
+export interface RelayPlanTask {
+  id: string;
+  subject: string;
+  description: string;
+  status: "pending" | "in_progress" | "completed" | "deleted";
+}
+
+export interface RelayDraftingActivity {
+  filesExplored: string[];
+  searches: string[];
+  toolCounts: Record<string, number>;
+  approachSummary: string;
+  lastActivityAt: string; // ISO
+  turnCount: number;
+}
+
+export interface RelaySessionPlan {
+  status: "drafting" | "implementing" | "completed" | "rejected" | "none";
+  markdown: string | null;
+  tasks: RelayPlanTask[];
+  agentLabel: string;
+  timestamp: string; // ISO
+  planDurationMs: number | null;
+  draftingActivity: RelayDraftingActivity | null;
+}
+
 export interface RelayAgent {
   sessionId: string;
   label: string;
@@ -15,6 +60,8 @@ export interface RelayAgent {
   planStatus: "drafting" | "implementing" | "completed" | "rejected" | "none";
   planTaskProgress: string | null; // e.g. "3/5"
   operatorId: string;
+  risk: RelayAgentRisk;
+  plans: RelaySessionPlan[];
 }
 
 export interface RelayWorkstream {

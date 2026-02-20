@@ -1,7 +1,8 @@
-import type { DashboardState, Agent, SessionPlan } from "../types/index.js";
+import type { DashboardState, Agent, SessionPlan, DraftingActivity } from "../types/index.js";
 import type {
   OperatorState,
   RelayAgent,
+  RelaySessionPlan,
   RelayWorkstream,
   RelayCollision,
   RelayFeedEvent,
@@ -106,6 +107,40 @@ function mapAgent(a: Agent): RelayAgent {
     planStatus: topPlan?.status ?? "none",
     planTaskProgress: computePlanTaskProgress(topPlan),
     operatorId: a.operatorId,
+    risk: {
+      ...a.risk,
+      spinningSignals: a.risk.spinningSignals.map((s) => ({
+        pattern: s.pattern,
+        level: s.level,
+        detail: s.detail,
+      })),
+    },
+    plans: a.plans.map(serializePlan),
+  };
+}
+
+function serializePlan(p: SessionPlan): RelaySessionPlan {
+  return {
+    status: p.status,
+    markdown: p.markdown,
+    tasks: p.tasks,
+    agentLabel: p.agentLabel,
+    timestamp: serializeDate(p.timestamp),
+    planDurationMs: p.planDurationMs,
+    draftingActivity: p.draftingActivity
+      ? serializeDraftingActivity(p.draftingActivity)
+      : null,
+  };
+}
+
+function serializeDraftingActivity(d: DraftingActivity) {
+  return {
+    filesExplored: d.filesExplored,
+    searches: d.searches,
+    toolCounts: d.toolCounts,
+    approachSummary: d.approachSummary,
+    lastActivityAt: serializeDate(d.lastActivityAt),
+    turnCount: d.turnCount,
   };
 }
 

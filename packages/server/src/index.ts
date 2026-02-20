@@ -4,3 +4,5 @@ export * from "./discovery/sessions.js";
 export * from "./core/nodes.js";
 export { createApp, startServer } from "./server/index.js";
 export type { StartServerOptions } from "./server/index.js";
+export { loadRelayConfig, saveRelayConfig } from "./relay/config.js";
+export type { RelayConfig, RelayTarget } from "./relay/types.js";

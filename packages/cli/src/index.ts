@@ -30,11 +30,20 @@ Commands:
   restart     Restart the Pylon server
   status      Show server status
   open        Open the dashboard in a browser
+  relay       Manage cloud relay connections
   help        Show this help message
 
 Options (start):
   --port N        Port number (default: 3002)
   --foreground    Run in foreground instead of background
+
+Relay subcommands:
+  relay <connect-link>                     Add/update a relay target
+  relay list                               List configured targets
+  relay remove <pylonId>                   Remove a target
+  relay sessions                           List active sessions
+  relay include <pylonId> <projectPath>    Start relaying a project
+  relay exclude <pylonId> <projectPath>    Stop relaying a project
 `.trim());
 }
 
@@ -64,6 +73,12 @@ async function main() {
     case "status":
       await statusCommand();
       break;
+
+    case "relay": {
+      const { relayCommand } = await import("./commands/relay.js");
+      await relayCommand(args.slice(1));
+      break;
+    }
 
     case "open": {
       const port = getOption("--port", "3002");

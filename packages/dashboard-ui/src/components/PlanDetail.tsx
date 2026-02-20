@@ -134,7 +134,7 @@ const taskIcon: Record<string, { char: string; className: string }> = {
 };
 
 function PlanOverview({ entries, onSelect }: { entries: PlanEntry[]; onSelect: (idx: number) => void }) {
-  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+  const [expandedPlanKeys, setExpandedPlanKeys] = useState<Set<string>>(new Set());
 
   if (entries.length === 0) {
     return <div className="h-full flex items-center justify-center text-dash-text-muted text-xs">No active plans</div>;
@@ -148,9 +148,10 @@ function PlanOverview({ entries, onSelect }: { entries: PlanEntry[]; onSelect: (
       </div>
       {entries.map((entry, i) => {
         const cfg = statusConfig[entry.plan.status];
-        const isExpanded = expandedIdx === i;
+        const planKey = `${entry.operatorId}:${entry.plan.agentLabel}:${entry.plan.timestamp}:${entry.title}`;
+        const isExpanded = expandedPlanKeys.has(planKey);
         return (
-          <div key={i} className="border-b border-dash-border">
+          <div key={planKey} className="border-b border-dash-border">
             <button onClick={() => onSelect(i)} className="w-full flex items-center gap-3 px-3.5 py-2 hover:bg-dash-surface-2 transition-colors text-left">
               <div className={`w-[3px] h-8 rounded-sm shrink-0 ${
                 entry.plan.status === "completed" ? "bg-dash-green"
@@ -175,7 +176,15 @@ function PlanOverview({ entries, onSelect }: { entries: PlanEntry[]; onSelect: (
                   {entry.tasksTotal > 0 && (
                     <span
                       className="cursor-pointer transition-colors px-1 py-px rounded border border-dash-border hover:border-dash-text-muted hover:bg-dash-surface-2 text-dash-text-dim"
-                      onClick={(e) => { e.stopPropagation(); setExpandedIdx(isExpanded ? null : i); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedPlanKeys((prev) => {
+                          const next = new Set(prev);
+                          if (isExpanded) next.delete(planKey);
+                          else next.add(planKey);
+                          return next;
+                        });
+                      }}
                     >
                       {entry.tasksDone}/{entry.tasksTotal} tasks {isExpanded ? "\u25B4" : "\u25BE"}
                     </span>

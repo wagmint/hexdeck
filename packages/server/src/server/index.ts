@@ -9,6 +9,7 @@ import { listProjects, listSessions, findSession, getActiveSessions } from "../d
 import { parseSessionFile } from "../parser/jsonl.js";
 import { buildParsedSession } from "../core/nodes.js";
 import { buildDashboardState } from "../core/dashboard.js";
+import { relayManager } from "../relay/manager.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -23,8 +24,7 @@ function serializeDate(d: Date): string {
   return d instanceof Date ? d.toISOString() : String(d);
 }
 
-function serializeDashboardState() {
-  const state = buildDashboardState();
+function serializeState(state: ReturnType<typeof buildDashboardState>) {
   return {
     ...state,
     collisions: state.collisions.map((col) => ({
@@ -49,10 +49,20 @@ let lastPushedJson = "";
 let tickerInterval: ReturnType<typeof setInterval> | null = null;
 let sseMessageId = 0;
 
+function shouldTickerRun() {
+  return clients.size > 0 || relayManager.hasTargets;
+}
+
 function startTicker() {
   if (tickerInterval) return;
   tickerInterval = setInterval(() => {
-    const data = serializeDashboardState();
+    const rawState = buildDashboardState();
+
+    // Relay (does its own diff check per connection)
+    relayManager.onStateUpdate(rawState);
+
+    // SSE (existing logic)
+    const data = serializeState(rawState);
     const json = JSON.stringify(data);
     if (json === lastPushedJson) return;
     lastPushedJson = json;
@@ -75,12 +85,12 @@ function stopTicker() {
 
 function addClient(client: SSEClient) {
   clients.add(client);
-  if (clients.size === 1) startTicker();
+  if (shouldTickerRun()) startTicker();
 }
 
 function removeClient(client: SSEClient) {
   clients.delete(client);
-  if (clients.size === 0) stopTicker();
+  if (!shouldTickerRun()) stopTicker();
 }
 
 // ─── App Factory ─────────────────────────────────────────────────────────────
@@ -183,7 +193,7 @@ export function createApp(options?: { dashboardDir?: string }): Hono {
 
   /** Full dashboard state */
   app.get("/api/dashboard", (c) => {
-    return c.json(serializeDashboardState());
+    return c.json(serializeState(buildDashboardState()));
   });
 
   /** SSE stream — pushes dashboard state on change */
@@ -192,7 +202,7 @@ export function createApp(options?: { dashboardDir?: string }): Hono {
       const client: SSEClient = { stream };
 
       // Send current state immediately
-      const data = serializeDashboardState();
+      const data = serializeState(buildDashboardState());
       const json = JSON.stringify(data);
       sseMessageId++;
       await stream.writeSSE({ data: json, event: "state", id: String(sseMessageId) });
@@ -272,6 +282,10 @@ export function startServer(options?: StartServerOptions): ServerType {
       console.log(`Dashboard: http://localhost:${info.port}`);
     }
   });
+
+  // Start relay manager (connects to configured relay targets)
+  relayManager.start();
+  if (relayManager.hasTargets) startTicker();
 
   return server;
 }

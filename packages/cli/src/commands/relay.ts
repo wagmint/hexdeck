@@ -1,0 +1,283 @@
+import type { RelayTarget, RelayConfig } from "@pylon-dev/server";
+
+export async function relayCommand(args: string[]): Promise<void> {
+  const subcommand = args[0];
+
+  switch (subcommand) {
+    case "list":
+      return listRelays();
+    case "remove":
+      return removeRelay(args[1]);
+    case "sessions":
+      return listSessions();
+    case "include":
+      return includeProject(args[1], args.slice(2).join(" "));
+    case "exclude":
+      return excludeProject(args[1], args.slice(2).join(" "));
+    default:
+      // If it looks like a connect link, treat it as "connect"
+      if (subcommand && subcommand.startsWith("pylon+")) {
+        return connectRelay(subcommand);
+      }
+      if (subcommand) {
+        console.error(`Unknown relay subcommand: ${subcommand}`);
+      }
+      printRelayHelp();
+      break;
+  }
+}
+
+// ─── Connect ────────────────────────────────────────────────────────────────
+
+async function connectRelay(link: string): Promise<void> {
+  // Parse: pylon+wss://relay.pylon.dev/ws?p=<pylonId>&t=<token>&r=<refreshToken>&n=<name>
+  let url: URL;
+  try {
+    // Convert pylon+wss:// → wss:// for URL parsing
+    const normalized = link.replace(/^pylon\+/, "");
+    url = new URL(normalized);
+  } catch {
+    console.error("Error: Invalid connect link format.");
+    console.error("Expected: pylon+wss://<host>/ws?p=<pylonId>&t=<token>&r=<refreshToken>&n=<name>");
+    process.exit(1);
+  }
+
+  const pylonId = url.searchParams.get("p");
+  const token = url.searchParams.get("t");
+  const refreshToken = url.searchParams.get("r");
+  const pylonName = url.searchParams.get("n") || "Unnamed Relay";
+
+  if (!pylonId || !token || !refreshToken) {
+    console.error("Error: Connect link missing required parameters (p, t, r).");
+    process.exit(1);
+  }
+
+  // Reconstruct the WebSocket URL (without query params)
+  const wsUrl = `${url.protocol}//${url.host}${url.pathname}`;
+
+  const { loadRelayConfig, saveRelayConfig } = await import("@pylon-dev/server");
+  const config = loadRelayConfig();
+
+  // Check for existing target with same pylonId
+  const existing = config.targets.find((t) => t.pylonId === pylonId);
+  if (existing) {
+    // Update token/name
+    existing.token = token;
+    existing.refreshToken = refreshToken;
+    existing.pylonName = pylonName;
+    existing.wsUrl = wsUrl;
+    saveRelayConfig(config);
+    console.log(`Updated relay target '${pylonName}' (${pylonId}).`);
+  } else {
+    const target: RelayTarget = {
+      pylonId,
+      pylonName,
+      wsUrl,
+      token,
+      refreshToken,
+      projects: [],
+      addedAt: new Date().toISOString(),
+    };
+    config.targets.push(target);
+    saveRelayConfig(config);
+    console.log(`Relay configured for '${pylonName}'.`);
+  }
+
+  console.log("No sessions selected yet.");
+  console.log("");
+  console.log("Run `pylon relay sessions` to see active sessions,");
+  console.log("then `pylon relay include <pylonId> <project>` to start sharing.");
+}
+
+// ─── List ───────────────────────────────────────────────────────────────────
+
+async function listRelays(): Promise<void> {
+  const { loadRelayConfig } = await import("@pylon-dev/server");
+  const config = loadRelayConfig();
+
+  if (config.targets.length === 0) {
+    console.log("No relay targets configured.");
+    console.log("Use `pylon relay <connect-link>` to add one.");
+    return;
+  }
+
+  console.log("Relay Targets");
+  console.log("─────────────────────────────");
+
+  for (const target of config.targets) {
+    console.log(`  ${target.pylonName}  (${target.pylonId.slice(0, 8)})`);
+    if (target.projects.length === 0) {
+      console.log("    No projects selected");
+    } else {
+      for (const p of target.projects) {
+        console.log(`    ${p}`);
+      }
+    }
+    console.log(`    Added: ${new Date(target.addedAt).toLocaleDateString()}`);
+    console.log("");
+  }
+}
+
+// ─── Remove ─────────────────────────────────────────────────────────────────
+
+async function removeRelay(pylonIdPrefix?: string): Promise<void> {
+  if (!pylonIdPrefix) {
+    console.error("Usage: pylon relay remove <pylonId>");
+    process.exit(1);
+  }
+
+  const { loadRelayConfig, saveRelayConfig } = await import("@pylon-dev/server");
+  const config = loadRelayConfig();
+
+  const matches = config.targets.filter((t) => t.pylonId.startsWith(pylonIdPrefix));
+
+  if (matches.length === 0) {
+    console.error(`No relay target found matching '${pylonIdPrefix}'.`);
+    process.exit(1);
+  }
+  if (matches.length > 1) {
+    console.error(`Ambiguous prefix '${pylonIdPrefix}' matches ${matches.length} targets:`);
+    for (const m of matches) {
+      console.error(`  ${m.pylonId}  ${m.pylonName}`);
+    }
+    process.exit(1);
+  }
+
+  const target = matches[0];
+  config.targets = config.targets.filter((t) => t.pylonId !== target.pylonId);
+  saveRelayConfig(config);
+  console.log(`Removed relay target '${target.pylonName}' (${target.pylonId}).`);
+}
+
+// ─── Sessions ───────────────────────────────────────────────────────────────
+
+async function listSessions(): Promise<void> {
+  const { getActiveSessions } = await import("@pylon-dev/server");
+  const sessions = getActiveSessions();
+
+  if (sessions.length === 0) {
+    console.log("No active sessions found.");
+    return;
+  }
+
+  // Group by project path
+  const byProject = new Map<string, number>();
+  for (const s of sessions) {
+    byProject.set(s.projectPath, (byProject.get(s.projectPath) || 0) + 1);
+  }
+
+  // Sort by path
+  const sorted = [...byProject.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+
+  // Abbreviate home dir
+  const home = process.env.HOME || process.env.USERPROFILE || "";
+
+  console.log("Active Sessions");
+  console.log("─────────────────────────────");
+
+  for (const [projectPath, count] of sorted) {
+    const display = home ? projectPath.replace(home, "~") : projectPath;
+    const label = count === 1 ? "session" : "sessions";
+    console.log(`  ${display.padEnd(35)} ${count} ${label}`);
+  }
+}
+
+// ─── Include ────────────────────────────────────────────────────────────────
+
+async function includeProject(pylonIdPrefix?: string, projectPath?: string): Promise<void> {
+  if (!pylonIdPrefix || !projectPath) {
+    console.error("Usage: pylon relay include <pylonId> <projectPath>");
+    process.exit(1);
+  }
+
+  const { loadRelayConfig, saveRelayConfig } = await import("@pylon-dev/server");
+  const config = loadRelayConfig();
+  const target = findTarget(config, pylonIdPrefix);
+
+  // Normalize path: expand ~ to home dir
+  const resolved = expandHome(projectPath);
+
+  if (target.projects.includes(resolved)) {
+    console.log(`Already relaying ${projectPath} to '${target.pylonName}'.`);
+    return;
+  }
+
+  target.projects.push(resolved);
+  saveRelayConfig(config);
+  console.log(`Now relaying ${projectPath} to '${target.pylonName}'.`);
+}
+
+// ─── Exclude ────────────────────────────────────────────────────────────────
+
+async function excludeProject(pylonIdPrefix?: string, projectPath?: string): Promise<void> {
+  if (!pylonIdPrefix || !projectPath) {
+    console.error("Usage: pylon relay exclude <pylonId> <projectPath>");
+    process.exit(1);
+  }
+
+  const { loadRelayConfig, saveRelayConfig } = await import("@pylon-dev/server");
+  const config = loadRelayConfig();
+  const target = findTarget(config, pylonIdPrefix);
+
+  const resolved = expandHome(projectPath);
+  const idx = target.projects.indexOf(resolved);
+
+  if (idx === -1) {
+    console.log(`Not currently relaying ${projectPath} to '${target.pylonName}'.`);
+    return;
+  }
+
+  target.projects.splice(idx, 1);
+  saveRelayConfig(config);
+  console.log(`Stopped relaying ${projectPath} to '${target.pylonName}'.`);
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function findTarget(config: RelayConfig, prefix: string): RelayTarget {
+  const matches = config.targets.filter((t) => t.pylonId.startsWith(prefix));
+
+  if (matches.length === 0) {
+    console.error(`No relay target found matching '${prefix}'.`);
+    process.exit(1);
+  }
+  if (matches.length > 1) {
+    console.error(`Ambiguous prefix '${prefix}' matches ${matches.length} targets:`);
+    for (const m of matches) {
+      console.error(`  ${m.pylonId}  ${m.pylonName}`);
+    }
+    process.exit(1);
+  }
+
+  return matches[0];
+}
+
+function expandHome(p: string): string {
+  if (p.startsWith("~/")) {
+    const home = process.env.HOME || process.env.USERPROFILE || "";
+    return home + p.slice(1);
+  }
+  return p;
+}
+
+function printRelayHelp(): void {
+  console.log(`
+Usage: pylon relay <subcommand> [options]
+
+Subcommands:
+  <connect-link>                           Add/update a relay target
+  list                                     List configured relay targets
+  remove <pylonId>                         Remove a relay target
+  sessions                                 List active sessions available to relay
+  include <pylonId> <projectPath>          Start relaying a project
+  exclude <pylonId> <projectPath>          Stop relaying a project
+
+Examples:
+  pylon relay "pylon+wss://relay.example.com/ws?p=abc&t=tok&r=ref&n=Team"
+  pylon relay list
+  pylon relay sessions
+  pylon relay include abc ~/Code/my-app
+  pylon relay exclude abc ~/Code/my-app
+  pylon relay remove abc
+`.trim());
+}

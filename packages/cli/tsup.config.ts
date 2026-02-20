@@ -13,6 +13,7 @@ export default defineConfig({
   external: [
     "hono",
     "@hono/node-server",
+    "ws",
   ],
   clean: true,
 });

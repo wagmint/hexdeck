@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useLayoutEffect } from "react";
+import { useState, useRef, useEffect, useCallback, useLayoutEffect, useMemo } from "react";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useRelay } from "@/hooks/useRelay";
-import type { Collision, RelayStatus } from "@pylon-dev/dashboard-ui";
+import type { Collision, DashboardState, RelayStatus } from "@pylon-dev/dashboard-ui";
 import {
   OperatorProvider,
   TopBar,
@@ -18,6 +18,8 @@ import {
 } from "@pylon-dev/dashboard-ui";
 
 export default function DashboardPage() {
+  type DashboardAgent = DashboardState["agents"][number];
+  const RISK_INACTIVE_HOLD_MS = 30_000;
   const { state, loading, error, connected } = useDashboard();
   const [relayOpen, setRelayOpen] = useState(false);
   const relay = useRelay(relayOpen);
@@ -32,6 +34,9 @@ export default function DashboardPage() {
   const workstreamItemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const previousWorkstreamRects = useRef<Map<string, DOMRect>>(new Map());
   const workstreamsForAnimation = state?.workstreams ?? [];
+  const liveAgentsForRisk = state?.agents ?? [];
+  const riskAgentHold = useRef<Map<string, { agent: DashboardAgent; lastSeenAt: number }>>(new Map());
+  const [riskHoldClock, setRiskHoldClock] = useState(0);
 
   const makeResizeHandler = useCallback(
     (setter: (h: number) => void, currentHeight: number, min = 80) =>
@@ -141,6 +146,65 @@ export default function DashboardPage() {
     previousWorkstreamRects.current = nextRects;
   }, [workstreamsForAnimation]);
 
+  useEffect(() => {
+    const now = Date.now();
+    const next = new Map(riskAgentHold.current);
+
+    for (const agent of liveAgentsForRisk) {
+      next.set(agent.sessionId, { agent, lastSeenAt: now });
+    }
+    for (const [sessionId, entry] of next) {
+      if (now - entry.lastSeenAt > RISK_INACTIVE_HOLD_MS) {
+        next.delete(sessionId);
+      }
+    }
+
+    riskAgentHold.current = next;
+    setRiskHoldClock(now);
+  }, [liveAgentsForRisk, RISK_INACTIVE_HOLD_MS]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = Date.now();
+      const next = new Map(riskAgentHold.current);
+      let changed = false;
+
+      for (const [sessionId, entry] of next) {
+        if (now - entry.lastSeenAt > RISK_INACTIVE_HOLD_MS) {
+          next.delete(sessionId);
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        riskAgentHold.current = next;
+      }
+      setRiskHoldClock(now);
+    }, 2_000);
+
+    return () => clearInterval(timer);
+  }, [RISK_INACTIVE_HOLD_MS]);
+
+  const heldRiskAgents = useMemo(() => {
+    const now = riskHoldClock || Date.now();
+    const bySessionId = new Map<string, DashboardAgent>();
+
+    // Always include currently-live agents from state.
+    for (const agent of liveAgentsForRisk) {
+      bySessionId.set(agent.sessionId, agent);
+    }
+
+    for (const { agent, lastSeenAt } of riskAgentHold.current.values()) {
+      if (now - lastSeenAt <= RISK_INACTIVE_HOLD_MS) {
+        if (!bySessionId.has(agent.sessionId)) {
+          bySessionId.set(agent.sessionId, agent);
+        }
+      }
+    }
+
+    return [...bySessionId.values()];
+  }, [liveAgentsForRisk, riskHoldClock, RISK_INACTIVE_HOLD_MS]);
+
   if (loading && !state) {
     return (
       <div className="h-screen bg-dash-bg flex items-center justify-center text-dash-text-muted text-sm font-mono">
@@ -177,8 +241,8 @@ export default function DashboardPage() {
     ? feed.filter(e => e.projectPath === selectedProjectPath)
     : feed;
   const filteredAgents = isFiltered
-    ? agents.filter(a => a.projectPath === selectedProjectPath)
-    : agents;
+    ? heldRiskAgents.filter(a => a.projectPath === selectedProjectPath)
+    : heldRiskAgents;
   const filteredCollisions = isFiltered
     ? collisions.filter(c => c.agents.some(a => a.projectPath === selectedProjectPath))
     : collisions;

@@ -1,4 +1,5 @@
 import type { ParsedSession, Collision, FeedEvent } from "../types/index.js";
+import { formatIdleDuration } from "./duration.js";
 
 // ─── In-memory feed state ──────────────────────────────────────────────────
 
@@ -180,8 +181,8 @@ export function buildFeed(
           projectPath: session.session.projectPath,
           operatorId: opId(sessionId),
           message: isStalled
-            ? `Stalled: no activity for ${Math.round(silenceMs / 60000)}m`
-            : `Idle for ${Math.round(silenceMs / 60000)}m`,
+            ? `Stalled: no activity for ${formatIdleDuration(silenceMs)}`
+            : `Idle for ${formatIdleDuration(silenceMs)}`,
         });
       }
     }

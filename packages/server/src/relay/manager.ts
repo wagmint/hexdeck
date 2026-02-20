@@ -154,6 +154,16 @@ class RelayManager {
 
   // ─── Internal ───────────────────────────────────────────────────────────
 
+  /** Persist a refreshed access token back to relay.json */
+  private handleTokenRefreshed(pylonId: string, newToken: string): void {
+    const config = loadRelayConfig();
+    const target = config.targets.find((t) => t.pylonId === pylonId);
+    if (target) {
+      target.token = newToken;
+      saveRelayConfig(config);
+    }
+  }
+
   private syncConnections(): void {
     const config = loadRelayConfig();
     const targetIds = new Set(config.targets.map((t) => t.pylonId));
@@ -170,12 +180,19 @@ class RelayManager {
     for (const target of config.targets) {
       let conn = this.connections.get(target.pylonId);
       if (!conn) {
-        conn = new RelayConnection(target.pylonId, target.wsUrl, target.token);
+        conn = new RelayConnection(
+          target.pylonId,
+          target.wsUrl,
+          target.token,
+          target.refreshToken,
+          this.handleTokenRefreshed.bind(this),
+        );
         this.connections.set(target.pylonId, conn);
         conn.connect();
       } else {
-        // Update token in case it changed
+        // Update tokens in case they changed
         conn.updateToken(target.token);
+        conn.updateRefreshToken(target.refreshToken);
       }
     }
   }

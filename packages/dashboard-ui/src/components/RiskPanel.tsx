@@ -13,15 +13,6 @@ export function RiskPanel({ agents }: RiskPanelProps) {
   const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const previousRects = useRef<Map<string, DOMRect>>(new Map());
 
-  const sorted = [...agents].sort((a, b) => {
-    const order: Record<RiskLevel, number> = { critical: 0, elevated: 1, nominal: 2 };
-    return (
-      order[a.risk.overallRisk] - order[b.risk.overallRisk]
-      || a.label.localeCompare(b.label)
-      || a.sessionId.localeCompare(b.sessionId)
-    );
-  });
-
   const setItemRef = useCallback(
     (id: string) => (el: HTMLDivElement | null) => {
       if (el) {
@@ -36,7 +27,7 @@ export function RiskPanel({ agents }: RiskPanelProps) {
   useLayoutEffect(() => {
     const nextRects = new Map<string, DOMRect>();
 
-    for (const agent of sorted) {
+    for (const agent of agents) {
       const el = itemRefs.current.get(agent.sessionId);
       if (!el) continue;
 
@@ -60,11 +51,11 @@ export function RiskPanel({ agents }: RiskPanelProps) {
     }
 
     previousRects.current = nextRects;
-  }, [sorted]);
+  }, [agents]);
 
   return (
     <div>
-      {sorted.map((agent) => (
+      {agents.map((agent) => (
         <div key={agent.sessionId} ref={setItemRef(agent.sessionId)} className="will-change-transform">
           <RiskCard agent={agent} />
         </div>

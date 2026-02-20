@@ -13,11 +13,16 @@ const RECONNECT_MAX_MS = 30_000;
 
 export type RelayConnectionStatus = "connected" | "connecting" | "disconnected";
 
+/** Callback to persist refreshed token back to config */
+export type OnTokenRefreshed = (pylonId: string, newToken: string) => void;
+
 export class RelayConnection {
   readonly pylonId: string;
 
   private wsUrl: string;
   private token: string;
+  private refreshToken: string;
+  private onTokenRefreshed: OnTokenRefreshed | null;
   private ws: WebSocket | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -26,11 +31,20 @@ export class RelayConnection {
   private operatorId: string | null = null;
   private lastStateJson = "";
   private intentionalClose = false;
+  private refreshing = false;
 
-  constructor(pylonId: string, wsUrl: string, token: string) {
+  constructor(
+    pylonId: string,
+    wsUrl: string,
+    token: string,
+    refreshToken: string = "",
+    onTokenRefreshed: OnTokenRefreshed | null = null,
+  ) {
     this.pylonId = pylonId;
     this.wsUrl = wsUrl;
     this.token = token;
+    this.refreshToken = refreshToken;
+    this.onTokenRefreshed = onTokenRefreshed;
   }
 
   get isConnected(): boolean {
@@ -43,9 +57,14 @@ export class RelayConnection {
     return "connecting";
   }
 
-  /** Update token (e.g. after refresh). Takes effect on next reconnect. */
+  /** Update token (e.g. after config change). Takes effect on next reconnect. */
   updateToken(token: string): void {
     this.token = token;
+  }
+
+  /** Update refresh token (e.g. after config change). */
+  updateRefreshToken(refreshToken: string): void {
+    this.refreshToken = refreshToken;
   }
 
   connect(): void {
@@ -109,8 +128,16 @@ export class RelayConnection {
           this.authenticated = true;
           this.operatorId = msg.operatorId;
         } else if (msg.type === "auth_error") {
-          console.error(`[relay] Auth failed for ${this.pylonId}: ${msg.reason}`);
-          this.disconnect();
+          const reason = (msg as { reason?: string; message?: string }).reason
+            ?? (msg as { message?: string }).message ?? "unknown";
+          console.error(`[relay] Auth failed for ${this.pylonId}: ${reason}`);
+
+          // If token expired and we have a refresh token, try refreshing
+          if (reason.toLowerCase().includes("expired") && this.refreshToken) {
+            this.tryTokenRefresh();
+          } else {
+            this.disconnect();
+          }
         }
       } catch {
         // Ignore malformed messages
@@ -128,6 +155,54 @@ export class RelayConnection {
     this.ws.on("error", () => {
       // Error always followed by close event — reconnect handled there
     });
+  }
+
+  private async tryTokenRefresh(): Promise<void> {
+    if (this.refreshing || this.intentionalClose) return;
+    this.refreshing = true;
+
+    try {
+      // Derive HTTP URL from WS URL: ws(s)://host/ws → http(s)://host
+      const httpUrl = this.wsUrl
+        .replace(/^wss:/, "https:")
+        .replace(/^ws:/, "http:")
+        .replace(/\/ws\/?$/, "");
+
+      const res = await fetch(`${httpUrl}/api/auth/relay-refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken: this.refreshToken }),
+      });
+
+      if (!res.ok) {
+        console.error(`[relay] Token refresh failed for ${this.pylonId}: ${res.status}`);
+        this.disconnect();
+        return;
+      }
+
+      const body = await res.json() as { success: boolean; data?: { accessToken: string } };
+      if (!body.success || !body.data?.accessToken) {
+        console.error(`[relay] Token refresh returned invalid response for ${this.pylonId}`);
+        this.disconnect();
+        return;
+      }
+
+      this.token = body.data.accessToken;
+
+      // Persist the new token back to config
+      if (this.onTokenRefreshed) {
+        this.onTokenRefreshed(this.pylonId, this.token);
+      }
+
+      console.log(`[relay] Token refreshed for ${this.pylonId}, reconnecting`);
+      this.reconnectAttempt = 0;
+      this.doConnect();
+    } catch (err) {
+      console.error(`[relay] Token refresh error for ${this.pylonId}:`, err);
+      this.scheduleReconnect();
+    } finally {
+      this.refreshing = false;
+    }
   }
 
   private send(msg: object): void {

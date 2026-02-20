@@ -9,6 +9,7 @@ import { buildParsedSession } from "./nodes.js";
 import { buildCodexParsedSession } from "./codex-nodes.js";
 import { detectCollisions } from "./collisions.js";
 import { buildFeed } from "./feed.js";
+import { formatIdleDuration } from "./duration.js";
 import { computeAgentRisk, computeWorkstreamRisk } from "./risk.js";
 import { computeTurnCost } from "./pricing.js";
 import { loadOperatorConfig, getSelfName, operatorId as makeOperatorId, getOperatorColor } from "./config.js";
@@ -885,12 +886,14 @@ export function buildDashboardState(): DashboardState {
 
   // 3. Parse all sessions
   const parsedSessions: ParsedSession[] = [];
+  const sessionLastActivityMs = new Map<string, number>();
   const claudeParsedIds = new Set<string>();
   const codexSessionIds = new Set<string>();
   for (const session of allSessions.values()) {
     if (isCodexSession(session)) continue;
     try {
       parsedSessions.push(getCachedOrParse(session));
+      sessionLastActivityMs.set(session.id, session.modifiedAt.getTime());
       claudeParsedIds.add(session.id);
     } catch {
       // Skip unparseable sessions
@@ -903,6 +906,7 @@ export function buildDashboardState(): DashboardState {
     if (!isCodexSession(session)) continue;
     try {
       parsedSessions.push(getCachedOrParseCodex(session));
+      sessionLastActivityMs.set(session.id, session.modifiedAt.getTime());
       codexSessionIds.add(session.id);
     } catch { /* skip broken Codex session */ }
   }
@@ -981,13 +985,13 @@ export function buildDashboardState(): DashboardState {
         agent.risk.spinningSignals.push({
           pattern: "stalled",
           level: "critical",
-          detail: `No activity for ${Math.round(silenceMs / 60000)}m`,
+          detail: `No activity for ${formatIdleDuration(silenceMs)}`,
         });
       } else {
         agent.risk.spinningSignals.push({
           pattern: "stalled",
           level: "elevated",
-          detail: `No activity for ${Math.round(silenceMs / 60000)}m`,
+          detail: `No activity for ${formatIdleDuration(silenceMs)}`,
         });
       }
       // Recompute overallRisk for stall signals
@@ -1001,7 +1005,7 @@ export function buildDashboardState(): DashboardState {
       agent.risk.spinningSignals.push({
         pattern: "idle",
         level: "nominal",
-        detail: `Idle for ${Math.round(silenceMs / 60000)}m`,
+        detail: `Idle for ${formatIdleDuration(silenceMs)}`,
       });
     }
   }
@@ -1019,7 +1023,9 @@ export function buildDashboardState(): DashboardState {
     const allProjectAgents = agents.filter(a => a.projectPath === projectPath);
     const activeProjectAgents = allProjectAgents.filter(a => a.isActive);
     const orderedActiveProjectAgents = [...activeProjectAgents].sort((a, b) => (
-      a.label.localeCompare(b.label) || a.sessionId.localeCompare(b.sessionId)
+      (sessionLastActivityMs.get(b.sessionId) ?? 0) - (sessionLastActivityMs.get(a.sessionId) ?? 0)
+      || a.label.localeCompare(b.label)
+      || a.sessionId.localeCompare(b.sessionId)
     ));
     let totalTurns = 0;
     let completedTurns = 0;
@@ -1102,7 +1108,7 @@ export function buildDashboardState(): DashboardState {
   const activeAgents = agents
     .filter(a => a.isActive)
     .sort((a, b) => (
-      a.projectPath.localeCompare(b.projectPath)
+      (sessionLastActivityMs.get(b.sessionId) ?? 0) - (sessionLastActivityMs.get(a.sessionId) ?? 0)
       || a.label.localeCompare(b.label)
       || a.sessionId.localeCompare(b.sessionId)
     ));

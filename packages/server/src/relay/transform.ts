@@ -41,6 +41,10 @@ export function transformToOperatorState(
       hasCollision: w.hasCollision,
       commits: w.commits,
       errors: w.errors,
+      risk: {
+        errorRate: w.risk.errorRate,
+        overallRisk: w.risk.overallRisk,
+      },
     }));
 
   // Filter collisions — include if any involved agent is in a selected project

@@ -28,6 +28,7 @@ export interface RelayWorkstream {
   hasCollision: boolean;
   commits: number;
   errors: number;
+  risk: { errorRate: number; overallRisk: "nominal" | "elevated" | "critical" };
 }
 
 export interface RelayCollision {

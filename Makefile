@@ -3,6 +3,7 @@ NPM = npm
 NPX = npx
 API_PORT = 3002
 FRONTEND_PORT = 3000
+LEVEL ?= patch
 
 # Default target
 .PHONY: help
@@ -15,6 +16,7 @@ help:
 	@echo "  make status         - Show Pylon server status"
 	@echo "  make install        - Install all dependencies"
 	@echo "  make build          - Build frontend"
+	@echo "  make dashboard-version [LEVEL=patch|minor|major] - Bump @pylon-dev/dashboard-ui version"
 	@echo "  make checkpoint NOTE='my note' - Create a checkpoint"
 	@echo "  make rewind ID='abc123'       - Rewind to a checkpoint"
 	@echo "  make checkpoints              - List all checkpoints"
@@ -70,6 +72,10 @@ install:
 .PHONY: build
 build:
 	$(NPM) run build
+
+.PHONY: dashboard-version
+dashboard-version:
+	cd packages/dashboard-ui && $(NPM) version $(LEVEL) --no-git-tag-version
 
 .PHONY: typecheck
 typecheck:

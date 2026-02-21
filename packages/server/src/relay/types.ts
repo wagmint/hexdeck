@@ -76,6 +76,30 @@ export interface RelayWorkstream {
   commits: number;
   errors: number;
   risk: { errorRate: number; overallRisk: "nominal" | "elevated" | "critical" };
+  intentCoveragePct: number;
+  driftPct: number;
+  intentConfidence: "high" | "medium" | "low";
+  intentStatus: "on_plan" | "drifting" | "blocked" | "no_clear_intent";
+  lastIntentUpdateAt: string | null;
+  intentLanes: {
+    inProgress: RelayIntentTaskView[];
+    done: RelayIntentTaskView[];
+    unplanned: RelayIntentTaskView[];
+  };
+  driftReasons: string[];
+}
+
+export interface RelayIntentTaskView {
+  id: string;
+  subject: string;
+  state: "pending" | "in_progress" | "completed" | "blocked" | "unplanned";
+  ownerLabel: string | null;
+  ownerSessionId: string | null;
+  evidence: {
+    edits: number;
+    commits: number;
+    lastTouchedAt: string | null;
+  };
 }
 
 export interface RelayCollision {

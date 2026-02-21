@@ -1,4 +1,4 @@
-import type { DashboardState, Agent, SessionPlan, DraftingActivity } from "../types/index.js";
+import type { DashboardState, Agent, SessionPlan, DraftingActivity, IntentTaskView } from "../types/index.js";
 import type {
   OperatorState,
   RelayAgent,
@@ -46,6 +46,17 @@ export function transformToOperatorState(
         errorRate: w.risk.errorRate,
         overallRisk: w.risk.overallRisk,
       },
+      intentCoveragePct: w.intentCoveragePct,
+      driftPct: w.driftPct,
+      intentConfidence: w.intentConfidence,
+      intentStatus: w.intentStatus,
+      lastIntentUpdateAt: w.lastIntentUpdateAt ? serializeDate(w.lastIntentUpdateAt) : null,
+      intentLanes: {
+        inProgress: w.intentLanes.inProgress.map(serializeIntentTaskView),
+        done: w.intentLanes.done.map(serializeIntentTaskView),
+        unplanned: w.intentLanes.unplanned.map(serializeIntentTaskView),
+      },
+      driftReasons: w.driftReasons,
     }));
 
   // Filter collisions — include if any involved agent is in a selected project
@@ -141,6 +152,21 @@ function serializeDraftingActivity(d: DraftingActivity) {
     approachSummary: d.approachSummary,
     lastActivityAt: serializeDate(d.lastActivityAt),
     turnCount: d.turnCount,
+  };
+}
+
+function serializeIntentTaskView(task: IntentTaskView) {
+  return {
+    id: task.id,
+    subject: task.subject,
+    state: task.state,
+    ownerLabel: task.ownerLabel,
+    ownerSessionId: task.ownerSessionId,
+    evidence: {
+      edits: task.evidence.edits,
+      commits: task.evidence.commits,
+      lastTouchedAt: task.evidence.lastTouchedAt ? serializeDate(task.evidence.lastTouchedAt) : null,
+    },
   };
 }
 

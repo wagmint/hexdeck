@@ -4,6 +4,11 @@
   "description": "Inspect and debug Claude Code sessions — local dashboard + API server",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wagmint/pylon.git"
+  },
+  "homepage": "https://github.com/wagmint/pylon#readme",
   "bin": {
     "pylon": "dist/index.js"
   },

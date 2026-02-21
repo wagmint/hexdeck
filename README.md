@@ -1,25 +1,43 @@
 # Pylon
 
-Local observability for Claude Code sessions.
+**Local observability for Claude Code sessions.**
 
-Pylon reads the JSONL session files Claude Code creates (`~/.claude/projects/`), parses them into structured data, and serves a live dashboard showing what your agents are doing.
+Pylon reads the JSONL session files Claude Code writes to `~/.claude/projects/`, parses them into structured turn-by-turn data, and serves a live dashboard showing what your agents are doing in real time.
 
-## Quick Start
+<!-- TODO: Add a GIF/screenshot of the main dashboard here -->
+<!-- ![Pylon Dashboard](docs/assets/dashboard.png) -->
+
+## Install
 
 ```bash
 npm install -g @pylon-dev/cli
 pylon start
 ```
 
-Opens `http://localhost:3002` with the dashboard.
+Opens `http://localhost:3002` with the dashboard. That's it.
 
-## What It Does
+## Features
 
-**Dashboard** — live view of all active Claude Code sessions across your machine. See which agents are running, what files they're touching, and catch collisions before they happen.
+### Live Dashboard
+Real-time view of all active Claude Code sessions across your machine. See which agents are running, what files they're touching, and what they're working on — updated every second via SSE.
 
-**Session Inspector** — drill into any session to see the full turn-by-turn breakdown: user instructions, tool calls, files changed, commits, errors, and compactions.
+<!-- TODO: screenshot of dashboard with active sessions -->
 
-**API** — JSON API at `localhost:3002/api/` for building your own tooling on top.
+### Collision Detection
+Catch when two agents edit the same uncommitted file before it becomes a merge conflict. Pylon monitors git status and flags overlapping changes across sessions.
+
+<!-- TODO: screenshot of collision alert -->
+
+### Session Inspector
+Drill into any session to see the full turn-by-turn breakdown: user instructions, tool calls, files changed, commits, errors, and compactions.
+
+<!-- TODO: screenshot of session detail view -->
+
+### Risk Analytics
+Track error rates, spinning signals (agents stuck in loops), compaction proximity, file hotspots, and cost per session.
+
+### Live Feed
+Real-time event stream of agent activity — session starts, commits, errors, compactions, plan changes — across all your projects.
 
 ## Commands
 
@@ -33,7 +51,9 @@ pylon restart            # Restart
 pylon open               # Open dashboard in browser
 ```
 
-## API Endpoints
+## API
+
+JSON API at `localhost:3002/api/` for building your own tooling.
 
 | Endpoint | Description |
 |---|---|
@@ -47,7 +67,7 @@ pylon open               # Open dashboard in browser
 
 ## How It Works
 
-Claude Code stores session data as JSONL files in `~/.claude/projects/`. Pylon scans these files, parses the events into structured turn-pair nodes (one user message + everything Claude did in response), and computes dashboard state including active agents, file collisions, and a live feed.
+Claude Code stores session data as JSONL files in `~/.claude/projects/`. Pylon scans these files, parses the events into structured **turn-pair nodes** (one user message + everything Claude did in response), and computes dashboard state including active agents, file collisions, risk signals, and a live feed.
 
 The server is a single [Hono](https://hono.dev) process that serves both the API and the static dashboard.
 
@@ -63,13 +83,17 @@ npm run dev    # Next.js on :3000 + API on :3002
 Build everything:
 
 ```bash
-npm run build  # Builds dashboard, server, and CLI
+npm run build  # Builds dashboard-ui, dashboard, server, and CLI
 ```
 
 ## Requirements
 
 - Node.js >= 20
-- Claude Code installed (session files in `~/.claude/projects/`)
+- Claude Code installed (creates session files in `~/.claude/projects/`)
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
 
 ## License
 

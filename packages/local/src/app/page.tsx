@@ -225,6 +225,36 @@ export default function DashboardPage() {
 
   const { operators, agents, workstreams, collisions, feed, summary } = state;
 
+  // Empty state: Pylon is running but no sessions found
+  const isEmpty = workstreams.length === 0 && agents.length === 0 && feed.length === 0;
+
+  if (isEmpty) {
+    return (
+      <div className="h-screen flex flex-col bg-dash-bg text-dash-text font-mono">
+        <TopBar
+          summary={summary}
+          operators={operators}
+          relayStatus={null}
+          onRelayClick={() => {}}
+        />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center max-w-md px-6">
+            <div className="text-dash-text-muted text-4xl mb-6">&#9678;</div>
+            <h2 className="text-lg font-medium text-dash-text mb-3">Pylon is running</h2>
+            <p className="text-sm text-dash-text-muted leading-relaxed mb-6">
+              No Claude Code sessions detected yet. Start a Claude Code session in any project
+              and it will appear here automatically.
+            </p>
+            <div className="text-xs text-dash-text-dim space-y-2">
+              <p>Sessions are read from <code className="bg-dash-surface-2 px-1.5 py-0.5 rounded">~/.claude/projects/</code></p>
+              <p>Dashboard updates every second via SSE</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const relayStatus: RelayStatus | null =
     relay.targets.length > 0
       ? {

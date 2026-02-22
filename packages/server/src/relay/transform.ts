@@ -2,6 +2,7 @@ import type { DashboardState, Agent, SessionPlan, DraftingActivity, IntentTaskVi
 import type {
   OperatorState,
   RelayAgent,
+  RelayPlanTask,
   RelaySessionPlan,
   RelayWorkstream,
   RelayCollision,
@@ -42,6 +43,8 @@ export function transformToOperatorState(
       hasCollision: w.hasCollision,
       commits: w.commits,
       errors: w.errors,
+      plans: w.plans.map(serializePlan),
+      planTasks: w.planTasks.map(serializePlanTask),
       risk: {
         errorRate: w.risk.errorRate,
         overallRisk: w.risk.overallRisk,
@@ -141,6 +144,15 @@ function serializePlan(p: SessionPlan): RelaySessionPlan {
     draftingActivity: p.draftingActivity
       ? serializeDraftingActivity(p.draftingActivity)
       : null,
+  };
+}
+
+function serializePlanTask(task: RelayPlanTask): RelayPlanTask {
+  return {
+    id: task.id,
+    subject: task.subject,
+    description: task.description,
+    status: task.status,
   };
 }
 

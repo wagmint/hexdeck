@@ -75,6 +75,8 @@ export interface RelayWorkstream {
   hasCollision: boolean;
   commits: number;
   errors: number;
+  plans: RelaySessionPlan[];
+  planTasks: RelayPlanTask[];
   risk: { errorRate: number; overallRisk: "nominal" | "elevated" | "critical" };
   intentCoveragePct: number;
   driftPct: number;

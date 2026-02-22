@@ -4,6 +4,7 @@ import { useCallback, useLayoutEffect, useRef } from "react";
 import type { Agent, RiskLevel } from "../types";
 import { formatDuration } from "../utils";
 import { OperatorTag } from "./OperatorTag";
+import { Tip } from "./Tip";
 
 interface RiskPanelProps {
   agents: Agent[];
@@ -87,66 +88,87 @@ function RiskCard({ agent }: { agent: Agent }) {
       </div>
 
       {risk.contextUsagePct > 0 && (
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-[9px] text-dash-text-muted w-16 shrink-0">Context</span>
-          <ContextGauge pct={risk.contextUsagePct} />
-          <span className="text-[9px] text-dash-text-dim w-8 text-right">{risk.contextUsagePct}%</span>
-        </div>
+        <Tip text="% of the model's context window used">
+          <div className="flex items-center gap-2 mb-1 w-full">
+            <span className="text-[9px] text-dash-text-muted w-16 shrink-0">Context</span>
+            <ContextGauge pct={risk.contextUsagePct} />
+            <span className="text-[9px] text-dash-text-dim w-8 text-right">{risk.contextUsagePct}%</span>
+          </div>
+        </Tip>
       )}
 
-      <div className="flex items-center gap-2 mb-1">
-        <span className="text-[9px] text-dash-text-muted w-16 shrink-0">Err rate</span>
-        <MiniBar value={risk.errorRate} thresholds={[0.15, 0.35]} />
-        <span className="text-[9px] text-dash-text-dim w-8 text-right">{pct(risk.errorRate)}</span>
-      </div>
+      <Tip text="% of turns that hit an error">
+        <div className="flex items-center gap-2 mb-1 w-full">
+          <span className="text-[9px] text-dash-text-muted w-16 shrink-0">Err rate</span>
+          <MiniBar value={risk.errorRate} thresholds={[0.15, 0.35]} />
+          <span className="text-[9px] text-dash-text-dim w-8 text-right">{pct(risk.errorRate)}</span>
+        </div>
+      </Tip>
 
-      <div className="flex items-center gap-2 mb-1">
-        <span className="text-[9px] text-dash-text-muted w-16 shrink-0">Fixes</span>
-        <MiniBar value={risk.correctionRatio} thresholds={[0.4, 0.7]} invert />
-        <span className="text-[9px] text-dash-text-dim w-8 text-right">{pct(risk.correctionRatio)}</span>
-      </div>
+      <Tip text="% of errors the agent self-corrected">
+        <div className="flex items-center gap-2 mb-1 w-full">
+          <span className="text-[9px] text-dash-text-muted w-16 shrink-0">Fixes</span>
+          <MiniBar value={risk.correctionRatio} thresholds={[0.4, 0.7]} invert />
+          <span className="text-[9px] text-dash-text-dim w-8 text-right">{pct(risk.correctionRatio)}</span>
+        </div>
+      </Tip>
 
-      <div className="flex items-center gap-3 mb-1">
-        <span className="text-[9px] text-dash-text-muted">
-          {formatTokens(risk.totalTokens)} tokens
-        </span>
-        {risk.compactions > 0 && (
+      <Tip text="Total tokens sent and received">
+        <div className="flex items-center gap-3 mb-1">
           <span className="text-[9px] text-dash-text-muted">
-            {risk.compactions} compaction{risk.compactions !== 1 ? "s" : ""}
+            {formatTokens(risk.totalTokens)} tokens
           </span>
-        )}
-      </div>
+          {risk.compactions > 0 && (
+            <span className="text-[9px] text-dash-text-muted">
+              {risk.compactions} compaction{risk.compactions !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+      </Tip>
 
       {risk.sessionDurationMs > 0 && (
         <div className="flex items-center gap-3 mb-1">
-          <span className="text-[9px] text-dash-text-muted">
-            {formatDuration(risk.sessionDurationMs)} session
-          </span>
-          {risk.avgTurnTimeMs != null && (
+          <Tip text="Total time since session started" display="inline">
             <span className="text-[9px] text-dash-text-muted">
-              ~{formatDuration(risk.avgTurnTimeMs)}/turn
+              {formatDuration(risk.sessionDurationMs)} session
             </span>
+          </Tip>
+          {risk.avgTurnTimeMs != null && (
+            <Tip text="Avg time between turns (includes pauses)" display="inline">
+              <span className="text-[9px] text-dash-text-muted">
+                ~{formatDuration(risk.avgTurnTimeMs)}/turn
+              </span>
+            </Tip>
           )}
         </div>
       )}
 
       {risk.costPerSession > 0 && (
         <div className="flex items-center gap-3 mb-1">
-          <span className="text-[9px] text-dash-text-muted">
-            ${risk.costPerSession.toFixed(2)} session
-          </span>
-          <span className="text-[9px] text-dash-text-muted">
-            ~${risk.costPerTurn.toFixed(3)}/turn
-          </span>
+          <Tip text="Estimated total API cost for this session" display="inline">
+            <span className="text-[9px] text-dash-text-muted">
+              ${risk.costPerSession.toFixed(2)} session
+            </span>
+          </Tip>
+          <Tip text="Average estimated API cost per turn" display="inline">
+            <span className="text-[9px] text-dash-text-muted">
+              ~${risk.costPerTurn.toFixed(3)}/turn
+              {risk.peakTurnCost > risk.costPerTurn * 2 && (
+                <span className="text-dash-yellow"> (peak ${risk.peakTurnCost.toFixed(2)})</span>
+              )}
+            </span>
+          </Tip>
         </div>
       )}
 
       {risk.modelBreakdown.length >= 1 && (
         <div className="flex items-center gap-3 mb-1 flex-wrap">
           {risk.modelBreakdown.map((m) => (
-            <span key={m.model} className="text-[9px] text-dash-text-muted">
-              {m.model} ${m.cost.toFixed(2)}
-            </span>
+            <Tip key={m.model} text={`${m.turnCount} turn${m.turnCount !== 1 ? "s" : ""} on ${m.model}`} display="inline">
+              <span className="text-[9px] text-dash-text-muted">
+                {m.model} ${m.cost.toFixed(2)}
+              </span>
+            </Tip>
           ))}
         </div>
       )}

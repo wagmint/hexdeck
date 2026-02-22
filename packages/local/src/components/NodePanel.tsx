@@ -244,8 +244,20 @@ export function NodePanel({ turn, onClose }: NodePanelProps) {
           )}
         </SectionRow>
 
-        {/* JSONL position */}
-        <div className="pt-2 mt-2 border-t border-border">
+        {/* Metadata */}
+        <div className="pt-2 mt-2 border-t border-border space-y-1">
+          <div className="flex items-center gap-3">
+            {turn.cost > 0 && (
+              <span className="font-mono text-[10px] text-muted-foreground">
+                ${turn.cost.toFixed(3)}
+              </span>
+            )}
+            {turn.model && (
+              <span className="font-mono text-[10px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
+                {turn.model}
+              </span>
+            )}
+          </div>
           <span className="font-mono text-[10px] text-muted-foreground">
             JSONL lines {turn.startLine}&ndash;{turn.endLine}
           </span>

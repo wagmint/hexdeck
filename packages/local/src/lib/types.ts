@@ -109,6 +109,8 @@ export interface TurnNode {
   compactionText: string | null;
   startLine: number;
   endLine: number;
+  cost: number;
+  model: string | null;
 }
 
 export interface SessionStats {
@@ -119,6 +121,7 @@ export interface SessionStats {
   compactions: number;
   filesChanged: string[];
   toolsUsed: Record<string, number>;
+  totalCost: number;
 }
 
 export interface ParsedSession {

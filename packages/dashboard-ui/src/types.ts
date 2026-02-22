@@ -27,6 +27,7 @@ export interface AgentRisk {
   errorTrend: boolean[];
   costPerSession: number;
   costPerTurn: number;
+  peakTurnCost: number;
   modelBreakdown: ModelCost[];
   contextUsagePct: number;
   contextTokens: number;

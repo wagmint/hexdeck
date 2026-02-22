@@ -10,6 +10,7 @@ import {
   Wrench,
   AlertCircle,
   Layers,
+  DollarSign,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -61,6 +62,12 @@ export function SessionHeader({ session }: { session: ParsedSession }) {
             <FileCode className="w-3 h-3" />
             {stats.filesChanged.length} files changed
           </span>
+          {stats.totalCost > 0 && (
+            <span className="flex items-center gap-1">
+              <DollarSign className="w-3 h-3" />
+              ${stats.totalCost.toFixed(2)} total
+            </span>
+          )}
         </div>
 
         <div className="flex-1" />

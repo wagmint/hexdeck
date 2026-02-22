@@ -55,9 +55,11 @@ export function computeAgentRisk(parsed: ParsedSession, errorHistory?: boolean[]
   // ─── Cost computation ───────────────────────────────────────────────────
   const modelMap = new Map<string, { cost: number; tokens: number; turns: number }>();
   let sessionCost = 0;
+  let peakTurnCost = 0;
   for (const turn of turns) {
     const cost = computeTurnCost(turn.model, turn.tokenUsage);
     sessionCost += cost;
+    if (cost > peakTurnCost) peakTurnCost = cost;
     if (turn.model) {
       const name = shortModelName(turn.model);
       const entry = modelMap.get(name) ?? { cost: 0, tokens: 0, turns: 0 };
@@ -114,6 +116,7 @@ export function computeAgentRisk(parsed: ParsedSession, errorHistory?: boolean[]
     errorTrend,
     costPerSession: sessionCost,
     costPerTurn,
+    peakTurnCost,
     modelBreakdown,
     contextUsagePct,
     contextTokens: currentContextTokens,

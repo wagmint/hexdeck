@@ -27,6 +27,7 @@ export interface AgentRisk {
   errorTrend: boolean[];
   costPerSession: number;       // Total $ for this session
   costPerTurn: number;          // Average $/turn
+  peakTurnCost: number;         // Max single-turn cost
   modelBreakdown: ModelCost[];  // Per-model cost split
   contextUsagePct: number;      // 0-100, % of context window used
   contextTokens: number;        // Raw avg input tokens (last 5 turns)

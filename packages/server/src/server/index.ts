@@ -9,6 +9,7 @@ import { listProjects, listSessions, findSession, getActiveSessions } from "../d
 import { parseSessionFile } from "../parser/jsonl.js";
 import { buildParsedSession } from "../core/nodes.js";
 import { buildDashboardState } from "../core/dashboard.js";
+import { computeTurnCost, shortModelName } from "../core/pricing.js";
 import { relayManager } from "../relay/manager.js";
 import { parseConnectLink } from "../relay/link.js";
 
@@ -185,8 +186,13 @@ export function createApp(options?: { dashboardDir?: string }): Hono {
         compactionText: t.compactionText,
         startLine: t.startLine,
         endLine: t.endLine,
+        model: t.model ? shortModelName(t.model) : null,
+        cost: computeTurnCost(t.model, t.tokenUsage),
       })),
-      stats: parsed.stats,
+      stats: {
+        ...parsed.stats,
+        totalCost: parsed.turns.reduce((sum, t) => sum + computeTurnCost(t.model, t.tokenUsage), 0),
+      },
     });
   });
 

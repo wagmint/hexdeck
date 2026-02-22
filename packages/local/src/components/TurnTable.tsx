@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { TurnNode, TurnCategory } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
@@ -15,6 +15,7 @@ import {
   Pause,
   Share2,
   AlertTriangle,
+  ArrowUpDown,
 } from "lucide-react";
 
 // ─── Category config ────────────────────────────────────────────────────────
@@ -43,6 +44,8 @@ function isSignificantTurn(turn: TurnNode): boolean {
 
 // ─── TurnTable ──────────────────────────────────────────────────────────────
 
+type SortMode = "index" | "cost-desc";
+
 interface TurnTableProps {
   turns: TurnNode[];
   selectedTurnId: string | null;
@@ -50,7 +53,29 @@ interface TurnTableProps {
 }
 
 export function TurnTable({ turns, selectedTurnId, onSelectTurn }: TurnTableProps) {
+  const [sortMode, setSortMode] = useState<SortMode>("index");
+
   const significantTurns = useMemo(() => turns.filter(isSignificantTurn), [turns]);
+
+  const avgCost = useMemo(() => {
+    if (significantTurns.length === 0) return 0;
+    return significantTurns.reduce((sum, t) => sum + t.cost, 0) / significantTurns.length;
+  }, [significantTurns]);
+
+  const maxCost = useMemo(() => {
+    return Math.max(...significantTurns.map(t => t.cost), 0);
+  }, [significantTurns]);
+
+  const sortedTurns = useMemo(() => {
+    if (sortMode === "cost-desc") {
+      return [...significantTurns].sort((a, b) => b.cost - a.cost);
+    }
+    return significantTurns;
+  }, [significantTurns, sortMode]);
+
+  function toggleSort() {
+    setSortMode((prev) => (prev === "index" ? "cost-desc" : "index"));
+  }
 
   return (
     <div className="w-full h-[calc(100vh-53px)] overflow-y-auto">
@@ -62,14 +87,29 @@ export function TurnTable({ turns, selectedTurnId, onSelectTurn }: TurnTableProp
             <th className="text-left font-medium px-3 py-2">Goal</th>
             <th className="text-left font-medium px-3 py-2 w-[200px]">Actions</th>
             <th className="text-left font-medium px-3 py-2 w-[200px]">Artifacts</th>
+            <th className="text-left font-medium px-3 py-2 w-[72px]">
+              <button
+                onClick={toggleSort}
+                className={cn(
+                  "inline-flex items-center gap-1 hover:text-foreground transition-colors",
+                  sortMode === "cost-desc" && "text-foreground"
+                )}
+              >
+                Cost
+                <ArrowUpDown className="w-2.5 h-2.5" />
+              </button>
+            </th>
           </tr>
         </thead>
         <tbody>
-          {significantTurns.map((turn) => {
+          {sortedTurns.map((turn, i) => {
             const isSelected = turn.id === selectedTurnId;
             const cat = categoryConfig[turn.category] ?? categoryConfig.conversation;
             const CatIcon = cat.icon;
             const hasErrors = turn.sections.corrections.items.length > 0;
+            const isHighCost = turn.cost === maxCost && turn.cost > 0 || (avgCost > 0 && turn.cost > avgCost * 3);
+            const prevTurn = i > 0 ? sortedTurns[i - 1] : null;
+            const modelSwitched = turn.model != null && prevTurn?.model != null && turn.model !== prevTurn.model;
 
             return (
               <tr
@@ -92,12 +132,24 @@ export function TurnTable({ turns, selectedTurnId, onSelectTurn }: TurnTableProp
                   </span>
                 </td>
 
-                {/* Category */}
+                {/* Category + Model badge */}
                 <td className="px-3 py-2 align-top">
-                  <span className={cn("inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded", cat.color, cat.bg)}>
-                    <CatIcon className="w-3 h-3" />
-                    {cat.label}
-                  </span>
+                  <div className="flex flex-col gap-0.5">
+                    <span className={cn("inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded w-fit", cat.color, cat.bg)}>
+                      <CatIcon className="w-3 h-3" />
+                      {cat.label}
+                    </span>
+                    {turn.model && (
+                      <span className={cn(
+                        "text-[9px] px-1 py-px rounded w-fit font-mono",
+                        modelSwitched
+                          ? "text-amber-400 bg-amber-400/10 border border-amber-400/30"
+                          : "text-muted-foreground bg-secondary/50"
+                      )}>
+                        {turn.model}
+                      </span>
+                    )}
+                  </div>
                 </td>
 
                 {/* Goal */}
@@ -144,6 +196,16 @@ export function TurnTable({ turns, selectedTurnId, onSelectTurn }: TurnTableProp
                       {turn.sections.artifacts.summary}
                     </span>
                   )}
+                </td>
+
+                {/* Cost */}
+                <td className="px-3 py-2 align-top">
+                  <span className={cn(
+                    "font-mono text-[11px]",
+                    isHighCost ? "text-yellow-400 font-semibold" : "text-muted-foreground"
+                  )}>
+                    ${turn.cost.toFixed(2)}
+                  </span>
                 </td>
               </tr>
             );

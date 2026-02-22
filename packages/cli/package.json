@@ -1,14 +1,9 @@
 {
   "name": "@pylon-dev/cli",
   "version": "0.1.1",
-  "description": "Inspect and debug Claude Code sessions — local dashboard + API server",
+  "description": "Real-time dashboard for Claude Code sessions — monitor agents, track plans, detect collisions",
   "type": "module",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/wagmint/pylon.git"
-  },
-  "homepage": "https://github.com/wagmint/pylon#readme",
   "bin": {
     "pylon": "dist/index.js"
   },

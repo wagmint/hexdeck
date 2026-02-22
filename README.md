@@ -16,6 +16,15 @@ pylon start
 
 Opens `http://localhost:3002` with the dashboard. That's it.
 
+## Upgrade
+
+```bash
+npm install -g @pylon-dev/cli@latest
+```
+
+If you use Pylon Cloud relay, upgrade before connecting new links.
+Relay links now use short-lived one-time codes (`?c=...`) instead of embedded auth tokens.
+
 ## Features
 
 ### Live Dashboard
@@ -49,6 +58,23 @@ pylon status             # Show running server info
 pylon stop               # Stop the server
 pylon restart            # Restart
 pylon open               # Open dashboard in browser
+```
+
+Relay commands:
+
+```bash
+pylon relay <connect-link>                  # Add/update relay target from cloud link
+pylon relay list                            # List relay targets
+pylon relay sessions                        # List active local sessions/projects
+pylon relay include <pylonId> <projectPath> # Start relaying project
+pylon relay exclude <pylonId> <projectPath> # Stop relaying project
+pylon relay remove <pylonId>                # Remove relay target
+```
+
+Example connect link format:
+
+```text
+pylon+wss://relay.example.com/ws?p=<pylonId>&c=<connectCode>&n=<teamName>
 ```
 
 ## API

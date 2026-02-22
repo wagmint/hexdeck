@@ -8,7 +8,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { listProjects, listSessions, getActiveSessions } from "../discovery/sessions.js";
 import { buildDashboardState } from "../core/dashboard.js";
 import { relayManager } from "../relay/manager.js";
-import { parseConnectLink } from "../relay/link.js";
+import { parseConnectLink, exchangeConnectLink } from "../relay/link.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -212,9 +212,10 @@ export function createApp(options?: { dashboardDir?: string }): Hono {
     }
     try {
       const parsed = parseConnectLink(body.link);
-      relayManager.addTarget(parsed);
+      const creds = await exchangeConnectLink(parsed);
+      relayManager.addTarget(creds);
       if (shouldTickerRun()) startTicker();
-      return c.json({ ok: true, pylonId: parsed.pylonId, pylonName: parsed.pylonName });
+      return c.json({ ok: true, pylonId: creds.pylonId, pylonName: creds.pylonName });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Invalid connect link";
       return c.json({ error: message }, 400);

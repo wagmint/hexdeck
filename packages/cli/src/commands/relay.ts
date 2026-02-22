@@ -1,4 +1,4 @@
-import type { RelayTarget, RelayConfig, ParsedConnectLink } from "@pylon-dev/server";
+import type { RelayTarget, RelayConfig, ParsedConnectLink, ExchangedRelayCredentials } from "@pylon-dev/server";
 
 export async function relayCommand(args: string[]): Promise<void> {
   const subcommand = args[0];
@@ -30,7 +30,7 @@ export async function relayCommand(args: string[]): Promise<void> {
 // ─── Connect ────────────────────────────────────────────────────────────────
 
 async function connectRelay(link: string): Promise<void> {
-  const { parseConnectLink, loadRelayConfig, saveRelayConfig } = await import("@pylon-dev/server");
+  const { parseConnectLink, exchangeConnectLink, loadRelayConfig, saveRelayConfig } = await import("@pylon-dev/server");
 
   let parsed: ParsedConnectLink;
   try {
@@ -40,7 +40,15 @@ async function connectRelay(link: string): Promise<void> {
     process.exit(1);
   }
 
-  const { pylonId, pylonName, wsUrl, token, refreshToken } = parsed;
+  let creds: ExchangedRelayCredentials;
+  try {
+    creds = await exchangeConnectLink(parsed);
+  } catch (err: unknown) {
+    console.error(`Error: ${err instanceof Error ? err.message : "Connect exchange failed"}`);
+    process.exit(1);
+  }
+
+  const { pylonId, pylonName, wsUrl, token, refreshToken } = creds;
   const config = loadRelayConfig();
 
   // Check for existing target with same pylonId
@@ -258,7 +266,7 @@ Subcommands:
   exclude <pylonId> <projectPath>          Stop relaying a project
 
 Examples:
-  pylon relay "pylon+wss://relay.example.com/ws?p=abc&t=tok&r=ref&n=Team"
+  pylon relay "pylon+wss://relay.example.com/ws?p=abc&c=connectCode&n=Team"
   pylon relay list
   pylon relay sessions
   pylon relay include abc ~/Code/my-app

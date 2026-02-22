@@ -17,6 +17,7 @@ help:
 	@echo "  make install        - Install all dependencies"
 	@echo "  make build          - Build frontend"
 	@echo "  make dashboard-version [LEVEL=patch|minor|major] - Bump @pylon-dev/dashboard-ui version"
+	@echo "  make cli-version [LEVEL=patch|minor|major]       - Bump @pylon-dev/cli version"
 	@echo "  make checkpoint NOTE='my note' - Create a checkpoint"
 	@echo "  make rewind ID='abc123'       - Rewind to a checkpoint"
 	@echo "  make checkpoints              - List all checkpoints"
@@ -76,6 +77,10 @@ build:
 .PHONY: dashboard-version
 dashboard-version:
 	cd packages/dashboard-ui && $(NPM) version $(LEVEL) --no-git-tag-version
+
+.PHONY: cli-version
+cli-version:
+	cd packages/cli && $(NPM) version $(LEVEL) --no-git-tag-version
 
 .PHONY: typecheck
 typecheck:

@@ -6,6 +6,16 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx,mdx}",
     "../dashboard-ui/dist/**/*.{js,mjs}",
   ],
+  safelist: [
+    "bg-dash-green", "bg-dash-green-dim",
+    "bg-dash-yellow", "bg-dash-yellow-dim",
+    "bg-dash-red", "bg-dash-red-dim",
+    "bg-dash-blue", "bg-dash-blue-dim",
+    "bg-dash-purple", "bg-dash-purple-dim",
+    "text-dash-green", "text-dash-yellow", "text-dash-red",
+    "border-dash-green/30", "border-dash-blue/30",
+    "bg-dash-green/10", "bg-dash-blue/10",
+  ],
   theme: {
     extend: {
       fontFamily: {

@@ -5,11 +5,8 @@ import { cors } from "hono/cors";
 import { streamSSE, type SSEStreamingApi } from "hono/streaming";
 import { serve, type ServerType } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
-import { listProjects, listSessions, findSession, getActiveSessions } from "../discovery/sessions.js";
-import { parseSessionFile } from "../parser/jsonl.js";
-import { buildParsedSession } from "../core/nodes.js";
+import { listProjects, listSessions, getActiveSessions } from "../discovery/sessions.js";
 import { buildDashboardState } from "../core/dashboard.js";
-import { computeTurnCost, shortModelName } from "../core/pricing.js";
 import { relayManager } from "../relay/manager.js";
 import { parseConnectLink } from "../relay/link.js";
 
@@ -146,56 +143,6 @@ export function createApp(options?: { dashboardDir?: string }): Hono {
     );
   });
 
-  /** Get a parsed session with turn-pair nodes */
-  app.get("/api/sessions/:sessionId", (c) => {
-    const { sessionId } = c.req.param();
-    const session = findSession(sessionId);
-
-    if (!session) {
-      return c.json({ error: "Session not found" }, 404);
-    }
-
-    const events = parseSessionFile(session.path);
-    const parsed = buildParsedSession(session, events);
-
-    return c.json({
-      session: {
-        id: parsed.session.id,
-        projectPath: parsed.session.projectPath,
-        createdAt: parsed.session.createdAt.toISOString(),
-        modifiedAt: parsed.session.modifiedAt.toISOString(),
-        sizeBytes: parsed.session.sizeBytes,
-      },
-      turns: parsed.turns.map((t) => ({
-        id: t.id,
-        index: t.index,
-        summary: t.summary,
-        category: t.category,
-        userInstruction: t.userInstruction,
-        assistantPreview: t.assistantPreview,
-        sections: t.sections,
-        toolCounts: t.toolCounts,
-        filesChanged: t.filesChanged,
-        filesRead: t.filesRead,
-        commands: t.commands,
-        hasCommit: t.hasCommit,
-        commitMessage: t.commitMessage,
-        hasError: t.hasError,
-        errorCount: t.errorCount,
-        hasCompaction: t.hasCompaction,
-        compactionText: t.compactionText,
-        startLine: t.startLine,
-        endLine: t.endLine,
-        model: t.model ? shortModelName(t.model) : null,
-        cost: computeTurnCost(t.model, t.tokenUsage),
-      })),
-      stats: {
-        ...parsed.stats,
-        totalCost: parsed.turns.reduce((sum, t) => sum + computeTurnCost(t.model, t.tokenUsage), 0),
-      },
-    });
-  });
-
   // ─── Dashboard Routes ─────────────────────────────────────────────────────
 
   /** Full dashboard state */
@@ -323,12 +270,6 @@ export function createApp(options?: { dashboardDir?: string }): Hono {
   if (dashboardDir) {
     // Serve static files from the Next.js export directory
     app.use("/*", serveStatic({ root: dashboardDir }));
-
-    // SPA fallback for /session/:id routes
-    app.get("/session/:id{.+}", async (c) => {
-      const html = fs.readFileSync(path.join(dashboardDir, "session", "_.html"), "utf-8");
-      return c.html(html);
-    });
 
     // Catch-all fallback — serves index.html
     app.get("*", async (c) => {

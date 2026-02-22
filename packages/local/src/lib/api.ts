@@ -1,4 +1,4 @@
-import type { ProjectInfo, SessionInfo, ParsedSession } from "./types";
+import type { SessionInfo } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002";
 
@@ -12,18 +12,4 @@ async function fetchApi<T>(path: string): Promise<T> {
 
 export async function getActiveSessions(): Promise<SessionInfo[]> {
   return fetchApi<SessionInfo[]>("/api/sessions/active");
-}
-
-export async function getProjects(): Promise<ProjectInfo[]> {
-  return fetchApi<ProjectInfo[]>("/api/projects");
-}
-
-export async function getProjectSessions(
-  encodedName: string
-): Promise<SessionInfo[]> {
-  return fetchApi<SessionInfo[]>(`/api/projects/${encodedName}/sessions`);
-}
-
-export async function getSession(sessionId: string): Promise<ParsedSession> {
-  return fetchApi<ParsedSession>(`/api/sessions/${sessionId}`);
 }

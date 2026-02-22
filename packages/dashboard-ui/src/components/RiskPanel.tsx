@@ -68,6 +68,8 @@ export function RiskPanel({ agents }: RiskPanelProps) {
 function RiskCard({ agent }: { agent: Agent }) {
   const { risk, label, sessionId } = agent;
   const slug = sessionId.slice(0, 8);
+  const stallSignal = risk.spinningSignals.find((s) => s.pattern === "stalled" || s.pattern === "idle");
+  const otherSignals = risk.spinningSignals.filter((s) => s.pattern !== "stalled" && s.pattern !== "idle");
 
   return (
     <div className="px-3.5 py-2.5 border-b border-dash-border">
@@ -140,6 +142,15 @@ function RiskCard({ agent }: { agent: Agent }) {
               </span>
             </Tip>
           )}
+          {stallSignal && (
+            <span className={`text-[9px] font-medium ${
+              stallSignal.level === "critical" ? "text-dash-red" :
+              stallSignal.pattern === "stalled" ? "text-dash-yellow" :
+              "text-dash-text-muted"
+            }`}>
+              {stallSignal.detail}
+            </span>
+          )}
         </div>
       )}
 
@@ -179,9 +190,9 @@ function RiskCard({ agent }: { agent: Agent }) {
         </div>
       )}
 
-      {risk.spinningSignals.length > 0 && (
+      {otherSignals.length > 0 && (
         <div className="space-y-0.5 mb-1">
-          {risk.spinningSignals.map((sig, i) => (
+          {otherSignals.map((sig, i) => (
             <div key={i} className={`text-[9px] flex items-center gap-1 ${
               sig.level === "critical" ? "text-dash-red" : "text-dash-yellow"
             }`}>

@@ -3,9 +3,19 @@ export type {
   IntentEvidence, IntentTaskView, IntentLanes,
   OperatorStatus, Operator,
   PlanStatus, PlanTask, DraftingActivity, SessionPlan,
-  AgentStatus, Agent, Workstream, CollisionSeverity, Collision,
+  AgentType, AgentStatus, Agent, Workstream, CollisionSeverity, Collision,
   FeedEventType, FeedEvent, DashboardSummary, DashboardState,
 } from "./dashboard.js";
+export type {
+  PlanTaskCounts,
+  PlanHistoryItem,
+  PlanHistoryDetailItem,
+  PlanHistoryCursor,
+  PlanHistoryQuery,
+  PlanHistoryPage,
+  SessionPlanHistory,
+  PlanHistoryRefreshResult,
+} from "./plan-history.js";
 
 // ─── Token Usage ─────────────────────────────────────────────────────────────
 

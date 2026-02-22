@@ -1,6 +1,6 @@
 {
   "name": "@pylon-dev/cli",
-  "version": "0.1.2",
+  "version": "0.1.1",
   "description": "Inspect and debug Claude Code sessions — local dashboard + API server",
   "type": "module",
   "license": "MIT",

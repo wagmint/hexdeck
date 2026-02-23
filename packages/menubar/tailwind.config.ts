@@ -1,0 +1,51 @@
+import type { Config } from "tailwindcss";
+
+export default {
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ["Inter", "system-ui", "sans-serif"],
+        mono: ["JetBrains Mono", "Fira Code", "monospace"],
+      },
+      colors: {
+        dash: {
+          bg: "var(--dash-bg)",
+          surface: "var(--dash-surface)",
+          "surface-2": "var(--dash-surface-2)",
+          "surface-3": "var(--dash-surface-3)",
+          border: "var(--dash-border)",
+          "border-light": "var(--dash-border-light)",
+          text: "var(--dash-text)",
+          "text-dim": "var(--dash-text-dim)",
+          "text-muted": "var(--dash-text-muted)",
+          green: "var(--dash-green)",
+          "green-dim": "var(--dash-green-dim)",
+          red: "var(--dash-red)",
+          "red-dim": "var(--dash-red-dim)",
+          yellow: "var(--dash-yellow)",
+          "yellow-dim": "var(--dash-yellow-dim)",
+          blue: "var(--dash-blue)",
+          "blue-dim": "var(--dash-blue-dim)",
+          purple: "var(--dash-purple)",
+          "purple-dim": "var(--dash-purple-dim)",
+        },
+      },
+      animation: {
+        "fade-in": "fade-in 0.15s ease-out",
+        "dash-pulse": "dash-pulse 1.5s infinite",
+      },
+      keyframes: {
+        "fade-in": {
+          from: { opacity: "0", transform: "translateY(-4px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "dash-pulse": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.6" },
+        },
+      },
+    },
+  },
+  plugins: [],
+} satisfies Config;

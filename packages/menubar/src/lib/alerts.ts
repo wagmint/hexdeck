@@ -29,24 +29,33 @@ export function deriveAlerts(state: DashboardState): PylonAlert[] {
   }
 
   // Red/Yellow: spinning signals from agents
+  // Only alert on high-confidence patterns — skip file_churn and repeated_tool
+  // which fire too easily during normal work.
+  const ALERT_PATTERNS = new Set(["stalled", "error_loop", "stuck"]);
+
   for (const agent of state.agents) {
     if (!agent.isActive) continue;
 
     for (const signal of agent.risk.spinningSignals) {
-      if (signal.pattern === "stalled" && signal.level === "critical") {
+      if (!ALERT_PATTERNS.has(signal.pattern)) continue;
+
+      if (signal.level === "critical") {
         alerts.push({
-          id: `stall-critical-${agent.sessionId}`,
+          id: `spin-critical-${agent.sessionId}-${signal.pattern}`,
           severity: "red",
-          title: "Agent critically stalled",
+          title: signal.pattern === "stalled"
+            ? "Agent critically stalled"
+            : "Agent stuck",
           detail: `${agent.label} — ${signal.detail}`,
           timestamp: new Date().toISOString(),
         });
-      } else if (signal.level === "elevated" || signal.level === "critical") {
-        const isStall = signal.pattern === "stalled";
+      } else if (signal.level === "elevated") {
         alerts.push({
           id: `spin-${agent.sessionId}-${signal.pattern}`,
           severity: "yellow",
-          title: isStall ? "Agent stalling" : "Agent spinning",
+          title: signal.pattern === "stalled"
+            ? "Agent stalling"
+            : "Agent error loop",
           detail: `${agent.label} — ${signal.detail}`,
           timestamp: new Date().toISOString(),
         });

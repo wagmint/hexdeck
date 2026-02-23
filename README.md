@@ -16,6 +16,17 @@ pylon start
 
 Opens `http://localhost:3002` with the dashboard. That's it.
 
+### Menu bar app (macOS)
+
+For an always-visible tray icon showing agent status:
+
+```bash
+brew tap wagmint/pylon
+brew install --cask pylon
+```
+
+The menu bar app connects to the same local server — run `pylon start` first.
+
 ## Upgrade
 
 ```bash

@@ -10,12 +10,12 @@ import {
   deriveAlerts,
   worstSeverity,
   type PylonAlert,
-  type AlertSeverity,
+  type TraySeverity,
 } from "../lib/alerts";
 
 interface UseAlertsResult {
   alerts: PylonAlert[];
-  severity: AlertSeverity | "grey";
+  severity: TraySeverity;
 }
 
 export function useAlerts(
@@ -31,9 +31,9 @@ export function useAlerts(
     return deriveAlerts(state);
   }, [state]);
 
-  const severity = useMemo(() => {
-    if (!connected || !state) return "grey" as const;
-    return worstSeverity(alerts);
+  const severity: TraySeverity = useMemo(() => {
+    if (!connected || !state) return "grey";
+    return worstSeverity(alerts, state);
   }, [alerts, connected, state]);
 
   // Update tray icon when severity changes

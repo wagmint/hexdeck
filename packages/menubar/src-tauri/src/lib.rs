@@ -9,6 +9,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 fn update_tray_icon(app: tauri::AppHandle, color: String) -> Result<(), String> {
     let icon_bytes: &[u8] = match color.as_str() {
         "green" => include_bytes!("../icons/icon-green.png"),
+        "blue" => include_bytes!("../icons/icon-blue.png"),
         "yellow" => include_bytes!("../icons/icon-yellow.png"),
         "red" => include_bytes!("../icons/icon-red.png"),
         _ => include_bytes!("../icons/icon-grey.png"),

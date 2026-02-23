@@ -1,21 +1,23 @@
-import type { AlertSeverity } from "../lib/alerts";
+import type { TraySeverity } from "../lib/alerts";
 
-const dotColorClass: Record<AlertSeverity | "grey", string> = {
+const dotColorClass: Record<TraySeverity, string> = {
   red: "bg-dash-red",
   yellow: "bg-dash-yellow",
+  blue: "bg-dash-blue",
   green: "bg-dash-green",
   grey: "bg-dash-text-muted",
 };
 
-const pulseClass: Record<AlertSeverity | "grey", string> = {
+const pulseClass: Record<TraySeverity, string> = {
   red: "animate-dash-pulse",
   yellow: "",
+  blue: "animate-dash-pulse",
   green: "",
   grey: "",
 };
 
 interface StatusHeaderProps {
-  severity: AlertSeverity | "grey";
+  severity: TraySeverity;
   agentCount: number;
   connected: boolean;
 }

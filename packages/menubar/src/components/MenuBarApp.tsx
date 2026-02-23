@@ -1,6 +1,6 @@
 import { open } from "@tauri-apps/plugin-shell";
 import type { DashboardState } from "../lib/types";
-import type { PylonAlert, AlertSeverity } from "../lib/alerts";
+import type { PylonAlert, TraySeverity } from "../lib/alerts";
 import { StatusHeader } from "./StatusHeader";
 import { AlertList } from "./AlertList";
 import { AgentList } from "./AgentList";
@@ -8,7 +8,7 @@ import { AgentList } from "./AgentList";
 interface MenuBarAppProps {
   state: DashboardState | null;
   alerts: PylonAlert[];
-  severity: AlertSeverity | "grey";
+  severity: TraySeverity;
   connected: boolean;
   loading: boolean;
   error: string | null;

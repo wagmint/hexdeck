@@ -957,8 +957,8 @@ export function buildDashboardState(): DashboardState {
   }
 
   // ─── Stall / idle detection (post-pass, no existing code modified) ──
-  const STALL_WARN_MS = 5 * 60 * 1000;   // 5 min → elevated
-  const STALL_CRIT_MS = 15 * 60 * 1000;  // 15 min → critical
+  const STALL_WARN_MS = 15 * 60 * 1000;  // 15 min → elevated
+  const STALL_CRIT_MS = 45 * 60 * 1000;  // 45 min → critical
   const IDLE_MS = 5 * 60 * 1000;         // 5 min with no active work → idle
 
   /** Sessions that are stalled (have active work but went silent) */
@@ -978,7 +978,7 @@ export function buildDashboardState(): DashboardState {
       p.tasks.some(t => t.status === "in_progress" || t.status === "pending")
     );
 
-    if (hasActiveWork) {
+    if (hasActiveWork && silenceMs > STALL_WARN_MS) {
       // Stalled: was working towards a goal but went silent
       stalledSessionIds.add(agent.sessionId);
       if (silenceMs > STALL_CRIT_MS) {

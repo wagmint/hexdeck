@@ -45,7 +45,7 @@ jobs:
         with:
           projectPath: packages/menubar
           tagName: ${{ github.ref_name }}
-          releaseName: "Pylon ${{ github.ref_name }}"
+          releaseName: "Hexdeck ${{ github.ref_name }}"
           releaseBody: "See the assets below to download and install this version."
           releaseDraft: false
           prerelease: false
@@ -73,7 +73,7 @@ jobs:
         id: sha
         run: |
           ARM_DMG=$(ls artifacts/*aarch64*.dmg 2>/dev/null || ls artifacts/*arm64*.dmg 2>/dev/null)
-          X86_DMG=$(ls artifacts/*x86_64*.dmg 2>/dev/null || ls artifacts/*x64*.dmg 2>/dev/null)
+          X86_DMG=$(ls artifacts/*x86_64*.dmg 2>/dev/null || ls artifacts/*_x64*.dmg 2>/dev/null)
           echo "arm_sha=$(shasum -a 256 "$ARM_DMG" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
           echo "x86_sha=$(shasum -a 256 "$X86_DMG" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
           echo "arm_dmg=$(basename "$ARM_DMG")" >> "$GITHUB_OUTPUT"
@@ -83,11 +83,11 @@ jobs:
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
-          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/wagmint/homebrew-pylon.git" tap
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/wagmint/homebrew-hexdeck.git" tap
           mkdir -p tap/Casks
 
-          cat > tap/Casks/pylon.rb << 'CASK'
-          cask "pylon" do
+          cat > tap/Casks/hexdeck.rb << 'CASK'
+          cask "hexdeck" do
             version "${{ steps.version.outputs.version }}"
 
             on_arm do
@@ -100,15 +100,15 @@ jobs:
               sha256 "${{ steps.sha.outputs.x86_sha }}"
             end
 
-            name "Pylon"
-            desc "Menu bar monitoring utility"
+            name "Hexdeck"
+            desc "Menu bar monitoring utility for Claude Code"
             homepage "https://github.com/${{ github.repository }}"
 
-            app "Pylon.app"
+            app "Hexdeck.app"
 
             zap trash: [
-              "~/Library/Application Support/dev.pylon.menubar",
-              "~/Library/Caches/dev.pylon.menubar",
+              "~/Library/Application Support/dev.hexdeck.menubar",
+              "~/Library/Caches/dev.hexdeck.menubar",
             ]
           end
           CASK
@@ -116,6 +116,6 @@ jobs:
           cd tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Casks/pylon.rb
-          git commit -m "Update pylon to ${{ steps.version.outputs.version }}"
+          git add Casks/hexdeck.rb
+          git commit -m "Update hexdeck to ${{ steps.version.outputs.version }}"
           git push

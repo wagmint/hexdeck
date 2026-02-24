@@ -23,6 +23,10 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "Hexdeck",
   description: "See your Claude Code sessions as a navigable tree",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

@@ -1,0 +1,24 @@
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <rect width="256" height="256" fill="#000000" />
+  <g transform="translate(0 14)">
+    <path
+      d="M128 40L73 72V136M128 40L183 72V136M73 136L128 168L183 136"
+      fill="none"
+      stroke="#00D8FF"
+      stroke-width="12"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <ellipse
+      cx="128"
+      cy="124"
+      rx="112"
+      ry="28"
+      transform="rotate(-18 128 124)"
+      fill="none"
+      stroke="#00D8FF"
+      stroke-width="12"
+      stroke-linecap="round"
+    />
+  </g>
+</svg>

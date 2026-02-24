@@ -132,6 +132,13 @@ npm run build  # Builds dashboard-ui, dashboard, server, and CLI
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
 
+## Hexcore
+
+For cloud coordination across machines, use Hexcore:
+
+- Cloud repo: https://github.com/wagmint/hexcore
+- Cloud docs: https://hexcore.dev/docs
+
 ## License
 
 MIT

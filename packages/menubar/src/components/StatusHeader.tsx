@@ -31,7 +31,8 @@ export function StatusHeader({
     <div className="flex items-center justify-between px-4 py-3 border-b border-dash-border">
       <div className="flex items-center gap-2.5">
         <div
-          className={`w-2.5 h-2.5 rounded-full ${dotColorClass[severity]} ${pulseClass[severity]}`}
+          className={`w-2.5 h-2.5 ${dotColorClass[severity]} ${pulseClass[severity]}`}
+          style={{ clipPath: "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)" }}
         />
         <span className="text-sm font-semibold text-dash-text">Hexdeck</span>
       </div>

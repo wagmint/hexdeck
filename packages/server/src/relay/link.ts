@@ -14,16 +14,16 @@ export interface ExchangedRelayCredentials {
 }
 
 /**
- * Parse a pylon+wss:// connect link into its components.
+ * Parse a hexcore+wss:// connect link into its components.
  * Throws on invalid format or missing required parameters.
  */
 export function parseConnectLink(link: string): ParsedConnectLink {
   let url: URL;
   try {
-    const normalized = link.replace(/^pylon\+/, "");
+    const normalized = link.replace(/^hexcore\+/, "");
     url = new URL(normalized);
   } catch {
-    throw new Error("Invalid connect link format. Expected: pylon+wss://<host>/ws?p=<pylonId>&c=<code>&n=<name>");
+    throw new Error("Invalid connect link format. Expected: hexcore+wss://<host>/ws?p=<hexcoreId>&c=<code>&n=<name>");
   }
 
   const pylonId = url.searchParams.get("p");

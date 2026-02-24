@@ -1,4 +1,4 @@
-# Pylon Menu Bar App
+# Hexdeck Menu Bar App
 
 macOS menu bar app for monitoring AI coding agents at a glance. Built with Tauri v2 + React.
 
@@ -7,12 +7,12 @@ macOS menu bar app for monitoring AI coding agents at a glance. Built with Tauri
 **Homebrew:**
 
 ```bash
-brew tap wagmint/pylon && brew install --cask pylon
+brew tap wagmint/hexdeck && brew install --cask hexdeck
 ```
 
-**Direct download:** grab the `.dmg` for your architecture from [the latest release](https://github.com/wagmint/pylon/releases/latest).
+**Direct download:** grab the `.dmg` for your architecture from [the latest release](https://github.com/wagmint/hexdeck/releases/latest).
 
-The menu bar app connects to the local Pylon server — you need the CLI running (`pylon start`) for it to work.
+The menu bar app connects to the local Hexdeck server — you need the CLI running (`hex start`) for it to work.
 
 ## What it does
 

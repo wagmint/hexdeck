@@ -1,4 +1,4 @@
-// Subset of @pylon-dev/dashboard-ui types needed by the menubar app.
+// Subset of @hexdeck/dashboard-ui types needed by the menubar app.
 // Kept local to avoid pulling in the full dashboard-ui dependency.
 
 export type RiskLevel = "nominal" | "elevated" | "critical";

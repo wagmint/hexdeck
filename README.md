@@ -1,17 +1,17 @@
-# Pylon
+# Hexdeck
 
 **Local observability for Claude Code sessions.**
 
-Pylon reads the JSONL session files Claude Code writes to `~/.claude/projects/`, parses them into structured turn-by-turn data, and serves a live dashboard showing what your agents are doing in real time.
+Hexdeck reads the JSONL session files Claude Code writes to `~/.claude/projects/`, parses them into structured turn-by-turn data, and serves a live dashboard showing what your agents are doing in real time.
 
 <!-- TODO: Add a GIF/screenshot of the main dashboard here -->
-<!-- ![Pylon Dashboard](docs/assets/dashboard.png) -->
+<!-- ![Hexdeck Dashboard](docs/assets/dashboard.png) -->
 
 ## Install
 
 ```bash
-npm install -g @pylon-dev/cli
-pylon start
+npm install -g @hexdeck/cli
+hex start
 ```
 
 Opens `http://localhost:3002` with the dashboard. That's it.
@@ -21,19 +21,19 @@ Opens `http://localhost:3002` with the dashboard. That's it.
 For an always-visible tray icon showing agent status:
 
 ```bash
-brew tap wagmint/pylon
-brew install --cask pylon
+brew tap wagmint/hexdeck
+brew install --cask hexdeck
 ```
 
-The menu bar app connects to the same local server — run `pylon start` first.
+The menu bar app connects to the same local server — run `hex start` first.
 
 ## Upgrade
 
 ```bash
-npm install -g @pylon-dev/cli@latest
+npm install -g @hexdeck/cli@latest
 ```
 
-If you use Pylon Cloud relay, upgrade before connecting new links.
+If you use Hexcore relay, upgrade before connecting new links.
 Relay links now use short-lived one-time codes (`?c=...`) instead of embedded auth tokens.
 
 ## Features
@@ -44,7 +44,7 @@ Real-time view of all active Claude Code sessions across your machine. See which
 <!-- TODO: screenshot of dashboard with active sessions -->
 
 ### Collision Detection
-Catch when two agents edit the same uncommitted file before it becomes a merge conflict. Pylon monitors git status and flags overlapping changes across sessions.
+Catch when two agents edit the same uncommitted file before it becomes a merge conflict. Hexdeck monitors git status and flags overlapping changes across sessions.
 
 <!-- TODO: screenshot of collision alert -->
 
@@ -62,30 +62,30 @@ Real-time event stream of agent activity — session starts, commits, errors, co
 ## Commands
 
 ```bash
-pylon start              # Start server + dashboard (background)
-pylon start --foreground # Start in foreground
-pylon start --port 8080  # Custom port
-pylon status             # Show running server info
-pylon stop               # Stop the server
-pylon restart            # Restart
-pylon open               # Open dashboard in browser
+hex start              # Start server + dashboard (background)
+hex start --foreground # Start in foreground
+hex start --port 8080  # Custom port
+hex status             # Show running server info
+hex stop               # Stop the server
+hex restart            # Restart
+hex open               # Open dashboard in browser
 ```
 
 Relay commands:
 
 ```bash
-pylon relay <connect-link>                  # Add/update relay target from cloud link
-pylon relay list                            # List relay targets
-pylon relay sessions                        # List active local sessions/projects
-pylon relay include <pylonId> <projectPath> # Start relaying project
-pylon relay exclude <pylonId> <projectPath> # Stop relaying project
-pylon relay remove <pylonId>                # Remove relay target
+hex relay <connect-link>                  # Add/update relay target from cloud link
+hex relay list                            # List relay targets
+hex relay sessions                        # List active local sessions/projects
+hex relay include <hexcoreId> <projectPath> # Start relaying project
+hex relay exclude <hexcoreId> <projectPath> # Stop relaying project
+hex relay remove <hexcoreId>                # Remove relay target
 ```
 
 Example connect link format:
 
 ```text
-pylon+wss://relay.example.com/ws?p=<pylonId>&c=<connectCode>&n=<teamName>
+hexcore+wss://relay.example.com/ws?p=<hexcoreId>&c=<connectCode>&n=<teamName>
 ```
 
 ## API
@@ -104,15 +104,15 @@ JSON API at `localhost:3002/api/` for building your own tooling.
 
 ## How It Works
 
-Claude Code stores session data as JSONL files in `~/.claude/projects/`. Pylon scans these files, parses the events into structured **turn-pair nodes** (one user message + everything Claude did in response), and computes dashboard state including active agents, file collisions, risk signals, and a live feed.
+Claude Code stores session data as JSONL files in `~/.claude/projects/`. Hexdeck scans these files, parses the events into structured **turn-pair nodes** (one user message + everything Claude did in response), and computes dashboard state including active agents, file collisions, risk signals, and a live feed.
 
 The server is a single [Hono](https://hono.dev) process that serves both the API and the static dashboard.
 
 ## Development
 
 ```bash
-git clone https://github.com/wagmint/pylon.git
-cd pylon
+git clone https://github.com/wagmint/hexdeck.git
+cd hexdeck
 npm install
 npm run dev    # Next.js on :3000 + API on :3002
 ```

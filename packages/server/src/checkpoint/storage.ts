@@ -3,7 +3,7 @@ import { join } from "path";
 import { homedir } from "os";
 import type { Checkpoint } from "../types/index.js";
 
-const PYLON_DIR = join(homedir(), ".pylon");
+const PYLON_DIR = join(homedir(), ".hexdeck");
 const CHECKPOINTS_DIR = join(PYLON_DIR, "checkpoints");
 
 function ensureDir(dir: string) {

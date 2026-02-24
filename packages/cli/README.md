@@ -1,12 +1,12 @@
-# Pylon
+# Hexdeck
 
 Real-time dashboard for your Claude Code sessions.
 
 See what your agents are doing, track plans and progress, detect file collisions, and monitor costs — all locally.
 
 ```bash
-npm install -g @pylon-dev/cli
-pylon start
+npm install -g @hexdeck/cli
+hex start
 ```
 
 Opens a live dashboard at `http://localhost:3002`.
@@ -22,12 +22,12 @@ Opens a live dashboard at `http://localhost:3002`.
 
 ## Privacy
 
-Pylon runs entirely on your machine. No data is sent externally.
+Hexdeck runs entirely on your machine. No data is sent externally.
 
 | | Details |
 |---|---|
 | **Reads** | `~/.claude/projects/` (session logs), `git status` (collision detection) |
-| **Writes** | `~/.pylon/` (pid file, config, plan index) |
+| **Writes** | `~/.hexdeck/` (pid file, config, plan index) |
 | **Network** | `localhost` only — zero outbound connections |
 | **Telemetry** | None. No analytics, no tracking, no phone-home. |
 
@@ -36,13 +36,13 @@ Cloud relay is available for team use but is strictly opt-in, per-project, and s
 ## Commands
 
 ```bash
-pylon start              # Start server + dashboard
-pylon start --foreground # Run in foreground
-pylon start --port 8080  # Custom port
-pylon status             # Show server info
-pylon stop               # Stop the server
-pylon restart            # Restart
-pylon open               # Open dashboard in browser
+hex start              # Start server + dashboard
+hex start --foreground # Run in foreground
+hex start --port 8080  # Custom port
+hex status             # Show server info
+hex stop               # Stop the server
+hex restart            # Restart
+hex open               # Open dashboard in browser
 ```
 
 ## Requirements
@@ -53,12 +53,12 @@ pylon open               # Open dashboard in browser
 ## Upgrade
 
 ```bash
-npm install -g @pylon-dev/cli@latest
+npm install -g @hexdeck/cli@latest
 ```
 
-## Pylon Cloud
+## Hexcore
 
-For teams running multiple operators on the same codebase, Pylon Cloud adds multiplayer coordination — shared dashboards, cross-operator collision detection, and team presence.
+For teams running multiple operators on the same codebase, Hexcore adds multiplayer coordination — shared dashboards, cross-operator collision detection, and team presence.
 
 ## License
 

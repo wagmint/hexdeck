@@ -9,7 +9,7 @@ export async function startCommand(options: { port: number; foreground: boolean 
   // Check if already running
   const existing = loadPid();
   if (existing && isProcessRunning(existing.pid)) {
-    console.log(`Pylon is already running (PID ${existing.pid}, port ${existing.port})`);
+    console.log(`Hexdeck is already running (PID ${existing.pid}, port ${existing.port})`);
     console.log(`  http://localhost:${existing.port}`);
     return;
   }
@@ -31,7 +31,7 @@ export async function startCommand(options: { port: number; foreground: boolean 
 
   if (foreground) {
     // Import and run directly
-    const { startServer } = await import("@pylon-dev/server");
+    const { startServer } = await import("@hexdeck/server");
     startServer({ port, dashboardDir: dashboardDir ?? undefined });
 
     savePid({
@@ -87,7 +87,7 @@ export async function startCommand(options: { port: number; foreground: boolean 
       dashboardDir,
     });
 
-    console.log(`Pylon started (PID ${child.pid})`);
+    console.log(`Hexdeck started (PID ${child.pid})`);
     console.log(`  http://localhost:${port}`);
 
     // Open browser on macOS

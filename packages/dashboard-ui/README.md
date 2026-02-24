@@ -1,11 +1,11 @@
-# @pylon-dev/dashboard-ui
+# @hexdeck/dashboard-ui
 
-Shared React UI components and types for building the Pylon dashboard experience.
+Shared React UI components and types for building the Hexdeck dashboard experience.
 
 ## Install
 
 ```bash
-npm install @pylon-dev/dashboard-ui
+npm install @hexdeck/dashboard-ui
 ```
 
 Peer dependencies:
@@ -18,7 +18,7 @@ Peer dependencies:
 - Dashboard components (`TopBar`, `AgentCard`, `WorkstreamNode`, `FeedItem`, `PlanDetail`, `RiskPanel`, etc.)
 - Shared dashboard data types (`DashboardState`, `Agent`, `Workstream`, `FeedEvent`, etc.)
 - Operator context (`OperatorProvider`, `useOperators`)
-- Tailwind preset (`@pylon-dev/dashboard-ui/tailwind-preset`)
+- Tailwind preset (`@hexdeck/dashboard-ui/tailwind-preset`)
 - Utility helpers (`timeAgo`, `formatDuration`)
 
 ## Tailwind setup
@@ -27,13 +27,13 @@ Add the preset:
 
 ```ts
 // tailwind.config.ts
-import pylonPreset from "@pylon-dev/dashboard-ui/tailwind-preset";
+import pylonPreset from "@hexdeck/dashboard-ui/tailwind-preset";
 
 export default {
   presets: [pylonPreset],
   content: [
     "./src/**/*.{ts,tsx}",
-    "./node_modules/@pylon-dev/dashboard-ui/dist/**/*.{js,mjs}",
+    "./node_modules/@hexdeck/dashboard-ui/dist/**/*.{js,mjs}",
   ],
 };
 ```
@@ -74,7 +74,7 @@ import {
   TopBar,
   AgentCard,
   type DashboardState,
-} from "@pylon-dev/dashboard-ui";
+} from "@hexdeck/dashboard-ui";
 
 export function Dashboard({ state }: { state: DashboardState }) {
   return (
@@ -103,6 +103,6 @@ Other exports:
 
 - `OperatorProvider`, `useOperators`
 - `timeAgo`, `formatDuration`
-- Dashboard and relay types from `@pylon-dev/dashboard-ui`
-- Tailwind preset from `@pylon-dev/dashboard-ui/tailwind-preset`
+- Dashboard and relay types from `@hexdeck/dashboard-ui`
+- Tailwind preset from `@hexdeck/dashboard-ui/tailwind-preset`
 

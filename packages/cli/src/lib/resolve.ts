@@ -19,7 +19,7 @@ export function findPackageRoot(): string {
  * Resolve the dashboard static export directory.
  * 1. PYLON_DASHBOARD_DIR env var (explicit override)
  * 2. Bundled dashboard/ directory (npm-installed package)
- * 3. @pylon-dev/local workspace package out/ directory (dev mode)
+ * 3. @hexdeck/local workspace package out/ directory (dev mode)
  * 4. null (API-only mode)
  */
 export function resolveDashboardDir(): string | null {
@@ -36,10 +36,10 @@ export function resolveDashboardDir(): string | null {
     return bundledDir;
   }
 
-  // 3. Resolve from @pylon-dev/local workspace package (dev mode)
+  // 3. Resolve from @hexdeck/local workspace package (dev mode)
   try {
     const require = createRequire(import.meta.url);
-    const pkgPath = require.resolve("@pylon-dev/local/package.json");
+    const pkgPath = require.resolve("@hexdeck/local/package.json");
     const outDir = join(dirname(pkgPath), "out");
     if (existsSync(outDir)) {
       return outDir;

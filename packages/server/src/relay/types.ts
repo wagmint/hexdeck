@@ -1,5 +1,5 @@
 // ─── Relay Protocol Types ───────────────────────────────────────────────────
-// Mirrors cloud's OperatorState shape independently (pylon can't import from pylon-cloud).
+// Mirrors cloud's OperatorState shape independently (hexdeck can't import from hexdeck-cloud).
 
 // ─── Relay State Types ──────────────────────────────────────────────────────
 

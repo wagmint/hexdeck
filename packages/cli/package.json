@@ -1,11 +1,11 @@
 {
-  "name": "@pylon-dev/cli",
+  "name": "@hexdeck/cli",
   "version": "0.1.1",
   "description": "Real-time dashboard for Claude Code sessions — monitor agents, track plans, detect collisions",
   "type": "module",
   "license": "MIT",
   "bin": {
-    "pylon": "dist/index.js"
+    "hex": "dist/index.js"
   },
   "files": [
     "dist",
@@ -34,8 +34,8 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "@pylon-dev/server": "*",
-    "@pylon-dev/local": "*",
+    "@hexdeck/server": "*",
+    "@hexdeck/local": "*",
     "@types/node": "^25.2.1",
     "tsup": "^8.0.0",
     "tsx": "^4.21.0",

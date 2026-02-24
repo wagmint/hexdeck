@@ -9,15 +9,15 @@ LEVEL ?= patch
 .PHONY: help
 help:
 	@echo "Available commands:"
-	@echo "  make pylon          - Start Pylon (API + dashboard) in foreground"
-	@echo "  make start          - Start Pylon server in background"
-	@echo "  make stop           - Stop Pylon server"
-	@echo "  make restart        - Restart Pylon server"
-	@echo "  make status         - Show Pylon server status"
+	@echo "  make hexdeck          - Start Hexdeck (API + dashboard) in foreground"
+	@echo "  make start          - Start Hexdeck server in background"
+	@echo "  make stop           - Stop Hexdeck server"
+	@echo "  make restart        - Restart Hexdeck server"
+	@echo "  make status         - Show Hexdeck server status"
 	@echo "  make install        - Install all dependencies"
 	@echo "  make build          - Build frontend"
-	@echo "  make dashboard-version [LEVEL=patch|minor|major] - Bump @pylon-dev/dashboard-ui version"
-	@echo "  make cli-version [LEVEL=patch|minor|major]       - Bump @pylon-dev/cli version"
+	@echo "  make dashboard-version [LEVEL=patch|minor|major] - Bump @hexdeck/dashboard-ui version"
+	@echo "  make cli-version [LEVEL=patch|minor|major]       - Bump @hexdeck/cli version"
 	@echo "  make checkpoint NOTE='my note' - Create a checkpoint"
 	@echo "  make rewind ID='abc123'       - Rewind to a checkpoint"
 	@echo "  make checkpoints              - List all checkpoints"
@@ -25,9 +25,9 @@ help:
 	@echo "  make typecheck      - Run TypeScript type checking"
 	@echo "  make clean          - Remove build artifacts and node_modules"
 
-# Pylon (API + dashboard)
-.PHONY: pylon
-pylon:
+# Hexdeck (API + dashboard)
+.PHONY: hexdeck
+hexdeck:
 	cd packages/cli && $(NPX) tsx src/index.ts start --foreground
 
 .PHONY: start

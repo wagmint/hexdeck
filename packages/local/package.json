@@ -1,5 +1,5 @@
 {
-  "name": "@pylon-dev/local",
+  "name": "@hexdeck/local",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -8,7 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
-    "@pylon-dev/dashboard-ui": "*",
+    "@hexdeck/dashboard-ui": "*",
     "clsx": "^2.1.1",
     "framer-motion": "^12.26.2",
     "lucide-react": "^0.462.0",

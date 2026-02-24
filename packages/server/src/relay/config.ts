@@ -6,8 +6,8 @@ import type { RelayConfig, RelayTarget } from "./types.js";
 
 // ─── Config Cache ───────────────────────────────────────────────────────────
 
-const CONFIG_PATH = join(homedir(), ".pylon", "relay.json");
-const KEY_PATH = join(homedir(), ".pylon", "relay.key");
+const CONFIG_PATH = join(homedir(), ".hexdeck", "relay.json");
+const KEY_PATH = join(homedir(), ".hexdeck", "relay.key");
 
 let cachedConfig: RelayConfig | null = null;
 let cachedMtimeMs = 0;
@@ -16,7 +16,7 @@ let cachedKey: Buffer | null = null;
 // ─── Public API ─────────────────────────────────────────────────────────────
 
 /**
- * Load relay config from ~/.pylon/relay.json.
+ * Load relay config from ~/.hexdeck/relay.json.
  * Cached by mtime — re-read on file change.
  * Missing or malformed config → empty { targets: [] }.
  */
@@ -40,8 +40,8 @@ export function loadRelayConfig(): RelayConfig {
 }
 
 /**
- * Save relay config to ~/.pylon/relay.json.
- * Creates ~/.pylon/ directory if it doesn't exist.
+ * Save relay config to ~/.hexdeck/relay.json.
+ * Creates ~/.hexdeck/ directory if it doesn't exist.
  */
 export function saveRelayConfig(config: RelayConfig): void {
   const dir = dirname(CONFIG_PATH);

@@ -30,7 +30,7 @@ const OPERATOR_COLORS = [
 
 // ─── Config Cache ───────────────────────────────────────────────────────────
 
-const CONFIG_PATH = join(homedir(), ".pylon", "operators.json");
+const CONFIG_PATH = join(homedir(), ".hexdeck", "operators.json");
 
 let cachedConfig: PylonConfig | null = null;
 let cachedMtimeMs = 0;
@@ -38,7 +38,7 @@ let cachedMtimeMs = 0;
 // ─── Public API ─────────────────────────────────────────────────────────────
 
 /**
- * Load operator config from ~/.pylon/operators.json.
+ * Load operator config from ~/.hexdeck/operators.json.
  * Cached by mtime — re-read on file change.
  * Missing or malformed config → empty { operators: [] }.
  */

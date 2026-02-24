@@ -2897,7 +2897,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pylon-menubar"
+name = "hexdeck-menubar"
 version = "0.1.0"
 dependencies = [
  "serde",

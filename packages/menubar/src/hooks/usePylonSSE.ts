@@ -42,7 +42,7 @@ export function usePylonSSE(): UsePylonSSEResult {
     es.onerror = () => {
       setConnected(false);
       if (!hasReceivedData.current) {
-        setError("Cannot connect to Pylon server");
+        setError("Cannot connect to Hexdeck server");
         setLoading(false);
       }
     };

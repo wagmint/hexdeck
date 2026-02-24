@@ -1,5 +1,5 @@
 {
-  "name": "pylon",
+  "name": "hexdeck",
   "private": true,
   "workspaces": ["packages/*"],
   "scripts": {

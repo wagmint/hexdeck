@@ -289,7 +289,7 @@ export function startServer(options?: StartServerOptions): ServerType {
   const app = createApp({ dashboardDir: options?.dashboardDir });
 
   const server = serve({ fetch: app.fetch, port }, (info) => {
-    console.log(`Pylon running on http://localhost:${info.port}`);
+    console.log(`Hexdeck running on http://localhost:${info.port}`);
     if (options?.dashboardDir) {
       console.log(`Dashboard: http://localhost:${info.port}`);
     }

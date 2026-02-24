@@ -103,7 +103,7 @@ function hashToIndex(id: string): number {
 
 // ─── Persistent label store (survives server restarts) ───────────────────────
 
-const PYLON_DIR = join(homedir(), ".pylon");
+const PYLON_DIR = join(homedir(), ".hexdeck");
 const LABELS_PATH = join(PYLON_DIR, "labels.json");
 
 interface LabelEntry {

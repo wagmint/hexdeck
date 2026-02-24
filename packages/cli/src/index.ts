@@ -22,12 +22,12 @@ function getOption(name: string, fallback: string): string {
 
 function printHelp() {
   console.log(`
-Usage: pylon <command> [options]
+Usage: hex <command> [options]
 
 Commands:
-  start       Start the Pylon server
-  stop        Stop the Pylon server
-  restart     Restart the Pylon server
+  start       Start the Hexdeck server
+  stop        Stop the Hexdeck server
+  restart     Restart the Hexdeck server
   status      Show server status
   open        Open the dashboard in a browser
   relay       Manage cloud relay connections
@@ -40,10 +40,10 @@ Options (start):
 Relay subcommands:
   relay <connect-link>                     Add/update a relay target
   relay list                               List configured targets
-  relay remove <pylonId>                   Remove a target
+  relay remove <hexcoreId>                 Remove a target
   relay sessions                           List active sessions
-  relay include <pylonId> <projectPath>    Start relaying a project
-  relay exclude <pylonId> <projectPath>    Stop relaying a project
+  relay include <hexcoreId> <projectPath>  Start relaying a project
+  relay exclude <hexcoreId> <projectPath>  Stop relaying a project
 `.trim());
 }
 

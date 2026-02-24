@@ -4,13 +4,13 @@ export async function statusCommand(): Promise<void> {
   const info = loadPid();
 
   if (!info) {
-    console.log("Pylon is not running.");
+    console.log("Hexdeck is not running.");
     return;
   }
 
   const running = isProcessRunning(info.pid);
 
-  console.log(`Pylon Status`);
+  console.log(`Hexdeck Status`);
   console.log(`─────────────────────────────`);
   console.log(`  PID:        ${info.pid} ${running ? "(running)" : "(dead)"}`);
   console.log(`  Port:       ${info.port}`);

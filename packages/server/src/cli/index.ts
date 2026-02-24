@@ -24,8 +24,8 @@ switch (command) {
   case "checkpoint": {
     const note = args.join(" ");
     if (!note) {
-      console.error("Usage: pylon checkpoint <note>");
-      console.error('  e.g.: pylon checkpoint "auth flow working"');
+      console.error("Usage: hex checkpoint <note>");
+      console.error('  e.g.: hex checkpoint "auth flow working"');
       process.exit(1);
     }
 
@@ -51,7 +51,7 @@ switch (command) {
   case "rewind": {
     const checkpointId = args[0];
     if (!checkpointId) {
-      console.error("Usage: pylon rewind <checkpoint-id>");
+      console.error("Usage: hex rewind <checkpoint-id>");
       process.exit(1);
     }
 
@@ -94,7 +94,7 @@ switch (command) {
 
   default:
     console.log(`
-Pylon — Checkpoints for Claude Code sessions
+Hexdeck — Checkpoints for Claude Code sessions
 
 Commands:
   checkpoint <note>       Create a checkpoint with a note

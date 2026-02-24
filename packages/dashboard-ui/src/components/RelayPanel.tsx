@@ -65,7 +65,7 @@ export function RelayPanel({
               value={link}
               onChange={(e) => setLink(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="pylon+wss://..."
+              placeholder="hexcore+wss://..."
               className="flex-1 bg-dash-bg border border-dash-border rounded px-2 py-1 text-[11px] font-mono text-dash-text placeholder:text-dash-text-muted focus:outline-none focus:border-dash-blue"
             />
             <button

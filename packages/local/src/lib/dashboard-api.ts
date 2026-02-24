@@ -1,4 +1,4 @@
-import type { DashboardState, FeedEvent } from "@pylon-dev/dashboard-ui";
+import type { DashboardState, FeedEvent } from "@hexdeck/dashboard-ui";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002";
 

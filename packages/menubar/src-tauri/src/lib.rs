@@ -50,7 +50,7 @@ pub fn run() {
             let _tray = tauri::tray::TrayIconBuilder::with_id("main-tray")
                 .icon(grey_icon)
                 .icon_as_template(true)
-                .tooltip("Pylon")
+                .tooltip("Hexdeck")
                 .on_tray_icon_event(move |tray, event| {
                     if let TrayIconEvent::Click { button_state: MouseButtonState::Up, .. } = event {
                         let app = tray.app_handle();

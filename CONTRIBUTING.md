@@ -1,12 +1,12 @@
-# Contributing to Pylon
+# Contributing to Hexdeck
 
-Thanks for your interest in contributing to Pylon!
+Thanks for your interest in contributing to Hexdeck!
 
 ## Development Setup
 
 ```bash
-git clone https://github.com/wagmint/pylon.git
-cd pylon
+git clone https://github.com/wagmint/hexdeck.git
+cd hexdeck
 npm install
 ```
 
@@ -45,8 +45,8 @@ packages/
 
 ## Reporting Issues
 
-- Use the [bug report template](https://github.com/wagmint/pylon/issues/new?template=bug_report.md) for bugs
-- Use the [feature request template](https://github.com/wagmint/pylon/issues/new?template=feature_request.md) for ideas
+- Use the [bug report template](https://github.com/wagmint/hexdeck/issues/new?template=bug_report.md) for bugs
+- Use the [feature request template](https://github.com/wagmint/hexdeck/issues/new?template=feature_request.md) for ideas
 
 ## Code Style
 

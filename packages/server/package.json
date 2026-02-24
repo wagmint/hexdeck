@@ -1,13 +1,13 @@
 {
-  "name": "@pylon-dev/server",
+  "name": "@hexdeck/server",
   "version": "0.1.0",
-  "description": "Pylon local backend server",
+  "description": "Hexdeck local backend server",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/server/main.ts",
     "serve": "tsx src/server/main.ts",
-    "pylon": "tsx src/cli/index.ts",
+    "hex": "tsx src/cli/index.ts",
     "parse": "tsx src/cli/parse.ts",
     "build": "tsc",
     "test": "vitest"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import type { RelayTargetInfo, ActiveProject } from "@pylon-dev/dashboard-ui";
+import type { RelayTargetInfo, ActiveProject } from "@hexdeck/dashboard-ui";
 import {
   getRelayTargets,
   connectRelay as apiConnect,

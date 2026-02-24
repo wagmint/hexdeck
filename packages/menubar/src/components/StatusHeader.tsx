@@ -33,7 +33,7 @@ export function StatusHeader({
         <div
           className={`w-2.5 h-2.5 rounded-full ${dotColorClass[severity]} ${pulseClass[severity]}`}
         />
-        <span className="text-sm font-semibold text-dash-text">Pylon</span>
+        <span className="text-sm font-semibold text-dash-text">Hexdeck</span>
       </div>
       <div className="flex items-center gap-2">
         <span className="text-xs text-dash-text-dim">

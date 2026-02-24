@@ -1,10 +1,10 @@
-# Pylon — Checkpoints for Claude Code
+# Hexdeck — Checkpoints for Claude Code
 
-Pylon is the observability and navigation layer for Claude Code sessions. It reads the JSONL session files Claude Code already creates (~/.claude/projects/), parses them into structured turn-pair nodes, and gives you checkpoints you can rewind to — like git commits but for your entire AI coding session (code state + conversation state).
+Hexdeck is the observability and navigation layer for Claude Code sessions. It reads the JSONL session files Claude Code already creates (~/.claude/projects/), parses them into structured turn-pair nodes, and gives you checkpoints you can rewind to — like git commits but for your entire AI coding session (code state + conversation state).
 
 ## Why this exists
 
-Claude Code has session forking (`--fork-session`), resume (`--continue`/`--resume`), and file checkpoints (Esc Esc to rewind) built in. But there's no visibility into any of it. You can't see how sessions relate, can't browse what happened, can't create named save points to rewind to. Pylon is that missing layer.
+Claude Code has session forking (`--fork-session`), resume (`--continue`/`--resume`), and file checkpoints (Esc Esc to rewind) built in. But there's no visibility into any of it. You can't see how sessions relate, can't browse what happened, can't create named save points to rewind to. Hexdeck is that missing layer.
 
 ## What's built (v0)
 
@@ -28,7 +28,7 @@ Claude Code has session forking (`--fork-session`), resume (`--continue`/`--resu
 **Checkpoint system** (`src/checkpoint/`)
 - `create.ts` — Creates a checkpoint capturing: JSONL line count, git commit hash, git diff, branch, changed files, user note
 - `rewind.ts` — Rewinds to a checkpoint by: copying JSONL, truncating to checkpoint line, rewriting session IDs, saving as new session file in `~/.claude/projects/`. Optionally restores git state.
-- `storage.ts` — Stores checkpoints in `~/.pylon/checkpoints/<encoded-project>.json`
+- `storage.ts` — Stores checkpoints in `~/.hexdeck/checkpoints/<encoded-project>.json`
 
 **Key technical discovery:** Claude Code JSONL files can be truncated at clean turn boundaries and resumed via `claude --resume`. The uuid/parentUuid thread links remain intact. This was tested and validated — truncated sessions load cleanly in Claude Code.
 
@@ -46,10 +46,10 @@ Claude Code has session forking (`--fork-session`), resume (`--continue`/`--resu
 - CORS enabled for frontend on localhost:3000
 
 ### CLI (`src/cli/`)
-- `index.ts` — Main pylon CLI:
-  - `pylon checkpoint <note>` — create a checkpoint
-  - `pylon rewind <checkpoint-id>` — rewind to checkpoint (creates truncated JSONL + restores git)
-  - `pylon checkpoints` — list all checkpoints
+- `index.ts` — Main hexdeck CLI:
+  - `hex checkpoint <note>` — create a checkpoint
+  - `hex rewind <checkpoint-id>` — rewind to checkpoint (creates truncated JSONL + restores git)
+  - `hex checkpoints` — list all checkpoints
 - `parse.ts` — Legacy parse CLI: projects, sessions, parse commands
 
 ### Frontend (`frontend/`)
@@ -66,20 +66,20 @@ Key types: SessionEvent, Message, ContentBlock (TextContent | ToolUseContent | T
 ## How to run
 
 ```bash
-# From pylon/
+# From hexdeck/
 make start          # Start API server on :3002
 cd frontend && npm run dev  # Start frontend on :3000
 
 # Checkpoints (run from your project directory)
-npm run pylon -- checkpoint "my save point"
-npm run pylon -- checkpoints
-npm run pylon -- rewind <checkpoint-id>
+npm run hex -- checkpoint "my save point"
+npm run hex -- checkpoints
+npm run hex -- rewind <checkpoint-id>
 ```
 
 ## Directory structure
 
 ```
-pylon/
+hexdeck/
 ├── src/
 │   ├── types/index.ts           # All type definitions
 │   ├── parser/jsonl.ts          # JSONL parser + helpers
@@ -91,7 +91,7 @@ pylon/
 │   │   └── storage.ts           # Checkpoint persistence
 │   ├── server/index.ts          # Hono API server
 │   ├── cli/
-│   │   ├── index.ts             # Main pylon CLI
+│   │   ├── index.ts             # Main hexdeck CLI
 │   │   └── parse.ts             # Legacy parse CLI
 │   └── index.ts                 # Public exports
 ├── frontend/
@@ -120,7 +120,7 @@ pylon/
 ## What's next
 
 ### Near-term
-- **Make it `npx pylon`** — restructure as publishable npm package with bin entry, auto-starts API + opens web UI, works from any directory
+- **Make it `npx hex`** — restructure as publishable npm package with bin entry, auto-starts API + opens web UI, works from any directory
 - **Verify frontend works** — open in browser, fix rendering bugs
 - **Polling/live updates** — frontend refreshes as session grows
 
@@ -134,12 +134,12 @@ pylon/
 - **Session comparison** — diff what happened on two different branches
 
 ### Product/distribution
-- The viral loop: Claude Code user sees screenshot of tree view → runs `npx pylon` → sees their own sessions → shares screenshot
+- The viral loop: Claude Code user sees screenshot of tree view → runs `npx hex` → sees their own sessions → shares screenshot
 - Target: "Built with Opus 4.6" Claude Code hackathon (Feb 10-16, $100k)
 - Judged by Claude team — tool that enhances Claude Code (not replaces it) is the right angle
 
 ## Research context
 
-This project was informed by 7+ user interviews identifying that AI coding tools create "speed without accountability." The core pain: session amnesia, context loss, inability to verify what happened. Pain layers: Memory (losing context), Verification (what did it do?), Calibration (was the approach right?), Flow (restarting from scratch). Pylon addresses Memory and Verification directly.
+This project was informed by 7+ user interviews identifying that AI coding tools create "speed without accountability." The core pain: session amnesia, context loss, inability to verify what happened. Pain layers: Memory (losing context), Verification (what did it do?), Calibration (was the approach right?), Flow (restarting from scratch). Hexdeck addresses Memory and Verification directly.
 
-Claude Code already has the mechanics (forking, checkpoints, resume). Pylon is the visibility and navigation layer on top.
+Claude Code already has the mechanics (forking, checkpoints, resume). Hexdeck is the visibility and navigation layer on top.

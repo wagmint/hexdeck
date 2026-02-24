@@ -10,7 +10,7 @@ export interface PidInfo {
   dashboardDir: string | null;
 }
 
-const PYLON_DIR = join(homedir(), ".pylon");
+const PYLON_DIR = join(homedir(), ".hexdeck");
 const PID_FILE = join(PYLON_DIR, "server.pid");
 
 function ensureDir() {

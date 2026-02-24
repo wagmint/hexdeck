@@ -71,7 +71,7 @@ if (command === "projects") {
   }
 } else {
   console.log(`
-Pylon CLI — Parse Claude Code sessions
+Hexdeck CLI — Parse Claude Code sessions
 
 Commands:
   projects              List all projects with sessions

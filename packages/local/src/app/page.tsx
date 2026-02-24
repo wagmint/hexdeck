@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useLayoutEffect, useMemo } from "react";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useRelay } from "@/hooks/useRelay";
-import type { Collision, DashboardState, RelayStatus } from "@pylon-dev/dashboard-ui";
+import type { Collision, DashboardState, RelayStatus } from "@hexdeck/dashboard-ui";
 import {
   OperatorProvider,
   TopBar,
@@ -15,7 +15,7 @@ import {
   PlanDetail,
   RiskPanel,
   RelayPanel,
-} from "@pylon-dev/dashboard-ui";
+} from "@hexdeck/dashboard-ui";
 
 export default function DashboardPage() {
   type DashboardAgent = DashboardState["agents"][number];
@@ -225,7 +225,7 @@ export default function DashboardPage() {
 
   const { operators, agents, workstreams, collisions, feed, summary } = state;
 
-  // Empty state: Pylon is running but no sessions found
+  // Empty state: Hexdeck is running but no sessions found
   const isEmpty = workstreams.length === 0 && agents.length === 0 && feed.length === 0;
 
   if (isEmpty) {
@@ -240,7 +240,7 @@ export default function DashboardPage() {
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-md px-6">
             <div className="text-dash-text-muted text-4xl mb-6">&#9678;</div>
-            <h2 className="text-lg font-medium text-dash-text mb-3">Pylon is running</h2>
+            <h2 className="text-lg font-medium text-dash-text mb-3">Hexdeck is running</h2>
             <p className="text-sm text-dash-text-muted leading-relaxed mb-6">
               No Claude Code sessions detected yet. Start a Claude Code session in any project
               and it will appear here automatically.

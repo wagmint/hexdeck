@@ -44,7 +44,7 @@ export function MenuBarApp({
           <div className="px-4 py-6 text-center">
             <p className="text-xs text-dash-red">{error}</p>
             <p className="text-[10px] text-dash-text-muted mt-1">
-              Is the Pylon server running?
+              Is the Hexdeck server running?
             </p>
           </div>
         )}

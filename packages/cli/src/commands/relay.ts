@@ -1,4 +1,4 @@
-import type { RelayTarget, RelayConfig, ParsedConnectLink, ExchangedRelayCredentials } from "@pylon-dev/server";
+import type { RelayTarget, RelayConfig, ParsedConnectLink, ExchangedRelayCredentials } from "@hexdeck/server";
 
 export async function relayCommand(args: string[]): Promise<void> {
   const subcommand = args[0];
@@ -16,7 +16,7 @@ export async function relayCommand(args: string[]): Promise<void> {
       return excludeProject(args[1], args.slice(2).join(" "));
     default:
       // If it looks like a connect link, treat it as "connect"
-      if (subcommand && subcommand.startsWith("pylon+")) {
+      if (subcommand && subcommand.startsWith("hexcore+")) {
         return connectRelay(subcommand);
       }
       if (subcommand) {
@@ -30,7 +30,7 @@ export async function relayCommand(args: string[]): Promise<void> {
 // ─── Connect ────────────────────────────────────────────────────────────────
 
 async function connectRelay(link: string): Promise<void> {
-  const { parseConnectLink, exchangeConnectLink, loadRelayConfig, saveRelayConfig } = await import("@pylon-dev/server");
+  const { parseConnectLink, exchangeConnectLink, loadRelayConfig, saveRelayConfig } = await import("@hexdeck/server");
 
   let parsed: ParsedConnectLink;
   try {
@@ -78,19 +78,19 @@ async function connectRelay(link: string): Promise<void> {
 
   console.log("No sessions selected yet.");
   console.log("");
-  console.log("Run `pylon relay sessions` to see active sessions,");
-  console.log("then `pylon relay include <pylonId> <project>` to start sharing.");
+  console.log("Run `hex relay sessions` to see active sessions,");
+  console.log("then `hex relay include <hexcoreId> <project>` to start sharing.");
 }
 
 // ─── List ───────────────────────────────────────────────────────────────────
 
 async function listRelays(): Promise<void> {
-  const { loadRelayConfig } = await import("@pylon-dev/server");
+  const { loadRelayConfig } = await import("@hexdeck/server");
   const config = loadRelayConfig();
 
   if (config.targets.length === 0) {
     console.log("No relay targets configured.");
-    console.log("Use `pylon relay <connect-link>` to add one.");
+    console.log("Use `hex relay <connect-link>` to add one.");
     return;
   }
 
@@ -115,11 +115,11 @@ async function listRelays(): Promise<void> {
 
 async function removeRelay(pylonIdPrefix?: string): Promise<void> {
   if (!pylonIdPrefix) {
-    console.error("Usage: pylon relay remove <pylonId>");
+    console.error("Usage: hex relay remove <hexcoreId>");
     process.exit(1);
   }
 
-  const { loadRelayConfig, saveRelayConfig } = await import("@pylon-dev/server");
+  const { loadRelayConfig, saveRelayConfig } = await import("@hexdeck/server");
   const config = loadRelayConfig();
 
   const matches = config.targets.filter((t) => t.pylonId.startsWith(pylonIdPrefix));
@@ -145,7 +145,7 @@ async function removeRelay(pylonIdPrefix?: string): Promise<void> {
 // ─── Sessions ───────────────────────────────────────────────────────────────
 
 async function listSessions(): Promise<void> {
-  const { getActiveSessions } = await import("@pylon-dev/server");
+  const { getActiveSessions } = await import("@hexdeck/server");
   const sessions = getActiveSessions();
 
   if (sessions.length === 0) {
@@ -179,11 +179,11 @@ async function listSessions(): Promise<void> {
 
 async function includeProject(pylonIdPrefix?: string, projectPath?: string): Promise<void> {
   if (!pylonIdPrefix || !projectPath) {
-    console.error("Usage: pylon relay include <pylonId> <projectPath>");
+    console.error("Usage: hex relay include <hexcoreId> <projectPath>");
     process.exit(1);
   }
 
-  const { loadRelayConfig, saveRelayConfig } = await import("@pylon-dev/server");
+  const { loadRelayConfig, saveRelayConfig } = await import("@hexdeck/server");
   const config = loadRelayConfig();
   const target = findTarget(config, pylonIdPrefix);
 
@@ -204,11 +204,11 @@ async function includeProject(pylonIdPrefix?: string, projectPath?: string): Pro
 
 async function excludeProject(pylonIdPrefix?: string, projectPath?: string): Promise<void> {
   if (!pylonIdPrefix || !projectPath) {
-    console.error("Usage: pylon relay exclude <pylonId> <projectPath>");
+    console.error("Usage: hex relay exclude <hexcoreId> <projectPath>");
     process.exit(1);
   }
 
-  const { loadRelayConfig, saveRelayConfig } = await import("@pylon-dev/server");
+  const { loadRelayConfig, saveRelayConfig } = await import("@hexdeck/server");
   const config = loadRelayConfig();
   const target = findTarget(config, pylonIdPrefix);
 
@@ -255,22 +255,22 @@ function expandHome(p: string): string {
 
 function printRelayHelp(): void {
   console.log(`
-Usage: pylon relay <subcommand> [options]
+Usage: hex relay <subcommand> [options]
 
 Subcommands:
   <connect-link>                           Add/update a relay target
   list                                     List configured relay targets
-  remove <pylonId>                         Remove a relay target
+  remove <hexcoreId>                         Remove a relay target
   sessions                                 List active sessions available to relay
-  include <pylonId> <projectPath>          Start relaying a project
-  exclude <pylonId> <projectPath>          Stop relaying a project
+  include <hexcoreId> <projectPath>          Start relaying a project
+  exclude <hexcoreId> <projectPath>          Stop relaying a project
 
 Examples:
-  pylon relay "pylon+wss://relay.example.com/ws?p=abc&c=connectCode&n=Team"
-  pylon relay list
-  pylon relay sessions
-  pylon relay include abc ~/Code/my-app
-  pylon relay exclude abc ~/Code/my-app
-  pylon relay remove abc
+  hex relay "hexcore+wss://relay.example.com/ws?p=abc&c=connectCode&n=Team"
+  hex relay list
+  hex relay sessions
+  hex relay include abc ~/Code/my-app
+  hex relay exclude abc ~/Code/my-app
+  hex relay remove abc
 `.trim());
 }

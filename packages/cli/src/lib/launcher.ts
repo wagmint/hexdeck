@@ -2,7 +2,7 @@
  * Entry point for the detached background server process.
  * Reads --port and --dashboard-dir from argv.
  */
-import { startServer } from "@pylon-dev/server";
+import { startServer } from "@hexdeck/server";
 
 const args = process.argv.slice(2);
 

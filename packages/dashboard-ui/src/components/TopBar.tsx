@@ -18,7 +18,7 @@ export function TopBar({ summary, operators, relayStatus, onRelayClick }: TopBar
   return (
     <div className="flex items-center justify-between px-4 h-10 bg-dash-surface border-b border-dash-border">
       <div className="font-display font-bold text-sm tracking-tight text-dash-green">
-        PYLON{" "}
+        HEXDECK{" "}
         <span className="font-normal text-dash-text-dim">control surface</span>
       </div>
       <div className="flex items-center gap-6">

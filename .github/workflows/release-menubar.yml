@@ -1,0 +1,118 @@
+name: Release Menubar
+
+on:
+  push:
+    tags:
+      - "menubar-v*"
+
+jobs:
+  build-macos:
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            runner: macos-latest
+          - target: x86_64-apple-darwin
+            runner: macos-13
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/menubar/src-tauri
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: packages/menubar
+          tagName: ${{ github.ref_name }}
+          releaseName: "Pylon ${{ github.ref_name }}"
+          releaseBody: "See the assets below to download and install this version."
+          releaseDraft: false
+          prerelease: false
+          args: --target ${{ matrix.target }}
+
+  update-homebrew:
+    needs: build-macos
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#menubar-v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download release DMGs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --pattern "*.dmg" \
+            --dir artifacts
+
+      - name: Compute SHA256 hashes
+        id: sha
+        run: |
+          ARM_DMG=$(ls artifacts/*aarch64*.dmg 2>/dev/null || ls artifacts/*arm64*.dmg 2>/dev/null)
+          X86_DMG=$(ls artifacts/*x86_64*.dmg 2>/dev/null || ls artifacts/*x64*.dmg 2>/dev/null)
+          echo "arm_sha=$(shasum -a 256 "$ARM_DMG" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "x86_sha=$(shasum -a 256 "$X86_DMG" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "arm_dmg=$(basename "$ARM_DMG")" >> "$GITHUB_OUTPUT"
+          echo "x86_dmg=$(basename "$X86_DMG")" >> "$GITHUB_OUTPUT"
+
+      - name: Update Homebrew tap
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/wagmint/homebrew-pylon.git" tap
+          mkdir -p tap/Casks
+
+          cat > tap/Casks/pylon.rb << 'CASK'
+          cask "pylon" do
+            version "${{ steps.version.outputs.version }}"
+
+            on_arm do
+              url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.sha.outputs.arm_dmg }}"
+              sha256 "${{ steps.sha.outputs.arm_sha }}"
+            end
+
+            on_intel do
+              url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.sha.outputs.x86_dmg }}"
+              sha256 "${{ steps.sha.outputs.x86_sha }}"
+            end
+
+            name "Pylon"
+            desc "Menu bar monitoring utility"
+            homepage "https://github.com/${{ github.repository }}"
+
+            app "Pylon.app"
+
+            zap trash: [
+              "~/Library/Application Support/dev.pylon.menubar",
+              "~/Library/Caches/dev.pylon.menubar",
+            ]
+          end
+          CASK
+
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/pylon.rb
+          git commit -m "Update pylon to ${{ steps.version.outputs.version }}"
+          git push

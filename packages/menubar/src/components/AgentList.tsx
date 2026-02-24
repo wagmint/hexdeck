@@ -82,9 +82,21 @@ function AgentRow({
       />
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-dash-text truncate">
-            {agent.label}
-          </span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-xs font-medium text-dash-text truncate">
+              {agent.label}
+            </span>
+            <span
+              className="text-[8px] font-semibold px-1.5 py-0.5 rounded border font-mono flex-shrink-0"
+              style={
+                agent.agentType === "codex"
+                  ? { color: "var(--dash-green)", borderColor: "rgba(0,232,123,0.3)", backgroundColor: "rgba(0,232,123,0.1)" }
+                  : { color: "var(--dash-blue)", borderColor: "rgba(77,159,255,0.3)", backgroundColor: "rgba(77,159,255,0.1)" }
+              }
+            >
+              {agent.agentType}
+            </span>
+          </div>
           <span className="text-[10px] text-dash-text-muted flex-shrink-0 ml-2">
             {statusLabel[agent.status]}
           </span>

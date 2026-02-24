@@ -5,6 +5,9 @@ on:
     tags:
       - "menubar-v*"
 
+permissions:
+  contents: write
+
 jobs:
   build-macos:
     strategy:
@@ -13,7 +16,7 @@ jobs:
           - target: aarch64-apple-darwin
             runner: macos-latest
           - target: x86_64-apple-darwin
-            runner: macos-13
+            runner: macos-14
     runs-on: ${{ matrix.runner }}
 
     steps:

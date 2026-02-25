@@ -25,6 +25,15 @@ A color-coded tray icon shows the overall state of your agents:
 - **Grey** — no active agents or disconnected
 
 Click the icon to see active agents and current alerts.
+Use the tray icon's right-click menu to toggle the floating widget on/off.
+
+## Keyboard shortcut
+
+Global shortcut to open/focus the popup:
+
+- `Cmd+Ctrl+H`
+
+The same shortcut is shown in the tray icon's right-click menu.
 
 ## Auto-updates
 

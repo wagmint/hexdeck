@@ -1,9 +1,10 @@
 use tauri::{
     image::Image,
-    menu::{Menu, MenuItem},
+    menu::{CheckMenuItem, Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconEvent},
     Manager,
 };
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -15,8 +16,51 @@ struct WidgetPosition {
     y: f64,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+struct WidgetSettings {
+    show_widget: bool,
+}
+
 fn position_file() -> Option<PathBuf> {
     dirs::home_dir().map(|h| h.join(".hexdeck").join("widget-position.json"))
+}
+
+fn settings_file() -> Option<PathBuf> {
+    dirs::home_dir().map(|h| h.join(".hexdeck").join("menubar-settings.json"))
+}
+
+fn load_widget_visibility() -> bool {
+    let Some(path) = settings_file() else {
+        return true;
+    };
+    let Ok(data) = fs::read_to_string(path) else {
+        return true;
+    };
+    let Ok(settings) = serde_json::from_str::<WidgetSettings>(&data) else {
+        return true;
+    };
+    settings.show_widget
+}
+
+fn save_widget_visibility(show_widget: bool) -> Result<(), String> {
+    let path = settings_file().ok_or("Cannot resolve home directory")?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let json = serde_json::to_string(&WidgetSettings { show_widget }).map_err(|e| e.to_string())?;
+    fs::write(&path, json).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn apply_widget_visibility(app: &tauri::AppHandle, show_widget: bool) {
+    if let Some(widget) = app.get_webview_window("widget") {
+        if show_widget {
+            let _ = widget.show();
+            let _ = widget.set_focus();
+        } else {
+            let _ = widget.hide();
+        }
+    }
 }
 
 #[tauri::command]
@@ -61,6 +105,34 @@ fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
 
+fn toggle_main_window_from_tray(
+    app: &tauri::AppHandle,
+    tray: &tauri::tray::TrayIcon,
+    tray_click_guard: &AtomicBool,
+) {
+    if let Some(window) = app.get_webview_window("main") {
+        if window.is_visible().unwrap_or(false) {
+            let _ = window.hide();
+        } else {
+            tray_click_guard.store(true, Ordering::SeqCst);
+            position_window_at_tray(&window, tray);
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    }
+}
+
+fn toggle_main_window_from_shortcut(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        if window.is_visible().unwrap_or(false) {
+            let _ = window.hide();
+        } else {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -68,6 +140,15 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _shortcut, event| {
+                    if event.state() == ShortcutState::Pressed {
+                        toggle_main_window_from_shortcut(app);
+                    }
+                })
+                .build(),
+        )
         .setup(|app| {
             // Hide from dock on macOS
             #[cfg(target_os = "macos")]
@@ -82,13 +163,32 @@ pub fn run() {
             // Shared flag to suppress focus-loss hide right after tray click
             let tray_click_guard: &'static AtomicBool =
                 Box::leak(Box::new(AtomicBool::new(false)));
+            let show_widget_flag: &'static AtomicBool =
+                Box::leak(Box::new(AtomicBool::new(load_widget_visibility())));
 
             // Build right-click context menu
+            let show_widget_item = CheckMenuItem::with_id(
+                app,
+                "toggle_widget",
+                "Show Floating Widget",
+                true,
+                show_widget_flag.load(Ordering::SeqCst),
+                None::<&str>,
+            )?;
+            let shortcut_hint = MenuItem::with_id(
+                app,
+                "shortcut_hint",
+                "Toggle Popup  (Cmd+Ctrl+H)",
+                false,
+                None::<&str>,
+            )?;
             let open_dashboard = MenuItem::with_id(app, "open_dashboard", "Open Dashboard", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&open_dashboard, &quit])?;
+            let menu = Menu::with_items(app, &[&show_widget_item, &shortcut_hint, &open_dashboard, &quit])?;
 
             let guard_for_tray = tray_click_guard;
+            let toggle_widget_menu_item = show_widget_item.clone();
+            let widget_flag_for_menu = show_widget_flag;
             let _tray = tauri::tray::TrayIconBuilder::with_id("main-tray")
                 .icon(grey_icon)
                 .icon_as_template(false)
@@ -98,20 +198,18 @@ pub fn run() {
                 .on_tray_icon_event(move |tray, event| {
                     if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
                         let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
-                            if window.is_visible().unwrap_or(false) {
-                                let _ = window.hide();
-                            } else {
-                                guard_for_tray.store(true, Ordering::SeqCst);
-                                position_window_at_tray(&window, tray);
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
-                        }
+                        toggle_main_window_from_tray(&app, tray, guard_for_tray);
                     }
                 })
-                .on_menu_event(|app, event| {
+                .on_menu_event(move |app, event| {
                     match event.id.as_ref() {
+                        "toggle_widget" => {
+                            let next = !widget_flag_for_menu.load(Ordering::SeqCst);
+                            widget_flag_for_menu.store(next, Ordering::SeqCst);
+                            let _ = toggle_widget_menu_item.set_checked(next);
+                            let _ = save_widget_visibility(next);
+                            apply_widget_visibility(app, next);
+                        }
                         "open_dashboard" => {
                             let _ = std::process::Command::new("open")
                                 .arg("http://localhost:3002")
@@ -124,6 +222,13 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            // Global shortcut: Cmd+Ctrl+H (short, still uncommon).
+            let shortcut = Shortcut::new(
+                Some(Modifiers::SUPER | Modifiers::CONTROL),
+                Code::KeyH,
+            );
+            app.global_shortcut().register(shortcut)?;
 
             // Auto-hide main window on focus loss
             let guard_for_window = tray_click_guard;
@@ -145,13 +250,9 @@ pub fn run() {
                 });
             }
 
-            // Show widget window and briefly focus to activate macOS mouse tracking.
-            // Without this initial focus, mouseenter/mouseleave events are not
-            // delivered to transparent always-on-top windows until the first click.
-            if let Some(widget) = app.get_webview_window("widget") {
-                let _ = widget.show();
-                let _ = widget.set_focus();
-            }
+            // Show/hide widget based on persisted setting.
+            // When shown, briefly focus to activate macOS mouse tracking.
+            apply_widget_visibility(&app.handle().clone(), show_widget_flag.load(Ordering::SeqCst));
 
             Ok(())
         })

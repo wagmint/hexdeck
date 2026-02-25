@@ -14,6 +14,7 @@ interface ExpandedCardProps {
   connected: boolean;
   loading: boolean;
   error: string | null;
+  onClose?: () => void;
 }
 
 export function ExpandedCard({
@@ -23,6 +24,7 @@ export function ExpandedCard({
   connected,
   loading,
   error,
+  onClose,
 }: ExpandedCardProps) {
   const agentCount = state?.summary.activeAgents ?? 0;
   const agents = state?.agents ?? [];
@@ -42,6 +44,16 @@ export function ExpandedCard({
           <span className="text-xs text-dash-text-dim">
             {agentCount} agent{agentCount !== 1 ? "s" : ""}
           </span>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="text-dash-text-muted hover:text-dash-text transition-colors text-sm leading-none w-5 h-5 rounded hover:bg-dash-surface-2"
+              aria-label="Close"
+              title="Close (Esc)"
+            >
+              ×
+            </button>
+          )}
           {!connected && (
             <span className="text-[10px] text-dash-red font-medium">
               disconnected

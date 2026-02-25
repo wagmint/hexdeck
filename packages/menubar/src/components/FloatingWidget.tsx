@@ -81,6 +81,7 @@ export function FloatingWidget({
           connected={connected}
           loading={loading}
           error={error}
+          onClose={widget.collapseToFavicon}
         />
       )}
     </div>

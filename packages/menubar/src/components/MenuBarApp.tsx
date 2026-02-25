@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-shell";
 import type { DashboardState } from "../lib/types";
 import type { PylonAlert, TraySeverity } from "../lib/alerts";
@@ -24,6 +26,20 @@ export function MenuBarApp({
 }: MenuBarAppProps) {
   const agentCount = state?.summary.activeAgents ?? 0;
   const agents = state?.agents ?? [];
+  const closeWindow = () => {
+    getCurrentWindow().hide();
+  };
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        closeWindow();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   return (
     <div className="flex flex-col h-screen bg-dash-bg rounded-xl overflow-hidden shadow-lg">
@@ -31,6 +47,7 @@ export function MenuBarApp({
         severity={severity}
         agentCount={agentCount}
         connected={connected}
+        onClose={closeWindow}
       />
 
       <div className="flex-1 overflow-y-auto">

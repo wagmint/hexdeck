@@ -4,7 +4,20 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconEvent},
     Manager,
 };
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
+
+#[derive(Serialize, Deserialize, Clone)]
+struct WidgetPosition {
+    x: f64,
+    y: f64,
+}
+
+fn position_file() -> Option<PathBuf> {
+    dirs::home_dir().map(|h| h.join(".hexdeck").join("widget-position.json"))
+}
 
 #[tauri::command]
 fn update_tray_icon(app: tauri::AppHandle, color: String) -> Result<(), String> {
@@ -23,6 +36,24 @@ fn update_tray_icon(app: tauri::AppHandle, color: String) -> Result<(), String> 
     }
 
     Ok(())
+}
+
+#[tauri::command]
+fn save_widget_position(x: f64, y: f64) -> Result<(), String> {
+    let path = position_file().ok_or("Cannot resolve home directory")?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let json = serde_json::to_string(&WidgetPosition { x, y }).map_err(|e| e.to_string())?;
+    fs::write(&path, json).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn load_widget_position() -> Option<WidgetPosition> {
+    let path = position_file()?;
+    let data = fs::read_to_string(path).ok()?;
+    serde_json::from_str(&data).ok()
 }
 
 #[tauri::command]
@@ -94,7 +125,7 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            // Auto-hide on focus loss
+            // Auto-hide main window on focus loss
             let guard_for_window = tray_click_guard;
             if let Some(window) = app.get_webview_window("main") {
                 let w = window.clone();
@@ -114,9 +145,22 @@ pub fn run() {
                 });
             }
 
+            // Show widget window and briefly focus to activate macOS mouse tracking.
+            // Without this initial focus, mouseenter/mouseleave events are not
+            // delivered to transparent always-on-top windows until the first click.
+            if let Some(widget) = app.get_webview_window("widget") {
+                let _ = widget.show();
+                let _ = widget.set_focus();
+            }
+
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![update_tray_icon, quit_app])
+        .invoke_handler(tauri::generate_handler![
+            update_tray_icon,
+            save_widget_position,
+            load_widget_position,
+            quit_app
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

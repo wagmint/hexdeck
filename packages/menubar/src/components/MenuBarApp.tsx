@@ -1,4 +1,5 @@
 import { open } from "@tauri-apps/plugin-shell";
+import { invoke } from "@tauri-apps/api/core";
 import type { DashboardState } from "../lib/types";
 import type { PylonAlert, TraySeverity } from "../lib/alerts";
 import { StatusHeader } from "./StatusHeader";
@@ -66,6 +67,12 @@ export function MenuBarApp({
           className="w-full text-xs text-dash-blue hover:text-dash-text transition-colors py-1.5 rounded-md hover:bg-dash-surface-2"
         >
           Open Dashboard
+        </button>
+        <button
+          onClick={() => invoke("quit_app")}
+          className="w-full mt-1 text-xs text-dash-text-muted hover:text-dash-red transition-colors py-1.5 rounded-md hover:bg-dash-surface-2"
+        >
+          Quit Hexdeck
         </button>
       </div>
     </div>

@@ -24,6 +24,11 @@ fn update_tray_icon(app: tauri::AppHandle, color: String) -> Result<(), String> 
     Ok(())
 }
 
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -90,7 +95,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![update_tray_icon])
+        .invoke_handler(tauri::generate_handler![update_tray_icon, quit_app])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

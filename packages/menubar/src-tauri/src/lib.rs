@@ -1,6 +1,7 @@
 use tauri::{
     image::Image,
-    tray::{MouseButtonState, TrayIconEvent},
+    menu::{Menu, MenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconEvent},
     Manager,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -51,13 +52,20 @@ pub fn run() {
             let tray_click_guard: &'static AtomicBool =
                 Box::leak(Box::new(AtomicBool::new(false)));
 
+            // Build right-click context menu
+            let open_dashboard = MenuItem::with_id(app, "open_dashboard", "Open Dashboard", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&open_dashboard, &quit])?;
+
             let guard_for_tray = tray_click_guard;
             let _tray = tauri::tray::TrayIconBuilder::with_id("main-tray")
                 .icon(grey_icon)
-                .icon_as_template(true)
+                .icon_as_template(false)
                 .tooltip("Hexdeck")
+                .menu(&menu)
+                .show_menu_on_left_click(false)
                 .on_tray_icon_event(move |tray, event| {
-                    if let TrayIconEvent::Click { button_state: MouseButtonState::Up, .. } = event {
+                    if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
                         let app = tray.app_handle();
                         if let Some(window) = app.get_webview_window("main") {
                             if window.is_visible().unwrap_or(false) {
@@ -69,6 +77,19 @@ pub fn run() {
                                 let _ = window.set_focus();
                             }
                         }
+                    }
+                })
+                .on_menu_event(|app, event| {
+                    match event.id.as_ref() {
+                        "open_dashboard" => {
+                            let _ = std::process::Command::new("open")
+                                .arg("http://localhost:3002")
+                                .spawn();
+                        }
+                        "quit" => {
+                            app.exit(0);
+                        }
+                        _ => {}
                     }
                 })
                 .build(app)?;

@@ -1,11 +1,11 @@
 import type { TraySeverity } from "../lib/alerts";
 
-const dotColorClass: Record<TraySeverity, string> = {
-  red: "bg-dash-red",
-  yellow: "bg-dash-yellow",
-  blue: "bg-dash-blue",
-  green: "bg-dash-green",
-  grey: "bg-dash-text-muted",
+const hexColor: Record<TraySeverity, string> = {
+  green: "var(--dash-green)",
+  blue: "var(--dash-blue)",
+  yellow: "var(--dash-yellow)",
+  red: "var(--dash-red)",
+  grey: "var(--dash-text-muted)",
 };
 
 const pulseClass: Record<TraySeverity, string> = {
@@ -30,10 +30,24 @@ export function StatusHeader({
   return (
     <div className="flex items-center justify-between px-4 py-3 border-b border-dash-border">
       <div className="flex items-center gap-2.5">
-        <div
-          className={`w-2.5 h-2.5 ${dotColorClass[severity]} ${pulseClass[severity]}`}
-          style={{ clipPath: "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)" }}
-        />
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 44 44"
+          className={pulseClass[severity]}
+        >
+          <polygon
+            points="22,3 38.5,12.5 38.5,31.5 22,41 5.5,31.5 5.5,12.5"
+            fill="none"
+            stroke={hexColor[severity]}
+            strokeWidth="1.5"
+            opacity="0.8"
+          />
+          <polygon
+            points="22,11 31.5,16.5 31.5,27.5 22,33 12.5,27.5 12.5,16.5"
+            fill={hexColor[severity]}
+          />
+        </svg>
         <span className="text-sm font-semibold text-dash-text">Hexdeck</span>
       </div>
       <div className="flex items-center gap-2">

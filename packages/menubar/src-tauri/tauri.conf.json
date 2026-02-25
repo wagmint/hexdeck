@@ -16,7 +16,7 @@
         "label": "main",
         "title": "Hexdeck",
         "width": 360,
-        "height": 520,
+        "height": 460,
         "resizable": false,
         "decorations": false,
         "transparent": true,
@@ -26,6 +26,7 @@
         "focus": false
       }
     ],
+    "macOSPrivateApi": true,
     "security": {
       "csp": null
     }

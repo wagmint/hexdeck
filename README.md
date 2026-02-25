@@ -1,8 +1,8 @@
 # Hexdeck
 
-**Local observability for Claude Code sessions.**
+**Local observability for Claude Code and Codex sessions.**
 
-Hexdeck reads the JSONL session files Claude Code writes to `~/.claude/projects/`, parses them into structured turn-by-turn data, and serves a live dashboard showing what your agents are doing in real time.
+Hexdeck reads local session logs from Claude Code (`~/.claude/projects/`) and Codex (`~/.codex/sessions/`), parses them into structured turn-by-turn data, and serves a live dashboard showing what your agents are doing in real time.
 
 <!-- TODO: Add a GIF/screenshot of the main dashboard here -->
 <!-- ![Hexdeck Dashboard](docs/assets/dashboard.png) -->
@@ -39,7 +39,7 @@ Relay links now use short-lived one-time codes (`?c=...`) instead of embedded au
 ## Features
 
 ### Live Dashboard
-Real-time view of all active Claude Code sessions across your machine. See which agents are running, what files they're touching, and what they're working on — updated every second via SSE.
+Real-time view of all active Claude Code and Codex sessions across your machine. See which agents are running, what files they're touching, and what they're working on — updated every second via SSE.
 
 <!-- TODO: screenshot of dashboard with active sessions -->
 
@@ -94,7 +94,7 @@ JSON API at `localhost:3002/api/` for building your own tooling.
 
 | Endpoint | Description |
 |---|---|
-| `GET /api/projects` | List all projects with Claude Code sessions |
+| `GET /api/projects` | List all projects with Claude Code and Codex sessions |
 | `GET /api/projects/:name/sessions` | List sessions for a project |
 | `GET /api/sessions/:id` | Parsed session with turn nodes and stats |
 | `GET /api/sessions/active` | Currently active sessions |
@@ -104,7 +104,7 @@ JSON API at `localhost:3002/api/` for building your own tooling.
 
 ## How It Works
 
-Claude Code stores session data as JSONL files in `~/.claude/projects/`. Hexdeck scans these files, parses the events into structured **turn-pair nodes** (one user message + everything Claude did in response), and computes dashboard state including active agents, file collisions, risk signals, and a live feed.
+Claude Code stores session data under `~/.claude/projects/` and Codex stores session logs under `~/.codex/sessions/`. Hexdeck scans both sources, parses the events into structured **turn-pair nodes** (one user message + everything the agent did in response), and computes dashboard state including active agents, file collisions, risk signals, and a live feed.
 
 The server is a single [Hono](https://hono.dev) process that serves both the API and the static dashboard.
 
@@ -126,7 +126,7 @@ npm run build  # Builds dashboard-ui, dashboard, server, and CLI
 ## Requirements
 
 - Node.js >= 20
-- Claude Code installed (creates session files in `~/.claude/projects/`)
+- Claude Code and/or Codex installed (session logs in `~/.claude/projects/` and `~/.codex/sessions/`)
 
 ## Contributing
 

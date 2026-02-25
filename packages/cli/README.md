@@ -1,6 +1,6 @@
 # Hexdeck
 
-Real-time dashboard for your Claude Code sessions.
+Real-time dashboard for your Claude Code and Codex sessions.
 
 See what your agents are doing, track plans and progress, detect file collisions, and monitor costs — all locally.
 
@@ -26,7 +26,7 @@ Hexdeck runs entirely on your machine. No data is sent externally.
 
 | | Details |
 |---|---|
-| **Reads** | `~/.claude/projects/` (session logs), `git status` (collision detection) |
+| **Reads** | `~/.claude/projects/` and `~/.codex/sessions/` (session logs), `git status` (collision detection) |
 | **Writes** | `~/.hexdeck/` (pid file, config, plan index) |
 | **Network** | `localhost` only — zero outbound connections |
 | **Telemetry** | None. No analytics, no tracking, no phone-home. |
@@ -48,7 +48,7 @@ hex open               # Open dashboard in browser
 ## Requirements
 
 - Node.js >= 20
-- Claude Code installed (`~/.claude/projects/` must exist)
+- Claude Code and/or Codex installed (`~/.claude/projects/` and/or `~/.codex/sessions/` must exist)
 
 ## Upgrade
 

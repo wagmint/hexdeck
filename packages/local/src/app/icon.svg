@@ -1,24 +1,60 @@
-<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
-  <rect width="256" height="256" fill="#000000" />
-  <g transform="translate(0 14)">
-    <path
-      d="M128 40L73 72V136M128 40L183 72V136M73 136L128 168L183 136"
-      fill="none"
-      stroke="#00D8FF"
-      stroke-width="12"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    />
-    <ellipse
-      cx="128"
-      cy="124"
-      rx="112"
-      ry="28"
-      transform="rotate(-18 128 124)"
-      fill="none"
-      stroke="#00D8FF"
-      stroke-width="12"
-      stroke-linecap="round"
-    />
-  </g>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="deckCore" cx="50%" cy="45%" r="58%">
+      <stop offset="0%" stop-color="#DDFFE9" stop-opacity="0.98" />
+      <stop offset="38%" stop-color="#51F2A1" stop-opacity="0.95" />
+      <stop offset="100%" stop-color="#00E87B" stop-opacity="1" />
+    </radialGradient>
+    <radialGradient id="deckAura" cx="50%" cy="50%" r="62%">
+      <stop offset="0%" stop-color="#8CFFBD" stop-opacity="0.9" />
+      <stop offset="52%" stop-color="#00E87B" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#00E87B" stop-opacity="0" />
+    </radialGradient>
+    <filter id="deckGlowStrong" x="-70%" y="-70%" width="240%" height="240%">
+      <feGaussianBlur stdDeviation="18" />
+    </filter>
+    <filter id="deckGlowSoft" x="-70%" y="-70%" width="240%" height="240%">
+      <feGaussianBlur stdDeviation="30" />
+    </filter>
+    <filter id="deckCoreGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="10" />
+    </filter>
+  </defs>
+
+  <polygon
+    points="512,232 746,367 746,657 512,792 278,657 278,367"
+    fill="none"
+    stroke="#00E87B"
+    stroke-width="12"
+    opacity="0.6"
+    filter="url(#deckGlowSoft)"
+  />
+  <polygon
+    points="512,232 746,367 746,657 512,792 278,657 278,367"
+    fill="none"
+    stroke="#00E87B"
+    stroke-width="10"
+    opacity="0.9"
+    filter="url(#deckGlowStrong)"
+  />
+  <polygon
+    points="512,232 746,367 746,657 512,792 278,657 278,367"
+    fill="none"
+    stroke="#00E87B"
+    stroke-width="10"
+    opacity="0.95"
+  />
+
+  <circle cx="512" cy="512" r="208" fill="url(#deckAura)" filter="url(#deckGlowSoft)" />
+  <circle cx="512" cy="512" r="156" fill="url(#deckAura)" />
+
+  <polygon
+    points="512,418 618,479 618,601 512,662 406,601 406,479"
+    fill="url(#deckCore)"
+    filter="url(#deckCoreGlow)"
+  />
+  <polygon
+    points="512,418 618,479 618,601 512,662 406,601 406,479"
+    fill="url(#deckCore)"
+  />
 </svg>

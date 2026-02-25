@@ -17,7 +17,27 @@ interface TopBarProps {
 export function TopBar({ summary, operators, relayStatus, onRelayClick }: TopBarProps) {
   return (
     <div className="flex items-center justify-between px-4 h-10 bg-dash-surface border-b border-dash-border">
-      <div className="font-display font-bold text-sm tracking-tight text-dash-green">
+      <div className="inline-flex items-center gap-2 font-display font-bold text-sm tracking-tight text-dash-green">
+        <svg viewBox="0 0 64 64" aria-hidden="true" className="w-4 h-4 shrink-0">
+          <defs>
+            <radialGradient id="hexdeckTopbarCore" cx="50%" cy="45%" r="60%">
+              <stop offset="0%" stopColor="#DDFFE9" />
+              <stop offset="45%" stopColor="#51F2A1" />
+              <stop offset="100%" stopColor="#00E87B" />
+            </radialGradient>
+          </defs>
+          <polygon
+            points="32,6 54,19 54,45 32,58 10,45 10,19"
+            fill="none"
+            stroke="#00E87B"
+            strokeWidth="3"
+            strokeLinejoin="round"
+          />
+          <polygon
+            points="32,21 41,26 41,38 32,43 23,38 23,26"
+            fill="url(#hexdeckTopbarCore)"
+          />
+        </svg>
         HEXDECK{" "}
         <span className="font-normal text-dash-text-dim">control surface</span>
       </div>

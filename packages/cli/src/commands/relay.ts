@@ -266,7 +266,7 @@ Subcommands:
   exclude <hexcoreId> <projectPath>          Stop relaying a project
 
 Examples:
-  hex relay "hexcore+wss://relay.example.com/ws?p=abc&c=connectCode&n=Team"
+  hex relay "hexcore+wss://relay.hexcore.app/ws?p=abc&c=connectCode&n=Team"
   hex relay list
   hex relay sessions
   hex relay include abc ~/Code/my-app

@@ -85,7 +85,7 @@ hex relay remove <hexcoreId>                # Remove relay target
 Example connect link format:
 
 ```text
-hexcore+wss://relay.example.com/ws?p=<hexcoreId>&c=<connectCode>&n=<teamName>
+hexcore+wss://relay.hexcore.app/ws?p=<hexcoreId>&c=<connectCode>&n=<teamName>
 ```
 
 ## API
@@ -137,7 +137,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
 For cloud coordination across machines, use Hexcore:
 
 - Cloud repo: https://github.com/wagmint/hexcore
-- Cloud docs: https://hexcore.dev/docs
+- Cloud docs: https://hexcore.app/docs
 
 ## License
 

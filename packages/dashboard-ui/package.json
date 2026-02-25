@@ -1,6 +1,6 @@
 {
   "name": "@hexdeck/dashboard-ui",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Shared dashboard UI components for Hexdeck",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

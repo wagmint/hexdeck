@@ -56,13 +56,18 @@ export function useWidgetState(): WidgetState {
     let newX = pos.x - widthDelta;
     let newY = pos.y;
 
-    // Keep on screen
-    const screenWidth = window.screen.availWidth * scale;
-    const screenHeight = window.screen.availHeight * scale;
-    if (newX + newPhysWidth > screenWidth) newX = screenWidth - newPhysWidth;
-    if (newY + newPhysHeight > screenHeight) newY = screenHeight - newPhysHeight;
-    newX = Math.max(0, newX);
-    newY = Math.max(0, newY);
+    // Keep on screen — use current monitor bounds (multi-monitor aware)
+    const monitor = await win.currentMonitor();
+    if (monitor) {
+      const monX = monitor.position.x;
+      const monY = monitor.position.y;
+      const monW = monitor.size.width;
+      const monH = monitor.size.height;
+      if (newX + newPhysWidth > monX + monW) newX = monX + monW - newPhysWidth;
+      if (newY + newPhysHeight > monY + monH) newY = monY + monH - newPhysHeight;
+      if (newX < monX) newX = monX;
+      if (newY < monY) newY = monY;
+    }
 
     await win.setPosition(new PhysicalPosition(newX, newY));
 

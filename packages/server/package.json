@@ -10,6 +10,8 @@
     "hex": "tsx src/cli/index.ts",
     "parse": "tsx src/cli/parse.ts",
     "build": "tsc",
+    "compile": "bun build src/standalone.ts --compile --outfile dist/hexdeck-server",
+    "compile:dev": "bun build src/standalone.ts --compile --outfile dist/hexdeck-server",
     "test": "vitest"
   },
   "license": "MIT",

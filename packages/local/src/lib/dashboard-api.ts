@@ -1,6 +1,6 @@
 import type { DashboardState, FeedEvent } from "@hexdeck/dashboard-ui";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:7433";
 
 export const SSE_DASHBOARD_URL = `${API_BASE}/api/dashboard/stream`;
 

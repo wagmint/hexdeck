@@ -39,7 +39,7 @@ Claude Code has session forking (`--fork-session`), resume (`--continue`/`--resu
 - Lines are threaded via uuid/parentUuid — truncation works if you cut at turn boundaries
 
 ### API server (`src/server/index.ts`)
-- Hono server on port 3002
+- Hono server on port 7433
 - `GET /api/projects` — list all projects
 - `GET /api/projects/:name/sessions` — list sessions for a project
 - `GET /api/sessions/:id` — full parsed session with turn nodes and stats
@@ -67,7 +67,7 @@ Key types: SessionEvent, Message, ContentBlock (TextContent | ToolUseContent | T
 
 ```bash
 # From hexdeck/
-make start          # Start API server on :3002
+make start          # Start API server on :7433
 cd frontend && npm run dev  # Start frontend on :3000
 
 # Checkpoints (run from your project directory)

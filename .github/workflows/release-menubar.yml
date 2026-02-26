@@ -14,8 +14,10 @@ jobs:
       matrix:
         include:
           - target: aarch64-apple-darwin
+            bun_target: bun-darwin-arm64
             runner: macos-latest
           - target: x86_64-apple-darwin
+            bun_target: bun-darwin-x64
             runner: macos-14
     runs-on: ${{ matrix.runner }}
 
@@ -35,7 +37,23 @@ jobs:
         with:
           workspaces: packages/menubar/src-tauri
 
+      - uses: oven-sh/setup-bun@v2
+
       - run: npm ci
+
+      - name: Build dashboard static export
+        run: npm run build --workspace=packages/dashboard-ui && npm run build --workspace=packages/local
+
+      - name: Compile server binary
+        run: |
+          cd packages/server
+          bun build src/standalone.ts --compile --target=${{ matrix.bun_target }} --outfile dist/hexdeck-server
+
+      - name: Stage bundled resources
+        run: |
+          mkdir -p packages/menubar/src-tauri/binaries
+          cp packages/server/dist/hexdeck-server packages/menubar/src-tauri/binaries/hexdeck-server
+          cp -r packages/local/out packages/menubar/src-tauri/dashboard
 
       - uses: tauri-apps/tauri-action@v0
         env:

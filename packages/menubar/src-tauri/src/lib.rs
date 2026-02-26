@@ -7,8 +7,10 @@ use tauri::{
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::net::TcpStream;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Clone)]
 struct WidgetPosition {
@@ -61,6 +63,140 @@ fn apply_widget_visibility(app: &tauri::AppHandle, show_widget: bool) {
             let _ = widget.hide();
         }
     }
+}
+
+// ─── Server Lifecycle ──────────────────────────────────────────────────────
+
+const SERVER_PORT: u16 = 7433;
+
+#[derive(Deserialize)]
+struct PidInfo {
+    pid: u64,
+    #[allow(dead_code)]
+    port: u16,
+}
+
+fn hexdeck_dir() -> Option<PathBuf> {
+    dirs::home_dir().map(|h| h.join(".hexdeck"))
+}
+
+fn is_server_reachable() -> bool {
+    TcpStream::connect_timeout(
+        &std::net::SocketAddr::from(([127, 0, 0, 1], SERVER_PORT)),
+        Duration::from_secs(2),
+    )
+    .is_ok()
+}
+
+fn load_pid_info() -> Option<PidInfo> {
+    let path = hexdeck_dir()?.join("server.pid");
+    let data = fs::read_to_string(path).ok()?;
+    serde_json::from_str(&data).ok()
+}
+
+fn is_pid_running(pid: u64) -> bool {
+    unsafe { libc::kill(pid as i32, 0) == 0 }
+}
+
+fn spawn_server(app: &tauri::AppHandle) -> Result<(), String> {
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .map_err(|e| format!("Cannot resolve resource dir: {e}"))?;
+
+    let binary = resource_dir.join("hexdeck-server");
+    if !binary.exists() {
+        return Err(format!("Server binary not found at {}", binary.display()));
+    }
+
+    // Ensure executable
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(&binary, fs::Permissions::from_mode(0o755));
+    }
+
+    let dashboard_dir = resource_dir.join("dashboard");
+    let mut cmd = std::process::Command::new(&binary);
+    cmd.arg("--port").arg(SERVER_PORT.to_string());
+    if dashboard_dir.exists() {
+        cmd.arg("--dashboard-dir")
+            .arg(dashboard_dir.to_string_lossy().as_ref());
+    }
+
+    // Detach: new session so it survives menubar exit
+    #[cfg(unix)]
+    unsafe {
+        use std::os::unix::process::CommandExt;
+        cmd.pre_exec(|| {
+            libc::setsid();
+            Ok(())
+        });
+    }
+
+    cmd.stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map_err(|e| format!("Failed to spawn server: {e}"))?;
+
+    Ok(())
+}
+
+/// Track whether we've already attempted (and failed) to spawn the server.
+/// Prevents repeated spawn attempts when the binary is a placeholder or missing.
+static SPAWN_ATTEMPTED: AtomicBool = AtomicBool::new(false);
+
+fn ensure_server_running(app: &tauri::AppHandle) {
+    if is_server_reachable() {
+        // Server is up — reset the flag so a future kill+restart can re-trigger
+        SPAWN_ATTEMPTED.store(false, Ordering::SeqCst);
+        return;
+    }
+
+    // Clean stale PID
+    if let Some(info) = load_pid_info() {
+        if !is_pid_running(info.pid) {
+            if let Some(dir) = hexdeck_dir() {
+                let _ = fs::remove_file(dir.join("server.pid"));
+            }
+        } else {
+            // PID running but port not reachable yet — wait a bit
+            for _ in 0..10 {
+                std::thread::sleep(Duration::from_millis(500));
+                if is_server_reachable() {
+                    return;
+                }
+            }
+        }
+    }
+
+    // Only attempt to spawn once until a successful connection resets the flag
+    if SPAWN_ATTEMPTED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+
+    // Spawn and wait for it to become reachable
+    if let Err(e) = spawn_server(app) {
+        eprintln!("hexdeck: {e}");
+        return;
+    }
+
+    for _ in 0..10 {
+        std::thread::sleep(Duration::from_millis(500));
+        if is_server_reachable() {
+            SPAWN_ATTEMPTED.store(false, Ordering::SeqCst);
+            return;
+        }
+    }
+    eprintln!("hexdeck: server spawned but not reachable after 5s");
+}
+
+#[tauri::command]
+fn ensure_server(app: tauri::AppHandle) {
+    std::thread::spawn(move || {
+        ensure_server_running(&app);
+    });
 }
 
 #[tauri::command]
@@ -156,6 +292,12 @@ pub fn run() {
                 app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             }
 
+            // Ensure the Hexdeck server is running (non-blocking)
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                ensure_server_running(&handle);
+            });
+
             // Create tray icon
             let grey_icon = Image::from_bytes(include_bytes!("../icons/icon-grey.png"))
                 .expect("Failed to load tray icon");
@@ -212,7 +354,7 @@ pub fn run() {
                         }
                         "open_dashboard" => {
                             let _ = std::process::Command::new("open")
-                                .arg("http://localhost:3002")
+                                .arg("http://localhost:7433")
                                 .spawn();
                         }
                         "quit" => {
@@ -260,7 +402,8 @@ pub fn run() {
             update_tray_icon,
             save_widget_position,
             load_widget_position,
-            quit_app
+            quit_app,
+            ensure_server
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

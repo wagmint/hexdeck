@@ -14,7 +14,7 @@ function getArg(name: string): string | undefined {
   return undefined;
 }
 
-const port = parseInt(getArg("--port") ?? "3002", 10);
+const port = parseInt(getArg("--port") ?? "7433", 10);
 const dashboardDir = getArg("--dashboard-dir") ?? undefined;
 
 startServer({ port, dashboardDir });

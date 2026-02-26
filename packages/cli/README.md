@@ -9,7 +9,7 @@ npm install -g @hexdeck/cli
 hex start
 ```
 
-Opens a live dashboard at `http://localhost:3002`.
+Opens a live dashboard at `http://localhost:7433`.
 
 ## What You Get
 

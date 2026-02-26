@@ -1,7 +1,7 @@
 # Variables
 NPM = npm
 NPX = npx
-API_PORT = 3002
+API_PORT = 7433
 FRONTEND_PORT = 3000
 LEVEL ?= patch
 

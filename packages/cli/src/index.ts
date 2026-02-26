@@ -34,7 +34,7 @@ Commands:
   help        Show this help message
 
 Options (start):
-  --port N        Port number (default: 3002)
+  --port N        Port number (default: 7433)
   --foreground    Run in foreground instead of background
 
 Relay subcommands:
@@ -51,7 +51,7 @@ async function main() {
   switch (command) {
     case "start":
       await startCommand({
-        port: parseInt(getOption("--port", "3002"), 10),
+        port: parseInt(getOption("--port", "7433"), 10),
         foreground: getFlag("--foreground"),
       });
       break;
@@ -65,7 +65,7 @@ async function main() {
       // Small delay to let the port free up
       await new Promise((r) => setTimeout(r, 500));
       await startCommand({
-        port: parseInt(getOption("--port", "3002"), 10),
+        port: parseInt(getOption("--port", "7433"), 10),
         foreground: getFlag("--foreground"),
       });
       break;
@@ -81,7 +81,7 @@ async function main() {
     }
 
     case "open": {
-      const port = getOption("--port", "3002");
+      const port = getOption("--port", "7433");
       const url = `http://localhost:${port}`;
       console.log(`Opening ${url}...`);
       if (process.platform === "darwin") {

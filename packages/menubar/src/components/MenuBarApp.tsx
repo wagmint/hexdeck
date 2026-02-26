@@ -79,7 +79,7 @@ export function MenuBarApp({
 
       <div className="border-t border-dash-border px-3 py-2">
         <button
-          onClick={() => open("http://localhost:3002")}
+          onClick={() => open("http://localhost:7433")}
           className="w-full text-xs text-dash-blue hover:text-dash-text transition-colors py-1.5 rounded-md hover:bg-dash-surface-2"
         >
           Open Dashboard

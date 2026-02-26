@@ -13,7 +13,7 @@ npm install
 ### Running in development
 
 ```bash
-npm run dev           # Runs Next.js dashboard (:3000) + API server (:3002)
+npm run dev           # Runs Next.js dashboard (:3000) + API server (:7433)
 npm run dev:server    # API server only
 npm run dev:local     # Dashboard only
 ```

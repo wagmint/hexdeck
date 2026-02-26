@@ -285,7 +285,7 @@ export function createApp(options?: { dashboardDir?: string }): Hono {
 // ─── Server Starter ──────────────────────────────────────────────────────────
 
 export function startServer(options?: StartServerOptions): ServerType {
-  const port = options?.port ?? parseInt(process.env.PORT ?? "3002", 10);
+  const port = options?.port ?? parseInt(process.env.PORT ?? "7433", 10);
   const app = createApp({ dashboardDir: options?.dashboardDir });
 
   const server = serve({ fetch: app.fetch, port }, (info) => {

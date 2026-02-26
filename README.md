@@ -14,7 +14,7 @@ npm install -g @hexdeck/cli
 hex start
 ```
 
-Opens `http://localhost:3002` with the dashboard. That's it.
+Opens `http://localhost:7433` with the dashboard. That's it.
 
 ### Menu bar app (macOS)
 
@@ -90,7 +90,7 @@ hexcore+wss://relay.hexcore.app/ws?p=<hexcoreId>&c=<connectCode>&n=<teamName>
 
 ## API
 
-JSON API at `localhost:3002/api/` for building your own tooling.
+JSON API at `localhost:7433/api/` for building your own tooling.
 
 | Endpoint | Description |
 |---|---|
@@ -114,7 +114,7 @@ The server is a single [Hono](https://hono.dev) process that serves both the API
 git clone https://github.com/wagmint/hexdeck.git
 cd hexdeck
 npm install
-npm run dev    # Next.js on :3000 + API on :3002
+npm run dev    # Next.js on :3000 + API on :7433
 ```
 
 Build everything:

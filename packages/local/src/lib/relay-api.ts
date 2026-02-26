@@ -1,6 +1,6 @@
 import type { RelayTargetInfo } from "@hexdeck/dashboard-ui";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:7433";
 
 export async function getRelayTargets(): Promise<RelayTargetInfo[]> {
   const res = await fetch(`${API_BASE}/api/relay/targets`);

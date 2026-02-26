@@ -1,6 +1,6 @@
 {
   "name": "@hexdeck/cli",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Real-time dashboard for Claude Code sessions — monitor agents, track plans, detect collisions",
   "type": "module",
   "license": "MIT",

@@ -3,10 +3,14 @@
 import { startCommand } from "./commands/start.js";
 import { stopCommand } from "./commands/stop.js";
 import { statusCommand } from "./commands/status.js";
+import { checkForUpdate } from "./lib/update-check.js";
 import { exec } from "node:child_process";
 
 const args = process.argv.slice(2);
 const command = args[0];
+
+// Fire off update check immediately (non-blocking)
+const updateMessage = checkForUpdate();
 
 function getFlag(name: string): boolean {
   return args.includes(name);
@@ -109,7 +113,12 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+main()
+  .then(async () => {
+    const msg = await updateMessage;
+    if (msg) console.log(msg);
+  })
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });

@@ -16,7 +16,7 @@
 
 ---
 
-Hexdeck reads local session logs from [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [Codex](https://github.com/openai/codex), parses them into structured turn-by-turn data, and serves a live dashboard showing what your agents are doing in real time.
+Hexdeck reads local session logs from [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [Codex](https://github.com/openai/codex), parses them into structured turn-by-turn data, and serves a live dashboard showing what your agents are doing in real time. Part of [Hexcore](https://hexcore.app).
 
 <p align="center">
   <img src=".github/assets/dashboard.png" alt="Hexdeck Dashboard" width="900">
@@ -142,13 +142,13 @@ npm run build  # Builds dashboard-ui, dashboard, server, and CLI
 
 ## Hexcore
 
-For multi-machine coordination, connect Hexdeck instances through [Hexcore](https://github.com/wagmint/hexcore) — a cloud relay that shares operator state across your team in real time.
+For multi-machine coordination, connect Hexdeck instances through [Hexcore](https://hexcore.app) — a cloud relay that shares operator state across your team in real time.
 
 <p align="center">
   <img src=".github/assets/relay.png" alt="Hexcore relay diagram" width="500">
 </p>
 
-- [Hexcore repo](https://github.com/wagmint/hexcore)
+- [Hexcore](https://hexcore.app)
 - [Documentation](https://hexcore.app/docs)
 
 ## Contributing

@@ -1,7 +1,9 @@
 {
   "name": "hexdeck",
   "private": true,
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "npm run dev --workspace=packages/server & npm run dev --workspace=packages/local",
     "dev:server": "npm run dev --workspace=packages/server",

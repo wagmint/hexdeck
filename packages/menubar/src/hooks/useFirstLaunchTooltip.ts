@@ -75,16 +75,7 @@ export function useFirstLaunchTooltip() {
 
     (async () => {
       try {
-        let seen = false;
-        try {
-          seen = await invoke<boolean>("load_has_seen_tooltip");
-        } catch {}
-
         if (cancelled) return;
-        if (seen) {
-          setBlockWidgetInteractions(false);
-          return;
-        }
 
         // Let position-loading settle first
         await sleep(STARTUP_DELAY);

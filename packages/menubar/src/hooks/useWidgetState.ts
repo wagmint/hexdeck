@@ -134,35 +134,18 @@ export function useWidgetState(interactionsBlocked = false): WidgetState {
     return () => unlisten?.();
   }, []);
 
-  // Load saved position on mount, or use a sensible default (center of screen)
+  // Always center on screen at startup
   useEffect(() => {
     (async () => {
       try {
         const win = getCurrentWindow();
         const scale = window.devicePixelRatio || 1;
         const widgetPhysSize = 48 * scale;
-        const pos = await invoke<{ x: number; y: number } | null>("load_widget_position");
-
-        if (pos) {
-          await win.setPosition(new PhysicalPosition(pos.x, pos.y));
-          // If saved position is off-screen (e.g. monitor disconnected), recenter
-          const monitor = await currentMonitor();
-          if (!monitor) {
-            const fallback = await primaryMonitor();
-            if (fallback) {
-              const cx = fallback.position.x + Math.round((fallback.size.width - widgetPhysSize) / 2);
-              const cy = fallback.position.y + Math.round((fallback.size.height - widgetPhysSize) / 2);
-              await win.setPosition(new PhysicalPosition(cx, cy));
-            }
-          }
-        } else {
-          // First launch: center on current monitor
-          const monitor = await currentMonitor() ?? await primaryMonitor();
-          if (monitor) {
-            const cx = monitor.position.x + Math.round((monitor.size.width - widgetPhysSize) / 2);
-            const cy = monitor.position.y + Math.round((monitor.size.height - widgetPhysSize) / 2);
-            await win.setPosition(new PhysicalPosition(cx, cy));
-          }
+        const monitor = await currentMonitor() ?? await primaryMonitor();
+        if (monitor) {
+          const cx = monitor.position.x + Math.round((monitor.size.width - widgetPhysSize) / 2);
+          const cy = monitor.position.y + Math.round((monitor.size.height - widgetPhysSize) / 2);
+          await win.setPosition(new PhysicalPosition(cx, cy));
         }
       } catch {
         // Not critical

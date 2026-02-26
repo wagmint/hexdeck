@@ -1,13 +1,20 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 function getLocalVersion(): string {
   try {
-    const dir = dirname(fileURLToPath(import.meta.url));
-    // Works from both src/ (dev) and dist/ (published)
-    const pkg = JSON.parse(readFileSync(join(dir, "../../package.json"), "utf-8"));
-    return pkg.version;
+    let dir = dirname(fileURLToPath(import.meta.url));
+    // Walk up until we find a package.json with our package name
+    for (let i = 0; i < 5; i++) {
+      const candidate = join(dir, "package.json");
+      if (existsSync(candidate)) {
+        const pkg = JSON.parse(readFileSync(candidate, "utf-8"));
+        if (pkg.name === "@hexdeck/cli") return pkg.version;
+      }
+      dir = dirname(dir);
+    }
+    return "0.0.0";
   } catch {
     return "0.0.0";
   }

@@ -1,91 +1,103 @@
-# Hexdeck
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/hexdeck-mark.svg">
+    <img alt="Hexdeck" src=".github/assets/hexdeck-mark.svg" width="64">
+  </picture>
+</p>
 
-**Local observability for Claude Code and Codex sessions.**
+<h3 align="center">Hexdeck</h3>
+<p align="center">Real-time observability for AI coding agents</p>
 
-Hexdeck reads local session logs from Claude Code (`~/.claude/projects/`) and Codex (`~/.codex/sessions/`), parses them into structured turn-by-turn data, and serves a live dashboard showing what your agents are doing in real time.
+<p align="center">
+  <a href="https://www.npmjs.com/package/@hexdeck/cli"><img alt="npm version" src="https://img.shields.io/npm/v/@hexdeck/cli.svg?style=flat-square&color=00e87b"></a>
+  <a href="https://github.com/wagmint/hexdeck/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/wagmint/hexdeck/ci.yml?style=flat-square"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square"></a>
+</p>
 
-<!-- TODO: Add a GIF/screenshot of the main dashboard here -->
-<!-- ![Hexdeck Dashboard](docs/assets/dashboard.png) -->
+---
+
+Hexdeck reads local session logs from [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [Codex](https://github.com/openai/codex), parses them into structured turn-by-turn data, and serves a live dashboard showing what your agents are doing in real time.
+
+<p align="center">
+  <img src=".github/assets/dashboard.png" alt="Hexdeck Dashboard" width="900">
+</p>
+
+## How sessions flow into Hexdeck
+
+Any tool that writes session logs — Claude Code, Codex, or both — streams into the same dashboard.
+
+<p align="center">
+  <img src=".github/assets/sessions.png" alt="Sessions flowing into Hexdeck" width="500">
+</p>
+
+## Features
+
+- **Live dashboard** — real-time view of all active agents, updated every second via SSE
+- **Plan tracking** — see each agent's current task list and overall workstream progress
+- **Collision detection** — catch when two agents edit the same uncommitted file before it becomes a merge conflict
+- **Risk analytics** — context usage, error rates, spinning signals, compaction proximity, cost per session
+- **Intent mapping** — track what agents intend to do vs. what they're actually doing
+- **Live feed** — event stream of commits, errors, compactions, and plan changes across all projects
+- **Multi-operator support** — one dashboard for every developer on the team via [Hexcore](#hexcore) relay
+
+## macOS floating widget
+
+Install via Homebrew for an always-on floating widget that shows agent status without opening a browser.
+
+<p align="center">
+  <img src=".github/assets/widget.png" alt="Hexdeck macOS widget" width="900">
+</p>
 
 ## Install
 
-```bash
-npm install -g @hexdeck/cli
-hex start
-```
-
-Opens `http://localhost:7433` with the dashboard. That's it.
-
-### Menu bar app (macOS)
-
-For an always-visible tray icon showing agent status:
+**macOS app** (floating widget + full dashboard):
 
 ```bash
 brew tap wagmint/hexdeck
 brew install --cask hexdeck
 ```
 
-The menu bar app connects to the same local server — run `hex start` first.
-
-## Upgrade
+**CLI** (cross-platform, dashboard in browser):
 
 ```bash
-npm install -g @hexdeck/cli@latest
+npm install -g @hexdeck/cli
+hex start
 ```
 
-If you use Hexcore relay, upgrade before connecting new links.
-Relay links now use short-lived one-time codes (`?c=...`) instead of embedded auth tokens.
+Opens `http://localhost:7433` with the dashboard.
 
-## Features
+## Privacy
 
-### Live Dashboard
-Real-time view of all active Claude Code and Codex sessions across your machine. See which agents are running, what files they're touching, and what they're working on — updated every second via SSE.
+Hexdeck is 100% offline. Zero network requests unless you explicitly connect to Hexcore.
 
-<!-- TODO: screenshot of dashboard with active sessions -->
-
-### Collision Detection
-Catch when two agents edit the same uncommitted file before it becomes a merge conflict. Hexdeck monitors git status and flags overlapping changes across sessions.
-
-<!-- TODO: screenshot of collision alert -->
-
-### Session Inspector
-Drill into any session to see the full turn-by-turn breakdown: user instructions, tool calls, files changed, commits, errors, and compactions.
-
-<!-- TODO: screenshot of session detail view -->
-
-### Risk Analytics
-Track error rates, spinning signals (agents stuck in loops), compaction proximity, file hotspots, and cost per session.
-
-### Live Feed
-Real-time event stream of agent activity — session starts, commits, errors, compactions, plan changes — across all your projects.
+| | What |
+|---|---|
+| **Reads** | Session transcripts in `~/.claude/projects/` and `~/.codex/sessions/`. Does **not** read source files, env vars, or git credentials. |
+| **Writes** | PID file (`~/.hexdeck/server.pid`), config (`~/.hexdeck/`), macOS app data in `~/Library/Application Support/dev.hexdeck.menubar`. |
+| **Network** | None. Only outbound if you connect to Hexcore via `hex relay`. |
+| **Telemetry** | None. No analytics, usage metrics, or tracking. |
 
 ## Commands
 
 ```bash
-hex start              # Start server + dashboard (background)
-hex start --foreground # Start in foreground
-hex start --port 8080  # Custom port
-hex status             # Show running server info
-hex stop               # Stop the server
-hex restart            # Restart
-hex open               # Open dashboard in browser
+hex start                # Start server + dashboard (background)
+hex start --foreground   # Start in foreground
+hex start --port 8080    # Custom port
+hex status               # Show running server info
+hex stop                 # Stop the server
+hex restart              # Restart
+hex open                 # Open dashboard in browser
 ```
 
-Relay commands:
+Relay commands (for [Hexcore](#hexcore) cloud coordination):
 
 ```bash
-hex relay <connect-link>                  # Add/update relay target from cloud link
-hex relay list                            # List relay targets
-hex relay sessions                        # List active local sessions/projects
-hex relay include <hexcoreId> <projectPath> # Start relaying project
-hex relay exclude <hexcoreId> <projectPath> # Stop relaying project
+hex relay <connect-link>                    # Add/update relay target from cloud link
+hex relay list                              # List relay targets
+hex relay sessions                          # List active local sessions/projects
+hex relay include <hexcoreId> <projectPath> # Start relaying a project
+hex relay exclude <hexcoreId> <projectPath> # Stop relaying a project
 hex relay remove <hexcoreId>                # Remove relay target
-```
-
-Example connect link format:
-
-```text
-hexcore+wss://relay.hexcore.app/ws?p=<hexcoreId>&c=<connectCode>&n=<teamName>
 ```
 
 ## API
@@ -102,7 +114,7 @@ JSON API at `localhost:7433/api/` for building your own tooling.
 | `GET /api/dashboard/stream` | SSE stream of dashboard updates |
 | `GET /api/health` | Health check |
 
-## How It Works
+## How it works
 
 Claude Code stores session data under `~/.claude/projects/` and Codex stores session logs under `~/.codex/sessions/`. Hexdeck scans both sources, parses the events into structured **turn-pair nodes** (one user message + everything the agent did in response), and computes dashboard state including active agents, file collisions, risk signals, and a live feed.
 
@@ -128,17 +140,21 @@ npm run build  # Builds dashboard-ui, dashboard, server, and CLI
 - Node.js >= 20
 - Claude Code and/or Codex installed (session logs in `~/.claude/projects/` and `~/.codex/sessions/`)
 
+## Hexcore
+
+For multi-machine coordination, connect Hexdeck instances through [Hexcore](https://github.com/wagmint/hexcore) — a cloud relay that shares operator state across your team in real time.
+
+<p align="center">
+  <img src=".github/assets/relay.png" alt="Hexcore relay diagram" width="500">
+</p>
+
+- [Hexcore repo](https://github.com/wagmint/hexcore)
+- [Documentation](https://hexcore.app/docs)
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
 
-## Hexcore
-
-For cloud coordination across machines, use Hexcore:
-
-- Cloud repo: https://github.com/wagmint/hexcore
-- Cloud docs: https://hexcore.app/docs
-
 ## License
 
-MIT
+[MIT](LICENSE)

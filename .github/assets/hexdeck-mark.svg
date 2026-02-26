@@ -1,0 +1,20 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="hexdeckMarkCore" cx="50%" cy="45%" r="60%">
+      <stop offset="0%" stop-color="#DDFFE9"/>
+      <stop offset="45%" stop-color="#51F2A1"/>
+      <stop offset="100%" stop-color="#00E87B"/>
+    </radialGradient>
+  </defs>
+  <polygon
+    points="32,6 54,19 54,45 32,58 10,45 10,19"
+    fill="none"
+    stroke="#00E87B"
+    stroke-width="3"
+    stroke-linejoin="round"
+  />
+  <polygon
+    points="32,21 41,26 41,38 32,43 23,38 23,26"
+    fill="url(#hexdeckMarkCore)"
+  />
+</svg>

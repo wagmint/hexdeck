@@ -73,7 +73,7 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -k "" "$KEYCHAIN_PATH"
           security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
 
-          codesign --force --options runtime --sign "$APPLE_SIGNING_IDENTITY" --timestamp packages/menubar/src-tauri/binaries/hexdeck-server
+          codesign --force --options runtime --entitlements packages/menubar/src-tauri/entitlements/server.entitlements.plist --sign "$APPLE_SIGNING_IDENTITY" --timestamp packages/menubar/src-tauri/binaries/hexdeck-server
 
       - uses: tauri-apps/tauri-action@v0
         env:

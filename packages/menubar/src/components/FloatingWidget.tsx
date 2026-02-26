@@ -5,9 +5,17 @@ import type { WidgetState } from "../hooks/useWidgetState";
 import { FaviconIcon } from "./FaviconIcon";
 import { SummaryPill } from "./SummaryPill";
 import { ExpandedCard } from "./ExpandedCard";
+import { SpeechBubbleTooltip } from "./SpeechBubbleTooltip";
+
+interface TooltipState {
+  showTooltip: boolean;
+  blockWidgetInteractions: boolean;
+  dismiss: () => void;
+}
 
 interface FloatingWidgetProps {
   widget: WidgetState;
+  tooltip: TooltipState;
   severity: TraySeverity;
   state: DashboardState | null;
   alerts: PylonAlert[];
@@ -18,6 +26,7 @@ interface FloatingWidgetProps {
 
 export function FloatingWidget({
   widget,
+  tooltip,
   severity,
   state,
   alerts,
@@ -43,6 +52,10 @@ export function FloatingWidget({
     const onUp = () => {
       cleanup();
       // No significant movement → treat as click
+      if (tooltip.showTooltip) {
+        tooltip.dismiss();
+        return;
+      }
       widget.onClickFavicon();
     };
 
@@ -55,25 +68,43 @@ export function FloatingWidget({
     document.addEventListener("mouseup", onUp);
   };
 
+  const handleHoverEnter = () => {
+    if (tooltip.blockWidgetInteractions) return;
+    widget.onHoverEnter();
+  };
+
+  const handleHoverLeave = () => {
+    if (tooltip.blockWidgetInteractions) return;
+    widget.onHoverLeave();
+  };
+
   return (
     <div
       // Nearly-invisible bg forces macOS to deliver mouse events to transparent window areas
       style={{ background: "rgba(0,0,0,0.01)" }}
-      onMouseEnter={widget.onHoverEnter}
-      onMouseLeave={widget.onHoverLeave}
+      onMouseEnter={handleHoverEnter}
+      onMouseLeave={handleHoverLeave}
       onMouseDown={handleMouseDown}
     >
-      {widget.tier === "favicon" && (
+      {tooltip.showTooltip && (
+        <div style={{ width: 320, height: 100, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+          <SpeechBubbleTooltip onDismiss={tooltip.dismiss} />
+          <div className="flex-shrink-0">
+            <FaviconIcon severity={severity} />
+          </div>
+        </div>
+      )}
+      {!tooltip.showTooltip && widget.tier === "favicon" && (
         <FaviconIcon severity={severity} />
       )}
-      {widget.tier === "pill" && (
+      {!tooltip.showTooltip && widget.tier === "pill" && (
         <SummaryPill
           severity={severity}
           state={state}
           connected={connected}
         />
       )}
-      {widget.tier === "card" && (
+      {!tooltip.showTooltip && widget.tier === "card" && (
         <ExpandedCard
           severity={severity}
           state={state}

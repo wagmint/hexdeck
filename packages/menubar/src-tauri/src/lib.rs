@@ -21,6 +21,8 @@ struct WidgetPosition {
 #[derive(Serialize, Deserialize, Clone)]
 struct WidgetSettings {
     show_widget: bool,
+    #[serde(default)]
+    has_seen_tooltip: bool,
 }
 
 fn position_file() -> Option<PathBuf> {
@@ -44,14 +46,30 @@ fn load_widget_visibility() -> bool {
     settings.show_widget
 }
 
-fn save_widget_visibility(show_widget: bool) -> Result<(), String> {
+fn load_settings() -> WidgetSettings {
+    let Some(path) = settings_file() else {
+        return WidgetSettings { show_widget: true, has_seen_tooltip: false };
+    };
+    let Ok(data) = fs::read_to_string(path) else {
+        return WidgetSettings { show_widget: true, has_seen_tooltip: false };
+    };
+    serde_json::from_str(&data).unwrap_or(WidgetSettings { show_widget: true, has_seen_tooltip: false })
+}
+
+fn save_settings(settings: &WidgetSettings) -> Result<(), String> {
     let path = settings_file().ok_or("Cannot resolve home directory")?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    let json = serde_json::to_string(&WidgetSettings { show_widget }).map_err(|e| e.to_string())?;
+    let json = serde_json::to_string(settings).map_err(|e| e.to_string())?;
     fs::write(&path, json).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+fn save_widget_visibility(show_widget: bool) -> Result<(), String> {
+    let mut settings = load_settings();
+    settings.show_widget = show_widget;
+    save_settings(&settings)
 }
 
 fn apply_widget_visibility(app: &tauri::AppHandle, show_widget: bool) {
@@ -237,6 +255,18 @@ fn load_widget_position() -> Option<WidgetPosition> {
 }
 
 #[tauri::command]
+fn load_has_seen_tooltip() -> bool {
+    load_settings().has_seen_tooltip
+}
+
+#[tauri::command]
+fn save_has_seen_tooltip() -> Result<(), String> {
+    let mut settings = load_settings();
+    settings.has_seen_tooltip = true;
+    save_settings(&settings)
+}
+
+#[tauri::command]
 fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
@@ -276,15 +306,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .plugin(
-            tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(|app, _shortcut, event| {
-                    if event.state() == ShortcutState::Pressed {
-                        toggle_main_window_from_shortcut(app);
-                    }
-                })
-                .build(),
-        )
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
             // Hide from dock on macOS
             #[cfg(target_os = "macos")]
@@ -312,7 +334,7 @@ pub fn run() {
             let show_widget_item = CheckMenuItem::with_id(
                 app,
                 "toggle_widget",
-                "Show Floating Widget",
+                "Show Floating Widget  (Cmd+Ctrl+K)",
                 true,
                 show_widget_flag.load(Ordering::SeqCst),
                 None::<&str>,
@@ -365,12 +387,42 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            // Global shortcut: Cmd+Ctrl+H (short, still uncommon).
-            let shortcut = Shortcut::new(
+            // Global shortcuts
+            let shortcut_h = Shortcut::new(
                 Some(Modifiers::SUPER | Modifiers::CONTROL),
                 Code::KeyH,
             );
-            app.global_shortcut().register(shortcut)?;
+            let shortcut_k = Shortcut::new(
+                Some(Modifiers::SUPER | Modifiers::CONTROL),
+                Code::KeyK,
+            );
+
+            let widget_flag_for_shortcut = show_widget_flag;
+            let toggle_widget_for_shortcut = show_widget_item.clone();
+
+            app.global_shortcut().on_shortcuts(
+                [shortcut_h, shortcut_k],
+                move |app, shortcut, event| {
+                    if event.state() != ShortcutState::Pressed {
+                        return;
+                    }
+                    if shortcut.matches(
+                        Modifiers::SUPER | Modifiers::CONTROL,
+                        Code::KeyH,
+                    ) {
+                        toggle_main_window_from_shortcut(app);
+                    } else if shortcut.matches(
+                        Modifiers::SUPER | Modifiers::CONTROL,
+                        Code::KeyK,
+                    ) {
+                        let next = !widget_flag_for_shortcut.load(Ordering::SeqCst);
+                        widget_flag_for_shortcut.store(next, Ordering::SeqCst);
+                        let _ = toggle_widget_for_shortcut.set_checked(next);
+                        let _ = save_widget_visibility(next);
+                        apply_widget_visibility(app, next);
+                    }
+                },
+            )?;
 
             // Auto-hide main window on focus loss
             let guard_for_window = tray_click_guard;
@@ -402,6 +454,8 @@ pub fn run() {
             update_tray_icon,
             save_widget_position,
             load_widget_position,
+            load_has_seen_tooltip,
+            save_has_seen_tooltip,
             quit_app,
             ensure_server
         ])

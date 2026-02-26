@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWindow, currentMonitor, primaryMonitor } from "@tauri-apps/api/window";
 import { LogicalSize, PhysicalPosition } from "@tauri-apps/api/dpi";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -21,7 +21,7 @@ export interface WidgetState {
   collapseToFavicon: () => void;
 }
 
-export function useWidgetState(): WidgetState {
+export function useWidgetState(interactionsBlocked = false): WidgetState {
   const [tier, setTier] = useState<WidgetTier>("favicon");
   const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resizingRef = useRef(false);
@@ -57,15 +57,16 @@ export function useWidgetState(): WidgetState {
     let newY = pos.y;
 
     // Keep on screen — use current monitor bounds (multi-monitor aware)
-    const monitor = await win.currentMonitor();
+    const monitor = await currentMonitor();
     if (monitor) {
+      const edgePad = 8 * scale; // small margin so content isn't flush with screen edges
       const monX = monitor.position.x;
       const monY = monitor.position.y;
       const monW = monitor.size.width;
       const monH = monitor.size.height;
-      if (newX + newPhysWidth > monX + monW) newX = monX + monW - newPhysWidth;
-      if (newY + newPhysHeight > monY + monH) newY = monY + monH - newPhysHeight;
-      if (newX < monX) newX = monX;
+      if (newX + newPhysWidth > monX + monW - edgePad) newX = monX + monW - newPhysWidth - edgePad;
+      if (newY + newPhysHeight > monY + monH - edgePad) newY = monY + monH - newPhysHeight - edgePad;
+      if (newX < monX + edgePad) newX = monX + edgePad;
       if (newY < monY) newY = monY;
     }
 
@@ -76,14 +77,16 @@ export function useWidgetState(): WidgetState {
   }, []);
 
   const onHoverEnter = useCallback(() => {
+    if (interactionsBlocked) return;
     clearCollapseTimer();
     if (tier === "favicon") {
       setTier("pill");
       resizeWindow("pill");
     }
-  }, [tier, clearCollapseTimer, resizeWindow]);
+  }, [interactionsBlocked, tier, clearCollapseTimer, resizeWindow]);
 
   const onHoverLeave = useCallback(() => {
+    if (interactionsBlocked) return;
     clearCollapseTimer();
     if (tier === "pill") {
       collapseTimer.current = setTimeout(() => {
@@ -91,16 +94,17 @@ export function useWidgetState(): WidgetState {
         resizeWindow("favicon");
       }, HOVER_COLLAPSE_DELAY);
     }
-  }, [tier, clearCollapseTimer, resizeWindow]);
+  }, [interactionsBlocked, tier, clearCollapseTimer, resizeWindow]);
 
   const onClickFavicon = useCallback(() => {
+    if (interactionsBlocked) return;
     clearCollapseTimer();
     if (tier === "favicon" || tier === "pill") {
       setTier("card");
       resizeWindow("card");
       getCurrentWindow().setFocus();
     }
-  }, [tier, clearCollapseTimer, resizeWindow]);
+  }, [interactionsBlocked, tier, clearCollapseTimer, resizeWindow]);
 
   const collapseToFavicon = useCallback(() => {
     clearCollapseTimer();
@@ -130,21 +134,35 @@ export function useWidgetState(): WidgetState {
     return () => unlisten?.();
   }, []);
 
-  // Load saved position on mount, or use a sensible default
+  // Load saved position on mount, or use a sensible default (center of screen)
   useEffect(() => {
     (async () => {
       try {
         const win = getCurrentWindow();
+        const scale = window.devicePixelRatio || 1;
+        const widgetPhysSize = 48 * scale;
         const pos = await invoke<{ x: number; y: number } | null>("load_widget_position");
+
         if (pos) {
           await win.setPosition(new PhysicalPosition(pos.x, pos.y));
+          // If saved position is off-screen (e.g. monitor disconnected), recenter
+          const monitor = await currentMonitor();
+          if (!monitor) {
+            const fallback = await primaryMonitor();
+            if (fallback) {
+              const cx = fallback.position.x + Math.round((fallback.size.width - widgetPhysSize) / 2);
+              const cy = fallback.position.y + Math.round((fallback.size.height - widgetPhysSize) / 2);
+              await win.setPosition(new PhysicalPosition(cx, cy));
+            }
+          }
         } else {
-          // Default: top-right area, 16px from right edge, 8px from top
-          const scale = window.devicePixelRatio || 1;
-          const widgetPhysWidth = 48 * scale;
-          const defaultX = window.screen.availWidth * scale - widgetPhysWidth - 16 * scale;
-          const defaultY = 8 * scale;
-          await win.setPosition(new PhysicalPosition(defaultX, defaultY));
+          // First launch: center on current monitor
+          const monitor = await currentMonitor() ?? await primaryMonitor();
+          if (monitor) {
+            const cx = monitor.position.x + Math.round((monitor.size.width - widgetPhysSize) / 2);
+            const cy = monitor.position.y + Math.round((monitor.size.height - widgetPhysSize) / 2);
+            await win.setPosition(new PhysicalPosition(cx, cy));
+          }
         }
       } catch {
         // Not critical

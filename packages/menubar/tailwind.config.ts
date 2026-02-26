@@ -34,6 +34,7 @@ export default {
       animation: {
         "fade-in": "fade-in 0.15s ease-out",
         "dash-pulse": "dash-pulse 1.5s infinite",
+        "tooltip-in": "tooltip-in 0.3s ease-out",
       },
       keyframes: {
         "fade-in": {
@@ -43,6 +44,10 @@ export default {
         "dash-pulse": {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.6" },
+        },
+        "tooltip-in": {
+          from: { opacity: "0", transform: "translateX(8px)" },
+          to: { opacity: "1", transform: "translateX(0)" },
         },
       },
     },

@@ -57,7 +57,7 @@ brew tap wagmint/hexdeck
 brew install --cask hexdeck
 ```
 
-**CLI** (cross-platform, dashboard in browser):
+**Or via CLI** (cross-platform, dashboard in browser):
 
 ```bash
 npm install -g @hexdeck/cli

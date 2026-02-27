@@ -76,7 +76,7 @@ function renderTask(task: IntentTaskView) {
 export function WorkstreamNode({ workstream }: WorkstreamNodeProps) {
   const hasBusy = workstream.agents.some(a => a.status === "busy");
   const statusColor = hasBusy
-    ? "bg-dash-blue animate-dash-pulse"
+    ? "bg-dash-green animate-dash-pulse"
     : "bg-dash-green";
 
   const badge = intentStatusBadge[workstream.intentStatus];
@@ -97,7 +97,7 @@ export function WorkstreamNode({ workstream }: WorkstreamNodeProps) {
           </span>
         </div>
         <div className="flex gap-2.5 text-[9px] text-dash-text-muted">
-          <span className="text-dash-blue">
+          <span className="text-dash-green">
             {workstream.agents.filter((a) => a.isActive).length} active
           </span>
           <span className="inline-flex items-center gap-1 text-dash-green">

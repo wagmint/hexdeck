@@ -95,9 +95,7 @@ function buildSingleTurn(events: SessionEvent[], index: number): TurnNode | null
     if (event.message.role === "user") {
       const results = getToolResults(event.message);
       for (const result of results) {
-        // Use explicit is_error field when available; fall back to content heuristic
-        const isError = result.is_error === true ||
-          (result.is_error === undefined && isErrorResult(result.content));
+        const isError = result.is_error === true;
         if (isError) {
           errorCount++;
           errorResults.push({
@@ -907,19 +905,4 @@ function extractCommitMessage(cmd: string): string | null {
   return null;
 }
 
-function isErrorResult(content: string): boolean {
-  if (typeof content !== "string") return false;
-  // Long results (>2000 chars) are likely code/docs that mention errors, not actual errors.
-  // Real tool errors are typically short.
-  if (content.length > 2000) return false;
-  // Check first few lines for error patterns (not deep inside content)
-  const head = content.slice(0, 500);
-  return (
-    head.includes("Error:") ||
-    head.includes("error:") ||
-    head.includes("ENOENT") ||
-    head.includes("EACCES") ||
-    head.includes("Exit code") ||
-    head.includes("fatal:")
-  );
-}
+

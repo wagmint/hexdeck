@@ -30,7 +30,7 @@ export function AgentCard({ workstream, isSelected, onSelect }: AgentCardProps) 
 
   const hasBusy = workstream.agents.some(a => a.status === "busy");
   const stripColor = hasBusy
-    ? "border-l-dash-blue animate-dash-pulse"
+    ? "border-l-dash-green animate-dash-pulse"
     : "border-l-dash-green";
 
   return (

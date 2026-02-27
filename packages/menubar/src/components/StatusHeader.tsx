@@ -2,7 +2,6 @@ import type { TraySeverity } from "../lib/alerts";
 
 const hexColor: Record<TraySeverity, string> = {
   green: "var(--dash-green)",
-  blue: "var(--dash-blue)",
   yellow: "var(--dash-yellow)",
   red: "var(--dash-red)",
   grey: "var(--dash-text-muted)",
@@ -11,7 +10,6 @@ const hexColor: Record<TraySeverity, string> = {
 const pulseClass: Record<TraySeverity, string> = {
   red: "animate-dash-pulse",
   yellow: "",
-  blue: "animate-dash-pulse",
   green: "",
   grey: "",
 };

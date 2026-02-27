@@ -21,9 +21,9 @@ const statusConfig: Record<AgentStatus, {
     icon: "\u2713",
   },
   busy: {
-    bg: "bg-dash-blue-dim",
-    border: "border-dash-blue",
-    text: "text-dash-blue",
+    bg: "bg-dash-green-dim",
+    border: "border-dash-green",
+    text: "text-dash-green",
     icon: "\u25B6",
     animation: "animate-dash-pulse",
   },

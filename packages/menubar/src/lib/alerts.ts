@@ -102,28 +102,15 @@ export function deriveAlerts(state: DashboardState): PylonAlert[] {
   return alerts;
 }
 
-export type TraySeverity = AlertSeverity | "blue" | "grey";
+export type TraySeverity = AlertSeverity | "grey";
 
 export function worstSeverity(
   alerts: PylonAlert[],
   state: DashboardState,
 ): TraySeverity {
-  if (alerts.some((a) => a.severity === "red")) return "red";
-  if (alerts.some((a) => a.severity === "yellow")) return "yellow";
-  if (state.agents.some((a) => a.isActive && a.status === "busy")) return "blue";
-
-  // Green if agents exist and at least one is active without an idle/stalled signal
-  // (i.e. was active within the last 5 min). Grey if all are idle >5 min.
-  const activeAgents = state.agents.filter((a) => a.isActive);
-  if (activeAgents.length > 0) {
-    const allIdle = activeAgents.every((a) =>
-      a.risk.spinningSignals.some(
-        (s) => s.pattern === "idle" || s.pattern === "stalled",
-      ),
-    );
-    if (!allIdle) return "green";
-  }
-
-  if (alerts.some((a) => a.severity === "green")) return "green";
+  const active = state.agents.filter((a) => a.isActive);
+  if (active.some((a) => a.status === "conflict") || alerts.some((a) => a.severity === "red")) return "red";
+  if (active.some((a) => a.status === "warning") || alerts.some((a) => a.severity === "yellow")) return "yellow";
+  if (active.some((a) => a.status === "busy")) return "green";
   return "grey";
 }

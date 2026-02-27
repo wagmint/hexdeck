@@ -355,6 +355,8 @@ function finalizePlan(
   timestamp: Date,
   planDurationMs: number | null,
   draftingActivity: DraftingActivity | null,
+  postAcceptEdits: boolean,
+  postAcceptCommit: boolean,
 ): SessionPlan | null {
   // Apply final statuses
   for (const task of tasks) {
@@ -380,6 +382,10 @@ function finalizePlan(
   } else if (markdown || inPlanMode || planAccepted || planRejected) {
     if (planRejected) {
       status = "rejected";
+    } else if (postAcceptCommit) {
+      status = "completed";
+    } else if (postAcceptEdits) {
+      status = "implementing";
     } else if (inPlanMode || planAccepted || markdown) {
       status = "drafting";
     }
@@ -406,6 +412,10 @@ function buildSessionPlans(parsed: ParsedSession, agentLabel: string): SessionPl
   let planDurationMs: number | null = null;
   let tasks: PlanTask[] = [];
   let taskStatuses = new Map<string, string>();
+
+  // Post-acceptance activity signals (for task-less plans)
+  let postAcceptEdits = false;
+  let postAcceptCommit = false;
 
   // Drafting activity accumulator
   let draftFiles: Set<string> = new Set();
@@ -439,7 +449,7 @@ function buildSessionPlans(parsed: ParsedSession, agentLabel: string): SessionPl
   for (const turn of parsed.turns) {
     if (turn.hasPlanStart) {
       // Finalize current plan cycle (if it has any content)
-      const plan = finalizePlan(tasks, taskStatuses, markdown, inPlanMode, planAccepted, planRejected, agentLabel, lastPlanTs, planDurationMs, buildDraftingActivity());
+      const plan = finalizePlan(tasks, taskStatuses, markdown, inPlanMode, planAccepted, planRejected, agentLabel, lastPlanTs, planDurationMs, buildDraftingActivity(), postAcceptEdits, postAcceptCommit);
       if (plan) finalized.push(plan);
 
       // Start fresh cycle
@@ -449,6 +459,8 @@ function buildSessionPlans(parsed: ParsedSession, agentLabel: string): SessionPl
       inPlanMode = true;
       planAccepted = false;
       planRejected = false;
+      postAcceptEdits = false;
+      postAcceptCommit = false;
       lastPlanTs = turn.timestamp;
       planStartTs = turn.timestamp;
       planDurationMs = null;
@@ -490,6 +502,13 @@ function buildSessionPlans(parsed: ParsedSession, agentLabel: string): SessionPl
       }
     }
 
+    // Track post-acceptance activity for task-less plans
+    // Fires for both ExitPlanMode-accepted plans and planContent-sourced plans
+    if ((planAccepted || markdown) && !inPlanMode) {
+      if (turn.filesChanged.length > 0) postAcceptEdits = true;
+      if (turn.hasCommit) postAcceptCommit = true;
+    }
+
     // Cross-session plan: planMarkdown from JSONL envelope
     if (turn.planMarkdown && !markdown) {
       markdown = turn.planMarkdown;
@@ -515,7 +534,7 @@ function buildSessionPlans(parsed: ParsedSession, agentLabel: string): SessionPl
   }
 
   // Finalize the last plan cycle
-  const lastPlan = finalizePlan(tasks, taskStatuses, markdown, inPlanMode, planAccepted, planRejected, agentLabel, lastPlanTs, planDurationMs, buildDraftingActivity());
+  const lastPlan = finalizePlan(tasks, taskStatuses, markdown, inPlanMode, planAccepted, planRejected, agentLabel, lastPlanTs, planDurationMs, buildDraftingActivity(), postAcceptEdits, postAcceptCommit);
   if (lastPlan) finalized.push(lastPlan);
 
   return finalized;

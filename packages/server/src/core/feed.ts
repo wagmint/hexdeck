@@ -74,7 +74,7 @@ export function buildFeed(
           sessionId,
           projectPath,
           operatorId,
-          message: `Error${turn.errorCount > 1 ? ` (${turn.errorCount}x)` : ""}: ${turn.summary || "encountered an error"}`,
+          message: `Error${turn.errorCount > 1 ? ` (${turn.errorCount}x)` : ""}: ${turn.sections.corrections.items[0]?.error || "encountered an error"}`,
         });
       }
 

@@ -1141,9 +1141,10 @@ function determineAgentStatus(
   // Conflict: this session has files in a detected collision
   if (collisionSessionIds.has(parsed.session.id)) return "conflict";
 
-  // Warning: errors in the last 3 turns
+  // Warning: 2+ of the last 3 turns have errors (single errors are normal self-correction)
   const recentTurns = parsed.turns.slice(-3);
-  if (recentTurns.some(t => t.hasError)) return "warning";
+  const recentErrorCount = recentTurns.filter(t => t.hasError).length;
+  if (recentErrorCount >= 2) return "warning";
 
   // Active process but no recent file writes → idle (waiting for user input)
   if (isActive) {

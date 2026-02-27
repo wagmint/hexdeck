@@ -105,8 +105,16 @@ export function getActiveCodexSessions(): SessionInfo[] {
   if (!existsSync(CODEX_SESSIONS_DIR)) return [];
 
   try {
+    const pids = execSync(
+      `pgrep -f '(^|/)codex( |$)' 2>/dev/null || true`,
+      { encoding: "utf-8", timeout: 3000 }
+    ).trim();
+
+    if (!pids) return [];
+
+    const pidList = pids.split("\n").filter(Boolean).join(",");
     const output = execSync(
-      `lsof -c codex -Fn 2>/dev/null || true`,
+      `lsof -p ${pidList} -Fn 2>/dev/null || true`,
       { encoding: "utf-8", timeout: 5000 }
     );
 

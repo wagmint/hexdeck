@@ -112,7 +112,8 @@ export function findSession(sessionId: string): SessionInfo | null {
  * Get all currently active sessions by finding running `claude` CLI processes
  * and matching their working directories to project session files.
  *
- * Approach: `lsof -c claude -Fn` gets the cwd of each claude process.
+ * Approach: `pgrep -f claude` finds PIDs (works for both standalone binaries
+ * and Node.js symlinks), then `lsof -p` gets the cwd / open files of each.
  * We map each cwd to its encoded project dir, then pick the most recently
  * modified JSONL file in that dir (the active session).
  */
@@ -129,9 +130,20 @@ export function getActiveSessions(): SessionInfo[] {
   if (!existsSync(CLAUDE_PROJECTS_DIR)) return [];
 
   try {
-    // lsof -c claude -Fn outputs: p<pid>\nf<fd>\nn<path>\n...
+    // Use pgrep -f to find PIDs (matches full command line, not just kernel
+    // COMM). This handles both standalone binaries (Homebrew cask, COMM=claude)
+    // and Node.js symlinks (npm/formula, COMM=node). The pattern avoids matching
+    // Claude Desktop (capital C) or substrings like "claudefordesktop".
+    const pids = execSync(
+      `pgrep -f '(^|/)claude( |$)' 2>/dev/null || true`,
+      { encoding: "utf-8", timeout: 3000 }
+    ).trim();
+
+    if (!pids) return [];
+
+    const pidList = pids.split("\n").filter(Boolean).join(",");
     const output = execSync(
-      `lsof -c claude -Fn 2>/dev/null || true`,
+      `lsof -p ${pidList} -Fn 2>/dev/null || true`,
       { encoding: "utf-8", timeout: 5000 }
     );
 
@@ -272,12 +284,14 @@ function listSessionsInDir(dir: string): SessionInfo[] {
 }
 
 /**
- * Claude Code encodes project paths by replacing / with -.
- * e.g., /Users/jake/Code/kratos → -Users-jake-Code-kratos
+ * Claude Code encodes project paths by replacing all non-alphanumeric
+ * characters (except -) with -.
+ * e.g., /Users/tyler/code/my_project.ai → -Users-tyler-code-my-project-ai
+ *
+ * Decoding is lossy — we can't distinguish / from _ or . in the original
+ * path, so we fall back to replacing - with / (best-effort for display).
  */
 function decodeProjectName(encoded: string): string {
-  // The encoding replaces path separators with dashes
-  // Leading dash represents the root /
   if (encoded.startsWith("-")) {
     return "/" + encoded.slice(1).replace(/-/g, "/");
   }
@@ -285,5 +299,5 @@ function decodeProjectName(encoded: string): string {
 }
 
 function encodeProjectPath(path: string): string {
-  return path.replace(/\//g, "-");
+  return path.replace(/[^a-zA-Z0-9-]/g, "-");
 }

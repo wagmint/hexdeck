@@ -142,16 +142,6 @@ fn spawn_server(app: &tauri::AppHandle) -> Result<(), String> {
             .arg(dashboard_dir.to_string_lossy().as_ref());
     }
 
-    // Detach: new session so it survives menubar exit
-    #[cfg(unix)]
-    unsafe {
-        use std::os::unix::process::CommandExt;
-        cmd.pre_exec(|| {
-            libc::setsid();
-            Ok(())
-        });
-    }
-
     cmd.stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -159,6 +149,18 @@ fn spawn_server(app: &tauri::AppHandle) -> Result<(), String> {
         .map_err(|e| format!("Failed to spawn server: {e}"))?;
 
     Ok(())
+}
+
+/// Kill the server process if we spawned it (reads PID from disk).
+fn kill_server() {
+    if let Some(info) = load_pid_info() {
+        if is_pid_running(info.pid) {
+            unsafe { libc::kill(info.pid as i32, libc::SIGTERM); }
+            if let Some(dir) = hexdeck_dir() {
+                let _ = fs::remove_file(dir.join("server.pid"));
+            }
+        }
+    }
 }
 
 /// Track whether we've already attempted (and failed) to spawn the server.
@@ -458,8 +460,13 @@ pub fn run() {
             quit_app,
             ensure_server
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, event| {
+            if let tauri::RunEvent::Exit = event {
+                kill_server();
+            }
+        });
 }
 
 fn position_window_at_tray(

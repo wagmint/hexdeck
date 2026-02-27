@@ -106,6 +106,17 @@ function AgentRow({
             {agent.currentTask}
           </p>
         )}
+        {agent.status === "warning" && (
+          <p className="text-[10px] text-dash-yellow truncate mt-0.5">
+            {agent.risk.spinningSignals.find((s) => s.level !== "nominal")
+              ?.detail ?? "Errors in recent turns"}
+          </p>
+        )}
+        {agent.status === "conflict" && (
+          <p className="text-[10px] text-dash-red truncate mt-0.5">
+            File collision detected
+          </p>
+        )}
         <p className="text-[10px] text-dash-text-muted truncate">
           {projectName(agent.projectPath)}
         </p>

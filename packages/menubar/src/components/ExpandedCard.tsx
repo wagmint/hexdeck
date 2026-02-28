@@ -1,7 +1,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-shell";
 import { invoke } from "@tauri-apps/api/core";
-import type { TraySeverity, PylonAlert } from "../lib/alerts";
+import type { TraySeverity, HexcoreAlert } from "../lib/alerts";
 import type { DashboardState } from "../lib/types";
 import { AlertList } from "./AlertList";
 import { AgentList } from "./AgentList";
@@ -10,7 +10,7 @@ import { GlowHex } from "./GlowHex";
 interface ExpandedCardProps {
   severity: TraySeverity;
   state: DashboardState | null;
-  alerts: PylonAlert[];
+  alerts: HexcoreAlert[];
   connected: boolean;
   loading: boolean;
   error: string | null;

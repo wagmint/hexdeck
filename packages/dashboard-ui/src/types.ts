@@ -215,8 +215,8 @@ export interface DashboardState {
 export type RelayConnectionStatus = "connected" | "connecting" | "disconnected";
 
 export interface RelayTargetInfo {
-  pylonId: string;
-  pylonName: string;
+  hexcoreId: string;
+  hexcoreName: string;
   status: RelayConnectionStatus;
   projects: string[];
   addedAt: string;

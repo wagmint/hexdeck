@@ -52,8 +52,8 @@ export function saveRelayConfig(config: RelayConfig): void {
       const encryptedToken = encryptSecret(target.token);
       const encryptedRefreshToken = encryptSecret(target.refreshToken);
       return {
-        pylonId: target.pylonId,
-        pylonName: target.pylonName,
+        hexcoreId: target.hexcoreId,
+        hexcoreName: target.hexcoreName,
         wsUrl: target.wsUrl,
         tokenEnc: encryptedToken,
         refreshTokenEnc: encryptedRefreshToken,
@@ -78,8 +78,8 @@ export function saveRelayConfig(config: RelayConfig): void {
 // ─── Internal ───────────────────────────────────────────────────────────────
 
 interface DiskRelayTarget {
-  pylonId: string;
-  pylonName?: string;
+  hexcoreId: string;
+  hexcoreName?: string;
   wsUrl: string;
   token?: string;
   refreshToken?: string;
@@ -115,8 +115,8 @@ function normalizeTarget(raw: unknown): RelayTarget | null {
   if (!token || !refreshToken) return null;
 
   return {
-    pylonId: raw.pylonId,
-    pylonName: typeof raw.pylonName === "string" ? raw.pylonName : "Unnamed Relay",
+    hexcoreId: raw.hexcoreId,
+    hexcoreName: typeof raw.hexcoreName === "string" ? raw.hexcoreName : "Unnamed Relay",
     wsUrl: raw.wsUrl,
     token,
     refreshToken,
@@ -131,7 +131,7 @@ function isValidTarget(t: unknown): t is DiskRelayTarget {
   const hasPlainToken = typeof o.token === "string" && typeof o.refreshToken === "string";
   const hasEncryptedToken = typeof o.tokenEnc === "string" && typeof o.refreshTokenEnc === "string";
   return (
-    typeof o.pylonId === "string" &&
+    typeof o.hexcoreId === "string" &&
     typeof o.wsUrl === "string" &&
     (hasPlainToken || hasEncryptedToken)
   );
@@ -140,7 +140,7 @@ function isValidTarget(t: unknown): t is DiskRelayTarget {
 function loadRelayKey(): Buffer {
   if (cachedKey) return cachedKey;
 
-  const envKey = process.env.PYLON_RELAY_KEY;
+  const envKey = process.env.HEXCORE_RELAY_KEY;
   if (envKey) {
     const envBuf = Buffer.from(envKey, "base64");
     if (envBuf.length === 32) {

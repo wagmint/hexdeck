@@ -10,7 +10,7 @@ export interface OperatorConfig {
   codex?: string;   // path to .codex directory
 }
 
-export interface PylonConfig {
+export interface HexcoreConfig {
   selfName?: string;
   operators: OperatorConfig[];
 }
@@ -32,7 +32,7 @@ const OPERATOR_COLORS = [
 
 const CONFIG_PATH = join(homedir(), ".hexdeck", "operators.json");
 
-let cachedConfig: PylonConfig | null = null;
+let cachedConfig: HexcoreConfig | null = null;
 let cachedMtimeMs = 0;
 
 // ─── Public API ─────────────────────────────────────────────────────────────
@@ -42,7 +42,7 @@ let cachedMtimeMs = 0;
  * Cached by mtime — re-read on file change.
  * Missing or malformed config → empty { operators: [] }.
  */
-export function loadOperatorConfig(): PylonConfig {
+export function loadOperatorConfig(): HexcoreConfig {
   try {
     const stat = statSync(CONFIG_PATH);
     if (cachedConfig && stat.mtimeMs === cachedMtimeMs) {
@@ -66,7 +66,7 @@ export function loadOperatorConfig(): PylonConfig {
  * Get the self operator's display name.
  * Prefers config selfName, falls back to OS username.
  */
-export function getSelfName(config: PylonConfig): string {
+export function getSelfName(config: HexcoreConfig): string {
   if (config.selfName) return config.selfName;
   try {
     return userInfo().username;
@@ -92,7 +92,7 @@ export function getOperatorColor(index: number): string {
 
 // ─── Internal ───────────────────────────────────────────────────────────────
 
-function normalizeConfig(raw: unknown): PylonConfig {
+function normalizeConfig(raw: unknown): HexcoreConfig {
   // Array form: [{ name, claude?, codex? }]
   if (Array.isArray(raw)) {
     return {

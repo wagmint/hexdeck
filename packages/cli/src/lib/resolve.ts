@@ -17,14 +17,14 @@ export function findPackageRoot(): string {
 
 /**
  * Resolve the dashboard static export directory.
- * 1. PYLON_DASHBOARD_DIR env var (explicit override)
+ * 1. HEXDECK_DASHBOARD_DIR env var (explicit override)
  * 2. Bundled dashboard/ directory (npm-installed package)
  * 3. @hexdeck/local workspace package out/ directory (dev mode)
  * 4. null (API-only mode)
  */
 export function resolveDashboardDir(): string | null {
   // 1. Explicit env var
-  const envDir = process.env.PYLON_DASHBOARD_DIR;
+  const envDir = process.env.HEXDECK_DASHBOARD_DIR;
   if (envDir && existsSync(envDir)) {
     return envDir;
   }

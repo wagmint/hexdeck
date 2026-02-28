@@ -103,8 +103,8 @@ function hashToIndex(id: string): number {
 
 // ─── Persistent label store (survives server restarts) ───────────────────────
 
-const PYLON_DIR = join(homedir(), ".hexdeck");
-const LABELS_PATH = join(PYLON_DIR, "labels.json");
+const HEXDECK_DIR = join(homedir(), ".hexdeck");
+const LABELS_PATH = join(HEXDECK_DIR, "labels.json");
 
 interface LabelEntry {
   name: string;
@@ -140,7 +140,7 @@ function loadLabelStore(): void {
 
 function saveLabelStore(): void {
   try {
-    if (!existsSync(PYLON_DIR)) mkdirSync(PYLON_DIR, { recursive: true });
+    if (!existsSync(HEXDECK_DIR)) mkdirSync(HEXDECK_DIR, { recursive: true });
     const obj: Record<string, LabelEntry> = {};
     for (const [id, entry] of labelStore) {
       obj[id] = entry;

@@ -4,7 +4,7 @@ version = "0.5.4"
 edition = "2021"
 
 [lib]
-name = "pylon_menubar_lib"
+name = "hexdeck_menubar_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

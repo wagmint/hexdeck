@@ -2,7 +2,7 @@ import type { DashboardState } from "./types";
 
 export type AlertSeverity = "red" | "yellow" | "green";
 
-export interface PylonAlert {
+export interface HexcoreAlert {
   id: string;
   severity: AlertSeverity;
   title: string;
@@ -12,8 +12,8 @@ export interface PylonAlert {
 
 const RECENT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 
-export function deriveAlerts(state: DashboardState): PylonAlert[] {
-  const alerts: PylonAlert[] = [];
+export function deriveAlerts(state: DashboardState): HexcoreAlert[] {
+  const alerts: HexcoreAlert[] = [];
   const now = Date.now();
 
   // Red: file collisions
@@ -105,7 +105,7 @@ export function deriveAlerts(state: DashboardState): PylonAlert[] {
 export type TraySeverity = AlertSeverity | "grey";
 
 export function worstSeverity(
-  alerts: PylonAlert[],
+  alerts: HexcoreAlert[],
   state: DashboardState,
 ): TraySeverity {
   const active = state.agents.filter((a) => a.isActive);

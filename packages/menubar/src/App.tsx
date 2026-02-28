@@ -1,5 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { usePylonSSE } from "./hooks/usePylonSSE";
+import { useHexcoreSSE } from "./hooks/useHexcoreSSE";
 import { useAlerts } from "./hooks/useAlerts";
 import { useAutoUpdate } from "./hooks/useAutoUpdate";
 import { MenuBarApp } from "./components/MenuBarApp";
@@ -9,7 +9,7 @@ const isWidget = getCurrentWindow().label === "widget";
 
 export default function App() {
   useAutoUpdate();
-  const { state, loading, error, connected } = usePylonSSE();
+  const { state, loading, error, connected } = useHexcoreSSE();
   const { alerts, severity } = useAlerts(state, connected);
 
   if (isWidget) {

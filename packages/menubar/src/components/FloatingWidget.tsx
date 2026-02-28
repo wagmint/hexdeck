@@ -1,5 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import type { TraySeverity, PylonAlert } from "../lib/alerts";
+import type { TraySeverity, HexcoreAlert } from "../lib/alerts";
 import type { DashboardState } from "../lib/types";
 import type { WidgetState } from "../hooks/useWidgetState";
 import { FaviconIcon } from "./FaviconIcon";
@@ -18,7 +18,7 @@ interface FloatingWidgetProps {
   tooltip: TooltipState;
   severity: TraySeverity;
   state: DashboardState | null;
-  alerts: PylonAlert[];
+  alerts: HexcoreAlert[];
   connected: boolean;
   loading: boolean;
   error: string | null;

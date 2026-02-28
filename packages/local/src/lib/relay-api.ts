@@ -19,15 +19,15 @@ export async function connectRelay(link: string): Promise<{ error?: string }> {
   return {};
 }
 
-export async function removeRelayTarget(pylonId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/relay/targets/${encodeURIComponent(pylonId)}`, {
+export async function removeRelayTarget(hexcoreId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/relay/targets/${encodeURIComponent(hexcoreId)}`, {
     method: "DELETE",
   });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
 }
 
-export async function includeProject(pylonId: string, projectPath: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/relay/targets/${encodeURIComponent(pylonId)}/include`, {
+export async function includeProject(hexcoreId: string, projectPath: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/relay/targets/${encodeURIComponent(hexcoreId)}/include`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ projectPath }),
@@ -35,8 +35,8 @@ export async function includeProject(pylonId: string, projectPath: string): Prom
   if (!res.ok) throw new Error(`API error: ${res.status}`);
 }
 
-export async function excludeProject(pylonId: string, projectPath: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/relay/targets/${encodeURIComponent(pylonId)}/exclude`, {
+export async function excludeProject(hexcoreId: string, projectPath: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/relay/targets/${encodeURIComponent(hexcoreId)}/exclude`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ projectPath }),

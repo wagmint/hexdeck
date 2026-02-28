@@ -48,23 +48,23 @@ async function connectRelay(link: string): Promise<void> {
     process.exit(1);
   }
 
-  const { pylonId, pylonName, wsUrl, token, refreshToken } = creds;
+  const { hexcoreId, hexcoreName, wsUrl, token, refreshToken } = creds;
   const config = loadRelayConfig();
 
-  // Check for existing target with same pylonId
-  const existing = config.targets.find((t) => t.pylonId === pylonId);
+  // Check for existing target with same hexcoreId
+  const existing = config.targets.find((t) => t.hexcoreId === hexcoreId);
   if (existing) {
     // Update token/name
     existing.token = token;
     existing.refreshToken = refreshToken;
-    existing.pylonName = pylonName;
+    existing.hexcoreName = hexcoreName;
     existing.wsUrl = wsUrl;
     saveRelayConfig(config);
-    console.log(`Updated relay target '${pylonName}' (${pylonId}).`);
+    console.log(`Updated relay target '${hexcoreName}' (${hexcoreId}).`);
   } else {
     const target: RelayTarget = {
-      pylonId,
-      pylonName,
+      hexcoreId,
+      hexcoreName,
       wsUrl,
       token,
       refreshToken,
@@ -73,7 +73,7 @@ async function connectRelay(link: string): Promise<void> {
     };
     config.targets.push(target);
     saveRelayConfig(config);
-    console.log(`Relay configured for '${pylonName}'.`);
+    console.log(`Relay configured for '${hexcoreName}'.`);
   }
 
   console.log("No sessions selected yet.");
@@ -98,7 +98,7 @@ async function listRelays(): Promise<void> {
   console.log("─────────────────────────────");
 
   for (const target of config.targets) {
-    console.log(`  ${target.pylonName}  (${target.pylonId.slice(0, 8)})`);
+    console.log(`  ${target.hexcoreName}  (${target.hexcoreId.slice(0, 8)})`);
     if (target.projects.length === 0) {
       console.log("    No projects selected");
     } else {
@@ -113,8 +113,8 @@ async function listRelays(): Promise<void> {
 
 // ─── Remove ─────────────────────────────────────────────────────────────────
 
-async function removeRelay(pylonIdPrefix?: string): Promise<void> {
-  if (!pylonIdPrefix) {
+async function removeRelay(hexcoreIdPrefix?: string): Promise<void> {
+  if (!hexcoreIdPrefix) {
     console.error("Usage: hex relay remove <hexcoreId>");
     process.exit(1);
   }
@@ -122,24 +122,24 @@ async function removeRelay(pylonIdPrefix?: string): Promise<void> {
   const { loadRelayConfig, saveRelayConfig } = await import("@hexdeck/server");
   const config = loadRelayConfig();
 
-  const matches = config.targets.filter((t) => t.pylonId.startsWith(pylonIdPrefix));
+  const matches = config.targets.filter((t) => t.hexcoreId.startsWith(hexcoreIdPrefix));
 
   if (matches.length === 0) {
-    console.error(`No relay target found matching '${pylonIdPrefix}'.`);
+    console.error(`No relay target found matching '${hexcoreIdPrefix}'.`);
     process.exit(1);
   }
   if (matches.length > 1) {
-    console.error(`Ambiguous prefix '${pylonIdPrefix}' matches ${matches.length} targets:`);
+    console.error(`Ambiguous prefix '${hexcoreIdPrefix}' matches ${matches.length} targets:`);
     for (const m of matches) {
-      console.error(`  ${m.pylonId}  ${m.pylonName}`);
+      console.error(`  ${m.hexcoreId}  ${m.hexcoreName}`);
     }
     process.exit(1);
   }
 
   const target = matches[0];
-  config.targets = config.targets.filter((t) => t.pylonId !== target.pylonId);
+  config.targets = config.targets.filter((t) => t.hexcoreId !== target.hexcoreId);
   saveRelayConfig(config);
-  console.log(`Removed relay target '${target.pylonName}' (${target.pylonId}).`);
+  console.log(`Removed relay target '${target.hexcoreName}' (${target.hexcoreId}).`);
 }
 
 // ─── Sessions ───────────────────────────────────────────────────────────────
@@ -177,58 +177,58 @@ async function listSessions(): Promise<void> {
 
 // ─── Include ────────────────────────────────────────────────────────────────
 
-async function includeProject(pylonIdPrefix?: string, projectPath?: string): Promise<void> {
-  if (!pylonIdPrefix || !projectPath) {
+async function includeProject(hexcoreIdPrefix?: string, projectPath?: string): Promise<void> {
+  if (!hexcoreIdPrefix || !projectPath) {
     console.error("Usage: hex relay include <hexcoreId> <projectPath>");
     process.exit(1);
   }
 
   const { loadRelayConfig, saveRelayConfig } = await import("@hexdeck/server");
   const config = loadRelayConfig();
-  const target = findTarget(config, pylonIdPrefix);
+  const target = findTarget(config, hexcoreIdPrefix);
 
   // Normalize path: expand ~ to home dir
   const resolved = expandHome(projectPath);
 
   if (target.projects.includes(resolved)) {
-    console.log(`Already relaying ${projectPath} to '${target.pylonName}'.`);
+    console.log(`Already relaying ${projectPath} to '${target.hexcoreName}'.`);
     return;
   }
 
   target.projects.push(resolved);
   saveRelayConfig(config);
-  console.log(`Now relaying ${projectPath} to '${target.pylonName}'.`);
+  console.log(`Now relaying ${projectPath} to '${target.hexcoreName}'.`);
 }
 
 // ─── Exclude ────────────────────────────────────────────────────────────────
 
-async function excludeProject(pylonIdPrefix?: string, projectPath?: string): Promise<void> {
-  if (!pylonIdPrefix || !projectPath) {
+async function excludeProject(hexcoreIdPrefix?: string, projectPath?: string): Promise<void> {
+  if (!hexcoreIdPrefix || !projectPath) {
     console.error("Usage: hex relay exclude <hexcoreId> <projectPath>");
     process.exit(1);
   }
 
   const { loadRelayConfig, saveRelayConfig } = await import("@hexdeck/server");
   const config = loadRelayConfig();
-  const target = findTarget(config, pylonIdPrefix);
+  const target = findTarget(config, hexcoreIdPrefix);
 
   const resolved = expandHome(projectPath);
   const idx = target.projects.indexOf(resolved);
 
   if (idx === -1) {
-    console.log(`Not currently relaying ${projectPath} to '${target.pylonName}'.`);
+    console.log(`Not currently relaying ${projectPath} to '${target.hexcoreName}'.`);
     return;
   }
 
   target.projects.splice(idx, 1);
   saveRelayConfig(config);
-  console.log(`Stopped relaying ${projectPath} to '${target.pylonName}'.`);
+  console.log(`Stopped relaying ${projectPath} to '${target.hexcoreName}'.`);
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function findTarget(config: RelayConfig, prefix: string): RelayTarget {
-  const matches = config.targets.filter((t) => t.pylonId.startsWith(prefix));
+  const matches = config.targets.filter((t) => t.hexcoreId.startsWith(prefix));
 
   if (matches.length === 0) {
     console.error(`No relay target found matching '${prefix}'.`);
@@ -237,7 +237,7 @@ function findTarget(config: RelayConfig, prefix: string): RelayTarget {
   if (matches.length > 1) {
     console.error(`Ambiguous prefix '${prefix}' matches ${matches.length} targets:`);
     for (const m of matches) {
-      console.error(`  ${m.pylonId}  ${m.pylonName}`);
+      console.error(`  ${m.hexcoreId}  ${m.hexcoreName}`);
     }
     process.exit(1);
   }

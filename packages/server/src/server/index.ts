@@ -215,7 +215,7 @@ export function createApp(options?: { dashboardDir?: string }): Hono {
       const creds = await exchangeConnectLink(parsed);
       relayManager.addTarget(creds);
       if (shouldTickerRun()) startTicker();
-      return c.json({ ok: true, pylonId: creds.pylonId, pylonName: creds.pylonName });
+      return c.json({ ok: true, hexcoreId: creds.hexcoreId, hexcoreName: creds.hexcoreName });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Invalid connect link";
       return c.json({ error: message }, 400);
@@ -223,9 +223,9 @@ export function createApp(options?: { dashboardDir?: string }): Hono {
   });
 
   /** Remove a relay target */
-  app.delete("/api/relay/targets/:pylonId", (c) => {
-    const { pylonId } = c.req.param();
-    const removed = relayManager.removeTarget(pylonId);
+  app.delete("/api/relay/targets/:hexcoreId", (c) => {
+    const { hexcoreId } = c.req.param();
+    const removed = relayManager.removeTarget(hexcoreId);
     if (!removed) {
       return c.json({ error: "Target not found" }, 404);
     }
@@ -234,13 +234,13 @@ export function createApp(options?: { dashboardDir?: string }): Hono {
   });
 
   /** Include a project in a relay target */
-  app.post("/api/relay/targets/:pylonId/include", async (c) => {
-    const { pylonId } = c.req.param();
+  app.post("/api/relay/targets/:hexcoreId/include", async (c) => {
+    const { hexcoreId } = c.req.param();
     const body = await c.req.json<{ projectPath?: string }>();
     if (!body.projectPath) {
       return c.json({ error: "Missing 'projectPath' field" }, 400);
     }
-    const ok = relayManager.includeProject(pylonId, body.projectPath);
+    const ok = relayManager.includeProject(hexcoreId, body.projectPath);
     if (!ok) {
       return c.json({ error: "Target not found" }, 404);
     }
@@ -248,13 +248,13 @@ export function createApp(options?: { dashboardDir?: string }): Hono {
   });
 
   /** Exclude a project from a relay target */
-  app.post("/api/relay/targets/:pylonId/exclude", async (c) => {
-    const { pylonId } = c.req.param();
+  app.post("/api/relay/targets/:hexcoreId/exclude", async (c) => {
+    const { hexcoreId } = c.req.param();
     const body = await c.req.json<{ projectPath?: string }>();
     if (!body.projectPath) {
       return c.json({ error: "Missing 'projectPath' field" }, 400);
     }
-    const ok = relayManager.excludeProject(pylonId, body.projectPath);
+    const ok = relayManager.excludeProject(hexcoreId, body.projectPath);
     if (!ok) {
       return c.json({ error: "Target not found" }, 404);
     }

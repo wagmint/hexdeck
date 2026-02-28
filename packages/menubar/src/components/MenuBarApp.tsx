@@ -2,14 +2,14 @@ import { useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-shell";
 import type { DashboardState } from "../lib/types";
-import type { PylonAlert, TraySeverity } from "../lib/alerts";
+import type { HexcoreAlert, TraySeverity } from "../lib/alerts";
 import { StatusHeader } from "./StatusHeader";
 import { AlertList } from "./AlertList";
 import { AgentList } from "./AgentList";
 
 interface MenuBarAppProps {
   state: DashboardState | null;
-  alerts: PylonAlert[];
+  alerts: HexcoreAlert[];
   severity: TraySeverity;
   connected: boolean;
   loading: boolean;

@@ -10,12 +10,12 @@ export interface PidInfo {
   dashboardDir: string | null;
 }
 
-const PYLON_DIR = join(homedir(), ".hexdeck");
-const PID_FILE = join(PYLON_DIR, "server.pid");
+const HEXDECK_DIR = join(homedir(), ".hexdeck");
+const PID_FILE = join(HEXDECK_DIR, "server.pid");
 
 function ensureDir() {
-  if (!existsSync(PYLON_DIR)) {
-    mkdirSync(PYLON_DIR, { recursive: true });
+  if (!existsSync(HEXDECK_DIR)) {
+    mkdirSync(HEXDECK_DIR, { recursive: true });
   }
 }
 

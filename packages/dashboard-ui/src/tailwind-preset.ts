@@ -2,8 +2,8 @@
  * Tailwind CSS preset for the Hexdeck dashboard theme.
  * Consuming apps should add this to their tailwind.config.ts:
  *
- *   import pylonPreset from "@hexdeck/dashboard-ui/tailwind-preset";
- *   export default { presets: [pylonPreset], ... }
+ *   import hexdeckPreset from "@hexdeck/dashboard-ui/tailwind-preset";
+ *   export default { presets: [hexdeckPreset], ... }
  */
 export default {
   theme: {

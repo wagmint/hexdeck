@@ -14,10 +14,10 @@ const RECONNECT_MAX_MS = 30_000;
 export type RelayConnectionStatus = "connected" | "connecting" | "disconnected";
 
 /** Callback to persist refreshed token back to config */
-export type OnTokenRefreshed = (pylonId: string, newToken: string) => void;
+export type OnTokenRefreshed = (hexcoreId: string, newToken: string) => void;
 
 export class RelayConnection {
-  readonly pylonId: string;
+  readonly hexcoreId: string;
 
   private wsUrl: string;
   private token: string;
@@ -34,13 +34,13 @@ export class RelayConnection {
   private refreshing = false;
 
   constructor(
-    pylonId: string,
+    hexcoreId: string,
     wsUrl: string,
     token: string,
     refreshToken: string = "",
     onTokenRefreshed: OnTokenRefreshed | null = null,
   ) {
-    this.pylonId = pylonId;
+    this.hexcoreId = hexcoreId;
     this.wsUrl = wsUrl;
     this.token = token;
     this.refreshToken = refreshToken;
@@ -108,7 +108,7 @@ export class RelayConnection {
       const authMsg: AuthMessage = {
         type: "auth",
         token: this.token,
-        pylonId: this.pylonId,
+        hexcoreId: this.hexcoreId,
       };
       this.send(authMsg);
 
@@ -130,7 +130,7 @@ export class RelayConnection {
         } else if (msg.type === "auth_error") {
           const reason = (msg as { reason?: string; message?: string }).reason
             ?? (msg as { message?: string }).message ?? "unknown";
-          console.error(`[relay] Auth failed for ${this.pylonId}: ${reason}`);
+          console.error(`[relay] Auth failed for ${this.hexcoreId}: ${reason}`);
 
           // If token expired and we have a refresh token, try refreshing
           if (reason.toLowerCase().includes("expired") && this.refreshToken) {
@@ -175,14 +175,14 @@ export class RelayConnection {
       });
 
       if (!res.ok) {
-        console.error(`[relay] Token refresh failed for ${this.pylonId}: ${res.status}`);
+        console.error(`[relay] Token refresh failed for ${this.hexcoreId}: ${res.status}`);
         this.disconnect();
         return;
       }
 
       const body = await res.json() as { success: boolean; data?: { accessToken: string } };
       if (!body.success || !body.data?.accessToken) {
-        console.error(`[relay] Token refresh returned invalid response for ${this.pylonId}`);
+        console.error(`[relay] Token refresh returned invalid response for ${this.hexcoreId}`);
         this.disconnect();
         return;
       }
@@ -191,14 +191,14 @@ export class RelayConnection {
 
       // Persist the new token back to config
       if (this.onTokenRefreshed) {
-        this.onTokenRefreshed(this.pylonId, this.token);
+        this.onTokenRefreshed(this.hexcoreId, this.token);
       }
 
-      console.log(`[relay] Token refreshed for ${this.pylonId}, reconnecting`);
+      console.log(`[relay] Token refreshed for ${this.hexcoreId}, reconnecting`);
       this.reconnectAttempt = 0;
       this.doConnect();
     } catch (err) {
-      console.error(`[relay] Token refresh error for ${this.pylonId}:`, err);
+      console.error(`[relay] Token refresh error for ${this.hexcoreId}:`, err);
       this.scheduleReconnect();
     } finally {
       this.refreshing = false;

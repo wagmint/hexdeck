@@ -7,8 +7,8 @@ export interface RelayPanelProps {
   targets: RelayTargetInfo[];
   activeProjects: ActiveProject[];
   onConnect: (link: string) => Promise<{ error?: string }>;
-  onRemove: (pylonId: string) => void;
-  onToggleProject: (pylonId: string, projectPath: string, include: boolean) => void;
+  onRemove: (hexcoreId: string) => void;
+  onToggleProject: (hexcoreId: string, projectPath: string, include: boolean) => void;
   onClose: () => void;
 }
 
@@ -90,7 +90,7 @@ export function RelayPanel({
           <div className="space-y-3">
             {targets.map((target) => (
               <TargetCard
-                key={target.pylonId}
+                key={target.hexcoreId}
                 target={target}
                 activeProjects={activeProjects}
                 onRemove={onRemove}
@@ -112,8 +112,8 @@ function TargetCard({
 }: {
   target: RelayTargetInfo;
   activeProjects: ActiveProject[];
-  onRemove: (pylonId: string) => void;
-  onToggleProject: (pylonId: string, projectPath: string, include: boolean) => void;
+  onRemove: (hexcoreId: string) => void;
+  onToggleProject: (hexcoreId: string, projectPath: string, include: boolean) => void;
 }) {
   const statusDot = {
     connected: "bg-dash-green",
@@ -129,15 +129,15 @@ function TargetCard({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusDot}`} />
-          <span className="text-dash-text truncate font-semibold">{target.pylonName}</span>
+          <span className="text-dash-text truncate font-semibold">{target.hexcoreName}</span>
           <span className="text-dash-text-muted text-[9px] shrink-0">
-            {target.pylonId.slice(0, 8)}
+            {target.hexcoreId.slice(0, 8)}
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-[9px] text-dash-text-muted">{target.status}</span>
           <button
-            onClick={() => onRemove(target.pylonId)}
+            onClick={() => onRemove(target.hexcoreId)}
             className="text-[9px] text-dash-red/60 hover:text-dash-red transition-colors"
           >
             Remove
@@ -164,7 +164,7 @@ function TargetCard({
                   </span>
                 </div>
                 <button
-                  onClick={() => onToggleProject(target.pylonId, proj.projectPath, !included)}
+                  onClick={() => onToggleProject(target.hexcoreId, proj.projectPath, !included)}
                   className={`w-7 h-4 rounded-full relative transition-colors shrink-0 ${
                     included ? "bg-dash-green/40" : "bg-dash-surface-3"
                   }`}

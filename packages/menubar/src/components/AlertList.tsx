@@ -1,4 +1,4 @@
-import type { PylonAlert } from "../lib/alerts";
+import type { HexcoreAlert } from "../lib/alerts";
 
 function timeAgo(timestamp: string): string {
   const diff = Date.now() - new Date(timestamp).getTime();
@@ -31,7 +31,7 @@ const severityStyles = {
 };
 
 interface AlertListProps {
-  alerts: PylonAlert[];
+  alerts: HexcoreAlert[];
 }
 
 export function AlertList({ alerts }: AlertListProps) {

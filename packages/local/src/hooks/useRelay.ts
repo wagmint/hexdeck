@@ -15,8 +15,8 @@ interface UseRelayResult {
   targets: RelayTargetInfo[];
   activeProjects: ActiveProject[];
   connect: (link: string) => Promise<{ error?: string }>;
-  remove: (pylonId: string) => void;
-  toggleProject: (pylonId: string, projectPath: string, include: boolean) => void;
+  remove: (hexcoreId: string) => void;
+  toggleProject: (hexcoreId: string, projectPath: string, include: boolean) => void;
 }
 
 export function useRelay(isOpen: boolean): UseRelayResult {
@@ -73,14 +73,14 @@ export function useRelay(isOpen: boolean): UseRelayResult {
     return result;
   }, [fetchData]);
 
-  const remove = useCallback((pylonId: string) => {
-    removeRelayTarget(pylonId).then(fetchData).catch(() => {});
+  const remove = useCallback((hexcoreId: string) => {
+    removeRelayTarget(hexcoreId).then(fetchData).catch(() => {});
   }, [fetchData]);
 
   const toggleProject = useCallback(
-    (pylonId: string, projectPath: string, include: boolean) => {
+    (hexcoreId: string, projectPath: string, include: boolean) => {
       const fn = include ? apiInclude : apiExclude;
-      fn(pylonId, projectPath).then(fetchData).catch(() => {});
+      fn(hexcoreId, projectPath).then(fetchData).catch(() => {});
     },
     [fetchData]
   );

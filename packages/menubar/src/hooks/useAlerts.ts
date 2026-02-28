@@ -9,12 +9,12 @@ import type { DashboardState } from "../lib/types";
 import {
   deriveAlerts,
   worstSeverity,
-  type PylonAlert,
+  type HexcoreAlert,
   type TraySeverity,
 } from "../lib/alerts";
 
 interface UseAlertsResult {
-  alerts: PylonAlert[];
+  alerts: HexcoreAlert[];
   severity: TraySeverity;
 }
 
@@ -48,7 +48,7 @@ export function useAlerts(
 
   // Send notifications for new red alerts
   const sendAlertNotification = useCallback(
-    async (alert: PylonAlert) => {
+    async (alert: HexcoreAlert) => {
       try {
         let granted = await isPermissionGranted();
         if (!granted) {

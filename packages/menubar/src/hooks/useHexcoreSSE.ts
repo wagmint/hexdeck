@@ -6,14 +6,14 @@ const SSE_URL = "http://localhost:7433/api/dashboard/stream";
 const INITIAL_RETRY_MS = 2000;
 const MAX_RETRY_MS = 10000;
 
-interface UsePylonSSEResult {
+interface UseHexcoreSSEResult {
   state: DashboardState | null;
   loading: boolean;
   error: string | null;
   connected: boolean;
 }
 
-export function usePylonSSE(): UsePylonSSEResult {
+export function useHexcoreSSE(): UseHexcoreSSEResult {
   const [state, setState] = useState<DashboardState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

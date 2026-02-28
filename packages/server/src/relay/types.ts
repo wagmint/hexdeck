@@ -163,7 +163,7 @@ export interface OperatorState {
 export interface AuthMessage {
   type: "auth";
   token: string;
-  pylonId: string;
+  hexcoreId: string;
 }
 
 export interface StateUpdateMessage {
@@ -193,8 +193,8 @@ export type ServerMessage = AuthOkMessage | AuthErrorMessage;
 // ─── Relay Config Types ─────────────────────────────────────────────────────
 
 export interface RelayTarget {
-  pylonId: string;
-  pylonName: string;
+  hexcoreId: string;
+  hexcoreName: string;
   wsUrl: string;
   token: string;
   refreshToken: string;

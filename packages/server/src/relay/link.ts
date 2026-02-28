@@ -1,13 +1,13 @@
 export interface ParsedConnectLink {
-  pylonId: string;
-  pylonName: string;
+  hexcoreId: string;
+  hexcoreName: string;
   wsUrl: string;
   connectCode: string;
 }
 
 export interface ExchangedRelayCredentials {
-  pylonId: string;
-  pylonName: string;
+  hexcoreId: string;
+  hexcoreName: string;
   wsUrl: string;
   token: string;
   refreshToken: string;
@@ -26,17 +26,17 @@ export function parseConnectLink(link: string): ParsedConnectLink {
     throw new Error("Invalid connect link format. Expected: hexcore+wss://<host>/ws?p=<hexcoreId>&c=<code>&n=<name>");
   }
 
-  const pylonId = url.searchParams.get("p");
+  const hexcoreId = url.searchParams.get("p");
   const connectCode = url.searchParams.get("c");
-  const pylonName = url.searchParams.get("n") || "Unnamed Relay";
+  const hexcoreName = url.searchParams.get("n") || "Unnamed Relay";
 
-  if (!pylonId || !connectCode) {
+  if (!hexcoreId || !connectCode) {
     throw new Error("Connect link missing required parameters (p, c).");
   }
 
   const wsUrl = `${url.protocol}//${url.host}${url.pathname}`;
 
-  return { pylonId, pylonName, wsUrl, connectCode };
+  return { hexcoreId, hexcoreName, wsUrl, connectCode };
 }
 
 interface ConnectExchangeApiResponse {
@@ -65,7 +65,7 @@ export async function exchangeConnectLink(parsed: ParsedConnectLink): Promise<Ex
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      pylonId: parsed.pylonId,
+      hexcoreId: parsed.hexcoreId,
       code: parsed.connectCode,
     }),
   });
@@ -89,8 +89,8 @@ export async function exchangeConnectLink(parsed: ParsedConnectLink): Promise<Ex
   }
 
   return {
-    pylonId: parsed.pylonId,
-    pylonName: parsed.pylonName,
+    hexcoreId: parsed.hexcoreId,
+    hexcoreName: parsed.hexcoreName,
     wsUrl: parsed.wsUrl,
     token,
     refreshToken,

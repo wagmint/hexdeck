@@ -7,8 +7,8 @@ import type { RelayConnectionStatus } from "./connection.js";
 import type { RelayTarget } from "./types.js";
 
 export interface RelayTargetStatus {
-  pylonId: string;
-  pylonName: string;
+  hexcoreId: string;
+  hexcoreName: string;
   status: RelayConnectionStatus;
   projects: string[];
   addedAt: string;
@@ -44,10 +44,10 @@ class RelayManager {
   getStatus(): RelayTargetStatus[] {
     const config = loadRelayConfig();
     return config.targets.map((t) => {
-      const conn = this.connections.get(t.pylonId);
+      const conn = this.connections.get(t.hexcoreId);
       return {
-        pylonId: t.pylonId,
-        pylonName: t.pylonName,
+        hexcoreId: t.hexcoreId,
+        hexcoreName: t.hexcoreName,
         status: conn ? conn.status : "disconnected",
         projects: t.projects,
         addedAt: t.addedAt,
@@ -56,18 +56,18 @@ class RelayManager {
   }
 
   /** Add or update a relay target from parsed connect link fields. */
-  addTarget(fields: { pylonId: string; pylonName: string; wsUrl: string; token: string; refreshToken: string }): void {
+  addTarget(fields: { hexcoreId: string; hexcoreName: string; wsUrl: string; token: string; refreshToken: string }): void {
     const config = loadRelayConfig();
-    const existing = config.targets.find((t) => t.pylonId === fields.pylonId);
+    const existing = config.targets.find((t) => t.hexcoreId === fields.hexcoreId);
     if (existing) {
       existing.token = fields.token;
       existing.refreshToken = fields.refreshToken;
-      existing.pylonName = fields.pylonName;
+      existing.hexcoreName = fields.hexcoreName;
       existing.wsUrl = fields.wsUrl;
     } else {
       const target: RelayTarget = {
-        pylonId: fields.pylonId,
-        pylonName: fields.pylonName,
+        hexcoreId: fields.hexcoreId,
+        hexcoreName: fields.hexcoreName,
         wsUrl: fields.wsUrl,
         token: fields.token,
         refreshToken: fields.refreshToken,
@@ -81,24 +81,24 @@ class RelayManager {
   }
 
   /** Remove a relay target and disconnect. */
-  removeTarget(pylonId: string): boolean {
+  removeTarget(hexcoreId: string): boolean {
     const config = loadRelayConfig();
-    const idx = config.targets.findIndex((t) => t.pylonId === pylonId);
+    const idx = config.targets.findIndex((t) => t.hexcoreId === hexcoreId);
     if (idx === -1) return false;
     config.targets.splice(idx, 1);
     saveRelayConfig(config);
-    const conn = this.connections.get(pylonId);
+    const conn = this.connections.get(hexcoreId);
     if (conn) {
       conn.disconnect();
-      this.connections.delete(pylonId);
+      this.connections.delete(hexcoreId);
     }
     return true;
   }
 
   /** Add a project to a relay target. */
-  includeProject(pylonId: string, projectPath: string): boolean {
+  includeProject(hexcoreId: string, projectPath: string): boolean {
     const config = loadRelayConfig();
-    const target = config.targets.find((t) => t.pylonId === pylonId);
+    const target = config.targets.find((t) => t.hexcoreId === hexcoreId);
     if (!target) return false;
     if (target.projects.includes(projectPath)) return true;
     target.projects.push(projectPath);
@@ -107,9 +107,9 @@ class RelayManager {
   }
 
   /** Remove a project from a relay target. */
-  excludeProject(pylonId: string, projectPath: string): boolean {
+  excludeProject(hexcoreId: string, projectPath: string): boolean {
     const config = loadRelayConfig();
-    const target = config.targets.find((t) => t.pylonId === pylonId);
+    const target = config.targets.find((t) => t.hexcoreId === hexcoreId);
     if (!target) return false;
     const idx = target.projects.indexOf(projectPath);
     if (idx === -1) return true;
@@ -139,7 +139,7 @@ class RelayManager {
     for (const target of config.targets) {
       if (target.projects.length === 0) continue;
 
-      const conn = this.connections.get(target.pylonId);
+      const conn = this.connections.get(target.hexcoreId);
       if (!conn) continue;
 
       const state = transformToOperatorState(
@@ -155,9 +155,9 @@ class RelayManager {
   // ─── Internal ───────────────────────────────────────────────────────────
 
   /** Persist a refreshed access token back to relay.json */
-  private handleTokenRefreshed(pylonId: string, newToken: string): void {
+  private handleTokenRefreshed(hexcoreId: string, newToken: string): void {
     const config = loadRelayConfig();
-    const target = config.targets.find((t) => t.pylonId === pylonId);
+    const target = config.targets.find((t) => t.hexcoreId === hexcoreId);
     if (target) {
       target.token = newToken;
       saveRelayConfig(config);
@@ -166,7 +166,7 @@ class RelayManager {
 
   private syncConnections(): void {
     const config = loadRelayConfig();
-    const targetIds = new Set(config.targets.map((t) => t.pylonId));
+    const targetIds = new Set(config.targets.map((t) => t.hexcoreId));
 
     // Remove connections for targets no longer in config
     for (const [id, conn] of this.connections) {
@@ -178,16 +178,16 @@ class RelayManager {
 
     // Add/update connections for current targets
     for (const target of config.targets) {
-      let conn = this.connections.get(target.pylonId);
+      let conn = this.connections.get(target.hexcoreId);
       if (!conn) {
         conn = new RelayConnection(
-          target.pylonId,
+          target.hexcoreId,
           target.wsUrl,
           target.token,
           target.refreshToken,
           this.handleTokenRefreshed.bind(this),
         );
-        this.connections.set(target.pylonId, conn);
+        this.connections.set(target.hexcoreId, conn);
         conn.connect();
       } else {
         // Update tokens in case they changed

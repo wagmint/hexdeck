@@ -7,7 +7,7 @@ import { serve, type ServerType } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { listProjects, listSessions, getActiveSessions } from "../discovery/sessions.js";
 import { buildDashboardState } from "../core/dashboard.js";
-import { blockedSessions, clearStaleBlocked, ensureHooks, type BlockedInfo } from "../core/blocked.js";
+import { blockedSessions, clearStaleBlocked, ensureHooks, createPendingDecision, resolveDecision, type BlockedInfo } from "../core/blocked.js";
 import { relayManager } from "../relay/manager.js";
 import { parseConnectLink, exchangeConnectLink, createRelayClaim, deriveHttpBaseFromWs } from "../relay/link.js";
 import { storeClaim, getClaim, removeClaim, cleanupExpiredClaims } from "../relay/claims.js";
@@ -238,6 +238,88 @@ export function createApp(options?: { dashboardDir?: string }): Hono {
         blockedAt: Date.now(),
         snapshotSize,
       });
+      return c.json({ ok: true });
+    } catch {
+      return c.json({ error: "Invalid JSON" }, 400);
+    }
+  });
+
+  /** Long-poll permission gate — called by PermissionRequest hook script.
+   *  Holds the HTTP connection until the user approves/denies from UI, or timeout. */
+  app.post("/api/hooks/permission-gate", async (c) => {
+    try {
+      const body = await c.req.json<Record<string, unknown>>();
+      const sessionId = pickString(body, "session_id", "sessionId")
+        ?? deriveSessionIdFromTranscript(pickString(body, "transcript_path", "transcriptPath"));
+      if (!sessionId) {
+        return c.json({ error: "Missing session_id" }, 400);
+      }
+
+      const toolName = pickString(body, "tool_name", "toolName", "tool")
+        ?? pickString(body, "hook_event_name", "hookEventName")
+        ?? "unknown";
+
+      if (toolName === "Stop") {
+        return c.json({ ok: true });
+      }
+
+      const toolInput = pickRecord(body, "tool_input", "toolInput") ?? {};
+      const transcriptPath = pickString(body, "transcript_path", "transcriptPath");
+
+      let snapshotSize = 0;
+      if (transcriptPath) {
+        try {
+          snapshotSize = fs.statSync(transcriptPath).size;
+        } catch { /* fall back to 0 */ }
+      }
+
+      blockedSessions.set(sessionId, {
+        sessionId,
+        toolName,
+        toolInput,
+        blockedAt: Date.now(),
+        snapshotSize,
+      });
+
+      // Hold connection until UI decision or timeout
+      const decision = await createPendingDecision(sessionId);
+
+      // Clean up blocked state when decision arrives (user decided from UI)
+      if (decision === "allow" || decision === "deny") {
+        blockedSessions.delete(sessionId);
+      }
+
+      // "prompt" means timeout/fallback — return empty so script outputs nothing
+      // and Claude Code falls through to the local permission dialog
+      if (decision === "prompt") {
+        return c.text("");
+      }
+
+      return c.json({
+        hookSpecificOutput: {
+          hookEventName: "PermissionRequest",
+          decision: { behavior: decision },
+        },
+      });
+    } catch {
+      // On any error, return empty — script outputs nothing, local dialog appears
+      return c.text("");
+    }
+  });
+
+  /** UI endpoint to approve/deny a blocked session */
+  app.post("/api/sessions/:id/decide", async (c) => {
+    try {
+      const sessionId = c.req.param("id");
+      const body = await c.req.json<{ action?: string }>();
+      const action = body.action;
+      if (action !== "approve" && action !== "deny") {
+        return c.json({ error: "Invalid action — must be 'approve' or 'deny'" }, 400);
+      }
+      const resolved = resolveDecision(sessionId, action === "approve" ? "allow" : "deny");
+      if (!resolved) {
+        return c.json({ error: "No pending decision for this session" }, 404);
+      }
       return c.json({ ok: true });
     } catch {
       return c.json({ error: "Invalid JSON" }, 400);

@@ -122,7 +122,7 @@ export interface Agent {
   plans: SessionPlan[];
   risk: AgentRisk;
   operatorId: string;
-  blockedOn?: { toolName: string; description: string } | null;
+  blockedOn?: { toolName: string; description: string; detail?: string } | null;
 }
 
 export interface Workstream {

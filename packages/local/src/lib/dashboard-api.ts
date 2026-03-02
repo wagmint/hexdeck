@@ -19,3 +19,14 @@ export async function getDashboardState(): Promise<DashboardState> {
 export async function getDashboardFeed(limit = 50): Promise<FeedEvent[]> {
   return fetchApi<FeedEvent[]>(`/api/dashboard/feed?limit=${limit}`);
 }
+
+export async function decideSession(sessionId: string, action: "approve" | "deny"): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/decide`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action }),
+  });
+  if (!res.ok) {
+    throw new Error(`API error: ${res.status} ${res.statusText}`);
+  }
+}

@@ -142,7 +142,7 @@ export interface Agent {
   /** Operator this agent belongs to */
   operatorId: string;
   /** What the agent is blocked on (tool name + description) when status === "blocked" */
-  blockedOn?: { toolName: string; description: string } | null;
+  blockedOn?: { toolName: string; description: string; detail?: string } | null;
 }
 
 export interface Workstream {

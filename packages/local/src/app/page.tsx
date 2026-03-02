@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useLayoutEffect, useMemo } from "react";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useRelay } from "@/hooks/useRelay";
+import { decideSession } from "@/lib/dashboard-api";
 import type { Collision, DashboardState, RelayStatus } from "@hexdeck/dashboard-ui";
 import {
   OperatorProvider,
@@ -74,6 +75,13 @@ export default function DashboardPage() {
     [bottomPanelHeight, makeResizeHandler]
   );
 
+
+  // Approve/deny a blocked agent from the UI
+  const handleDecide = useCallback(async (sessionId: string, action: "approve" | "deny") => {
+    try {
+      await decideSession(sessionId, action);
+    } catch { /* server down — ignore */ }
+  }, []);
 
   // Workstream focus filter
   const toggleWorkstream = useCallback((projectPath: string) => {
@@ -320,6 +328,7 @@ export default function DashboardPage() {
                   workstream={ws}
                   isSelected={selectedProjectPath === ws.projectPath}
                   onSelect={toggleWorkstream}
+                  onDecide={handleDecide}
                 />
               </div>
             ))

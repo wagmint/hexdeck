@@ -8,6 +8,7 @@ interface AgentCardProps {
   workstream: Workstream;
   isSelected?: boolean;
   onSelect?: (projectPath: string) => void;
+  onDecide?: (sessionId: string, action: "approve" | "deny") => void;
 }
 
 const planBadges: Partial<Record<PlanStatus, { label: string; className: string }>> = {
@@ -16,7 +17,7 @@ const planBadges: Partial<Record<PlanStatus, { label: string; className: string 
   rejected: { label: "REJECTED", className: "text-dash-red bg-dash-red/10" },
 };
 
-export function AgentCard({ workstream, isSelected, onSelect }: AgentCardProps) {
+export function AgentCard({ workstream, isSelected, onSelect, onDecide }: AgentCardProps) {
   const hasActive = workstream.agents.some((a) => a.isActive);
 
   const activePlan = workstream.plans.find(p => p.status !== "none");
@@ -81,7 +82,30 @@ export function AgentCard({ workstream, isSelected, onSelect }: AgentCardProps) 
             </span>
             <OperatorTag operatorId={agent.operatorId} />
             {agent.status === "blocked" && agent.blockedOn?.description ? (
-              <span className="text-[9px] text-dash-blue truncate">{agent.blockedOn.description}</span>
+              <>
+                <span className="text-[9px] text-dash-blue truncate">{agent.blockedOn.description}</span>
+                {agent.blockedOn.detail && (
+                  <span className="text-[8px] text-dash-text-dim font-mono truncate max-w-[100px]" title={agent.blockedOn.detail}>
+                    {agent.blockedOn.detail}
+                  </span>
+                )}
+                {onDecide && (
+                  <>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDecide(agent.sessionId, "approve"); }}
+                      className="text-[8px] font-semibold px-1 py-px rounded bg-dash-green/15 text-dash-green hover:bg-dash-green/25 transition-colors shrink-0"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDecide(agent.sessionId, "deny"); }}
+                      className="text-[8px] font-semibold px-1 py-px rounded bg-dash-red/15 text-dash-red hover:bg-dash-red/25 transition-colors shrink-0"
+                    >
+                      Deny
+                    </button>
+                  </>
+                )}
+              </>
             ) : agent.currentTask ? (
               <span className="text-[9px] text-dash-text-dim truncate">{agent.currentTask}</span>
             ) : null}

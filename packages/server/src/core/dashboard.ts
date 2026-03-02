@@ -9,7 +9,7 @@ import { buildParsedSession } from "./nodes.js";
 import { buildCodexParsedSession } from "./codex-nodes.js";
 import { detectCollisions } from "./collisions.js";
 import { buildFeed } from "./feed.js";
-import { blockedSessions, describeBlockedTool } from "./blocked.js";
+import { blockedSessions, describeBlockedTool, extractToolDetail } from "./blocked.js";
 import { formatIdleDuration } from "./duration.js";
 import { computeAgentRisk, computeWorkstreamRisk } from "./risk.js";
 import { computeTurnCost } from "./pricing.js";
@@ -966,7 +966,9 @@ export function buildDashboardState(): DashboardState {
     const blockedOn = status === "blocked"
       ? (() => {
           const info = blockedSessions.get(parsed.session.id);
-          return info ? { toolName: info.toolName, description: describeBlockedTool(info) } : null;
+          if (!info) return null;
+          const detail = extractToolDetail(info.toolName, info.toolInput);
+          return { toolName: info.toolName, description: describeBlockedTool(info), ...(detail ? { detail } : {}) };
         })()
       : null;
 

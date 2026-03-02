@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Agent, AgentStatus, Collision } from "../lib/types";
 
 const statusDot: Record<AgentStatus, string> = {
@@ -75,6 +76,19 @@ function AgentRow({
   dimmed?: boolean;
 }) {
   const statusNotes = getStatusNotes(agent, collisions);
+  const [deciding, setDeciding] = useState(false);
+
+  async function handleDecide(action: "approve" | "deny") {
+    setDeciding(true);
+    try {
+      await fetch(`http://localhost:7433/api/sessions/${agent.sessionId}/decide`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+    } catch { /* server down — ignore */ }
+    setDeciding(false);
+  }
 
   return (
     <div
@@ -118,6 +132,29 @@ function AgentRow({
             {note.text}
           </p>
         ))}
+        {agent.status === "blocked" && agent.blockedOn?.detail && (
+          <p className="text-[10px] text-dash-text-dim font-mono truncate mt-0.5">
+            {agent.blockedOn.detail}
+          </p>
+        )}
+        {agent.status === "blocked" && (
+          <div className="flex items-center gap-1.5 mt-1">
+            <button
+              disabled={deciding}
+              onClick={() => handleDecide("approve")}
+              className="text-[10px] font-medium px-2 py-0.5 rounded bg-dash-green/15 text-dash-green hover:bg-dash-green/25 transition-colors disabled:opacity-50"
+            >
+              Approve
+            </button>
+            <button
+              disabled={deciding}
+              onClick={() => handleDecide("deny")}
+              className="text-[10px] font-medium px-2 py-0.5 rounded bg-dash-red/15 text-dash-red hover:bg-dash-red/25 transition-colors disabled:opacity-50"
+            >
+              Deny
+            </button>
+          </div>
+        )}
         <p className="text-[10px] text-dash-text-muted truncate">
           {projectName(agent.projectPath)}
         </p>

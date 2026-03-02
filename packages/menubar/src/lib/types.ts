@@ -49,7 +49,7 @@ export interface Agent {
   plans: unknown[];
   risk: AgentRisk;
   operatorId: string;
-  blockedOn?: { toolName: string; description: string } | null;
+  blockedOn?: { toolName: string; description: string; detail?: string } | null;
 }
 
 export type CollisionSeverity = "warning" | "critical";

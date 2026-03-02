@@ -1208,7 +1208,7 @@ export function buildDashboardState(prefetchedActiveSessions?: SessionInfo[]): D
 }
 
 /** How long since last file modification before an active session is considered idle */
-const IDLE_THRESHOLD_MS = 10_000; // 10 seconds
+const IDLE_THRESHOLD_MS = 30_000; // 30 seconds
 
 function determineAgentStatus(
   parsed: ParsedSession,

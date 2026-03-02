@@ -1,4 +1,4 @@
-import type { Agent, AgentStatus } from "../lib/types";
+import type { Agent, AgentStatus, Collision } from "../lib/types";
 
 const statusDot: Record<AgentStatus, string> = {
   idle: "bg-dash-text-muted",
@@ -23,9 +23,10 @@ function projectName(projectPath: string): string {
 
 interface AgentListProps {
   agents: Agent[];
+  collisions: Collision[];
 }
 
-export function AgentList({ agents }: AgentListProps) {
+export function AgentList({ agents, collisions }: AgentListProps) {
   const activeAgents = agents.filter((a) => a.isActive);
   const inactiveAgents = agents.filter((a) => !a.isActive);
 
@@ -45,7 +46,7 @@ export function AgentList({ agents }: AgentListProps) {
             Active ({activeAgents.length})
           </span>
           {activeAgents.map((agent) => (
-            <AgentRow key={agent.sessionId} agent={agent} />
+            <AgentRow key={agent.sessionId} agent={agent} collisions={collisions} />
           ))}
         </div>
       )}
@@ -56,7 +57,7 @@ export function AgentList({ agents }: AgentListProps) {
             Inactive ({inactiveAgents.length})
           </span>
           {inactiveAgents.slice(0, 3).map((agent) => (
-            <AgentRow key={agent.sessionId} agent={agent} dimmed />
+            <AgentRow key={agent.sessionId} agent={agent} collisions={collisions} dimmed />
           ))}
         </div>
       )}
@@ -66,11 +67,15 @@ export function AgentList({ agents }: AgentListProps) {
 
 function AgentRow({
   agent,
+  collisions,
   dimmed = false,
 }: {
   agent: Agent;
+  collisions: Collision[];
   dimmed?: boolean;
 }) {
+  const statusNotes = getStatusNotes(agent, collisions);
+
   return (
     <div
       className={`flex items-start gap-2.5 px-3 py-2 rounded-lg hover:bg-dash-surface-2 transition-colors ${
@@ -108,26 +113,67 @@ function AgentRow({
             {agent.currentTask}
           </p>
         )}
-        {agent.status === "warning" && (
-          <p className="text-[10px] text-dash-yellow truncate mt-0.5">
-            {agent.risk.spinningSignals.find((s) => s.level !== "nominal")
-              ?.detail ?? "Errors in recent turns"}
+        {statusNotes.map((note, i) => (
+          <p key={`${agent.sessionId}-status-note-${i}`} className={`text-[10px] truncate mt-0.5 ${note.className}`}>
+            {note.text}
           </p>
-        )}
-        {agent.status === "conflict" && (
-          <p className="text-[10px] text-dash-yellow truncate mt-0.5">
-            File collision detected
-          </p>
-        )}
-        {agent.status === "blocked" && (
-          <p className="text-[10px] text-dash-blue truncate mt-0.5">
-            Waiting for your approval
-          </p>
-        )}
+        ))}
         <p className="text-[10px] text-dash-text-muted truncate">
           {projectName(agent.projectPath)}
         </p>
       </div>
     </div>
   );
+}
+
+const MAX_STATUS_NOTES = 2;
+
+function getStatusNotes(agent: Agent, collisions: Collision[]): Array<{ text: string; className: string }> {
+  if (agent.status === "blocked") {
+    const desc = agent.blockedOn?.description ?? "Waiting for your approval";
+    return [{ text: desc, className: "text-dash-blue" }];
+  }
+
+  if (agent.status === "conflict") {
+    const ownCollisions = collisions.filter((c) =>
+      c.agents.some((a) => a.sessionId === agent.sessionId),
+    );
+    if (ownCollisions.length === 0) {
+      return [{ text: "File collision detected", className: "text-dash-yellow" }];
+    }
+
+    const uniqueFiles = [...new Set(ownCollisions.map((c) => fileName(c.filePath)))];
+    const first = uniqueFiles[0];
+    const suffix = uniqueFiles.length > 1 ? ` (+${uniqueFiles.length - 1} more)` : "";
+    return [
+      { text: `Collision detected: ${first}${suffix}`, className: "text-dash-yellow" },
+      { text: `${ownCollisions.length} active collision${ownCollisions.length === 1 ? "" : "s"}`, className: "text-dash-yellow" },
+    ].slice(0, MAX_STATUS_NOTES);
+  }
+
+  if (agent.status === "warning") {
+    const elevatedSignals = agent.risk.spinningSignals.filter((s) => s.level !== "nominal");
+    if (elevatedSignals.length > 0) {
+      return elevatedSignals
+        .slice(0, MAX_STATUS_NOTES)
+        .map((s) => ({ text: formatSignal(s.pattern, s.detail), className: "text-dash-yellow" }));
+    }
+    const recentErrors = agent.risk.errorTrend.slice(-3).filter(Boolean).length;
+    return [{ text: `Errors in recent turns (${recentErrors}/3)`, className: "text-dash-yellow" }];
+  }
+
+  return [];
+}
+
+function formatSignal(pattern: string, detail: string): string {
+  if (pattern === "stalled") return `Stalling: ${detail}`;
+  if (pattern === "error_loop") return `Error loop: ${detail}`;
+  if (pattern === "stuck") return `Stuck: ${detail}`;
+  const name = pattern.replace(/_/g, " ");
+  return `${name.charAt(0).toUpperCase()}${name.slice(1)}: ${detail}`;
+}
+
+function fileName(path: string): string {
+  const parts = path.split("/");
+  return parts[parts.length - 1] || path;
 }

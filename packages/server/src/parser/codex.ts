@@ -27,12 +27,14 @@ export function parseCodexSessionFile(filePath: string): CodexEvent[] {
   const content = readFileSync(filePath, "utf-8");
   const lines = content.split("\n").filter((l) => l.trim().length > 0);
   const events: CodexEvent[] = [];
+  // Track pending function_call / custom_tool_call by call_id for pairing with outputs
+  const pendingCalls = new Map<string, { name: string; args: unknown; line: number; ts: Date }>();
 
   for (let i = 0; i < lines.length; i++) {
     try {
       const raw = JSON.parse(lines[i]);
-      const event = parseCodexLine(raw, i);
-      if (event) events.push(event);
+      const result = parseCodexLine(raw, i, pendingCalls);
+      if (result) events.push(result);
     } catch {
       // Skip malformed lines
     }
@@ -76,7 +78,11 @@ function parseTimestamp(raw: unknown): Date {
   return new Date(0);
 }
 
-function parseCodexLine(raw: unknown, line: number): CodexEvent | null {
+function parseCodexLine(
+  raw: unknown,
+  line: number,
+  pendingCalls: Map<string, { name: string; args: unknown; line: number; ts: Date }>,
+): CodexEvent | null {
   if (!raw || typeof raw !== "object") return null;
   const obj = raw as Record<string, unknown>;
   const ts = parseTimestamp(obj.timestamp);
@@ -89,7 +95,7 @@ function parseCodexLine(raw: unknown, line: number): CodexEvent | null {
     case "event_msg":
       return parseEventMsg(payload, line, ts);
     case "response_item":
-      return parseResponseItem(payload, line, ts);
+      return parseResponseItem(payload, line, ts, pendingCalls);
     case "compacted":
       return parseCompacted(payload, line, ts);
     case "turn_context":
@@ -198,7 +204,12 @@ function parseEventMsg(payload: Record<string, unknown>, line: number, ts: Date)
   }
 }
 
-function parseResponseItem(payload: Record<string, unknown>, line: number, ts: Date): CodexEvent | null {
+function parseResponseItem(
+  payload: Record<string, unknown>,
+  line: number,
+  ts: Date,
+  pendingCalls: Map<string, { name: string; args: unknown; line: number; ts: Date }>,
+): CodexEvent | null {
   const itemType = payload.type ?? payload.item_type;
 
   // Message response item — role + content
@@ -215,12 +226,84 @@ function parseResponseItem(payload: Record<string, unknown>, line: number, ts: D
     return { type: "agent_message", line, timestamp: ts, text };
   }
 
-  // LocalShellCall — command execution
+  // LocalShellCall — command execution (older Codex format)
   if (itemType === "LocalShellCall" || itemType === "local_shell_call") {
     const command = extractStringArray(payload.command ?? payload.args);
     const exitCode = typeof payload.exit_code === "number" ? payload.exit_code : (typeof payload.exitCode === "number" ? payload.exitCode : 0);
     const status = typeof payload.status === "string" ? payload.status : (exitCode === 0 ? "success" : "error");
     return { type: "exec_command", line, timestamp: ts, command, exitCode, status };
+  }
+
+  // function_call — newer Codex format: exec_command, write_stdin, etc.
+  // Store in pendingCalls; event is emitted when the matching function_call_output arrives.
+  if (itemType === "function_call") {
+    const callId = typeof payload.call_id === "string" ? payload.call_id : null;
+    const name = typeof payload.name === "string" ? payload.name : "";
+    if (callId && (name === "exec_command" || name === "write_stdin")) {
+      const args = typeof payload.arguments === "string" ? tryParseJson(payload.arguments) : payload.arguments;
+      pendingCalls.set(callId, { name, args, line, ts });
+    }
+    return null;
+  }
+
+  // function_call_output — pair with pending function_call to emit exec_command
+  if (itemType === "function_call_output") {
+    const callId = typeof payload.call_id === "string" ? payload.call_id : null;
+    if (!callId) return null;
+    const pending = pendingCalls.get(callId);
+    if (!pending) return null;
+    pendingCalls.delete(callId);
+
+    if (pending.name === "exec_command") {
+      const args = (pending.args ?? {}) as Record<string, unknown>;
+      const cmd = typeof args.cmd === "string" ? args.cmd : "";
+      const outputText = typeof payload.output === "string" ? payload.output : "";
+      const exitCode = extractExitCode(outputText);
+      return {
+        type: "exec_command", line: pending.line, timestamp: pending.ts,
+        command: [cmd],
+        exitCode,
+        status: exitCode === 0 ? "success" : "error",
+      };
+    }
+    // write_stdin doesn't produce a separate event
+    return null;
+  }
+
+  // custom_tool_call — apply_patch (file edits)
+  if (itemType === "custom_tool_call") {
+    const callId = typeof payload.call_id === "string" ? payload.call_id : null;
+    const name = typeof payload.name === "string" ? payload.name : "";
+    if (callId && name === "apply_patch") {
+      const input = typeof payload.input === "string" ? payload.input : "";
+      pendingCalls.set(callId, { name, args: input, line, ts });
+    }
+    return null;
+  }
+
+  // custom_tool_call_output — pair with pending apply_patch to emit patch_apply
+  if (itemType === "custom_tool_call_output") {
+    const callId = typeof payload.call_id === "string" ? payload.call_id : null;
+    if (!callId) return null;
+    const pending = pendingCalls.get(callId);
+    if (!pending) return null;
+    pendingCalls.delete(callId);
+
+    if (pending.name === "apply_patch") {
+      const outputRaw = typeof payload.output === "string" ? tryParseJson(payload.output) : payload.output;
+      const outputObj = (outputRaw && typeof outputRaw === "object" ? outputRaw : {}) as Record<string, unknown>;
+      const outputText = typeof outputObj.output === "string" ? outputObj.output : (typeof payload.output === "string" ? payload.output : "");
+      const meta = (outputObj.metadata ?? {}) as Record<string, unknown>;
+      const exitCode = typeof meta.exit_code === "number" ? meta.exit_code : 0;
+      const success = exitCode === 0 && /success/i.test(outputText);
+      const files = extractPatchFiles(pending.args as string, outputText);
+      return {
+        type: "patch_apply", line: pending.line, timestamp: pending.ts,
+        files,
+        success,
+      };
+    }
+    return null;
   }
 
   // Compaction response item
@@ -261,4 +344,30 @@ function extractStringArray(value: unknown): string[] {
   }
   if (typeof value === "string") return [value];
   return [];
+}
+
+function tryParseJson(value: string): unknown {
+  try { return JSON.parse(value); } catch { return value; }
+}
+
+/** Extract exit code from function_call_output text like "Process exited with code 0" */
+function extractExitCode(output: string): number {
+  const match = output.match(/Process exited with code (\d+)/);
+  return match ? parseInt(match[1], 10) : 0;
+}
+
+/** Extract file paths from apply_patch input/output.
+ *  Input contains "*** Update File: /path/to/file" lines.
+ *  Output contains "M /path/to/file" lines. */
+function extractPatchFiles(patchInput: string, outputText: string): string[] {
+  const files = new Set<string>();
+  // From patch input: *** Update File: /path, *** Add File: /path, *** Delete File: /path
+  for (const match of patchInput.matchAll(/\*\*\*\s+(?:Update|Add|Delete)\s+File:\s*(.+)/g)) {
+    files.add(match[1].trim());
+  }
+  // From output: M /path, A /path (git-style status prefixes)
+  for (const match of outputText.matchAll(/^[MAD]\s+(.+)$/gm)) {
+    files.add(match[1].trim());
+  }
+  return [...files];
 }

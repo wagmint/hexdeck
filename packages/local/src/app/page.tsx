@@ -427,9 +427,12 @@ export default function DashboardPage() {
             <RelayPanel
               targets={relay.targets}
               activeProjects={relay.activeProjects}
+              pendingOnboarding={relay.pendingOnboarding}
               onConnect={relay.connect}
               onRemove={relay.remove}
               onToggleProject={relay.toggleProject}
+              onOpenJoinUrl={relay.openJoinUrl}
+              onCancelOnboarding={relay.cancelOnboarding}
               onClose={() => setRelayOpen(false)}
             />
           </div>

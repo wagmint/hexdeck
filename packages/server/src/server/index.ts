@@ -9,7 +9,8 @@ import { listProjects, listSessions, getActiveSessions } from "../discovery/sess
 import { buildDashboardState } from "../core/dashboard.js";
 import { blockedSessions, clearStaleBlocked, ensureHooks, type BlockedInfo } from "../core/blocked.js";
 import { relayManager } from "../relay/manager.js";
-import { parseConnectLink, exchangeConnectLink } from "../relay/link.js";
+import { parseConnectLink, exchangeConnectLink, createRelayClaim, deriveHttpBaseFromWs } from "../relay/link.js";
+import { storeClaim, getClaim, removeClaim, cleanupExpiredClaims } from "../relay/claims.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -204,28 +205,36 @@ export function createApp(options?: { dashboardDir?: string }): Hono {
   /** Receive blocked notification from Claude Code PermissionRequest hook */
   app.post("/api/hooks/blocked", async (c) => {
     try {
-      const body = await c.req.json<{
-        session_id?: string;
-        transcript_path?: string;
-        tool_name?: string;
-        tool_input?: Record<string, unknown>;
-      }>();
-      const sessionId = body.session_id;
+      const body = await c.req.json<Record<string, unknown>>();
+      const sessionId = pickString(body, "session_id", "sessionId")
+        ?? deriveSessionIdFromTranscript(pickString(body, "transcript_path", "transcriptPath"));
       if (!sessionId) {
         return c.json({ error: "Missing session_id" }, 400);
       }
+
+      const transcriptPath = pickString(body, "transcript_path", "transcriptPath");
+      const toolName = pickString(body, "tool_name", "toolName", "tool")
+        ?? pickString(body, "hook_event_name", "hookEventName")
+        ?? "unknown";
+      const toolInput = pickRecord(body, "tool_input", "toolInput") ?? {};
+
+      // Stop means the agent finished — not blocked on approval, ignore it.
+      if (toolName === "Stop") {
+        return c.json({ ok: true });
+      }
+
       // Snapshot JSONL file size so we can detect when the user actually
       // responds (file grows) vs. Claude Code's own post-hook writes.
       let snapshotSize = 0;
-      if (body.transcript_path) {
+      if (transcriptPath) {
         try {
-          snapshotSize = fs.statSync(body.transcript_path).size;
+          snapshotSize = fs.statSync(transcriptPath).size;
         } catch { /* file not found — fall back to 0 */ }
       }
       blockedSessions.set(sessionId, {
         sessionId,
-        toolName: body.tool_name ?? "unknown",
-        toolInput: body.tool_input ?? {},
+        toolName,
+        toolInput,
         blockedAt: Date.now(),
         snapshotSize,
       });
@@ -234,6 +243,33 @@ export function createApp(options?: { dashboardDir?: string }): Hono {
       return c.json({ error: "Invalid JSON" }, 400);
     }
   });
+
+  function pickString(obj: Record<string, unknown>, ...keys: string[]): string | null {
+    for (const k of keys) {
+      if (typeof obj[k] === "string" && (obj[k] as string).length > 0) {
+        return obj[k] as string;
+      }
+    }
+    return null;
+  }
+
+  function pickRecord(obj: Record<string, unknown>, ...keys: string[]): Record<string, unknown> | null {
+    for (const k of keys) {
+      const v = obj[k];
+      if (v && typeof v === "object" && !Array.isArray(v)) {
+        return v as Record<string, unknown>;
+      }
+    }
+    return null;
+  }
+
+  function deriveSessionIdFromTranscript(transcriptPath: string | null): string | null {
+    if (!transcriptPath) return null;
+    const base = path.basename(transcriptPath);
+    if (!base.endsWith(".jsonl")) return null;
+    const id = base.slice(0, -".jsonl".length);
+    return id.length > 0 ? id : null;
+  }
 
   // ─── Relay API Routes ─────────────────────────────────────────────────────
 
@@ -250,10 +286,25 @@ export function createApp(options?: { dashboardDir?: string }): Hono {
     }
     try {
       const parsed = parseConnectLink(body.link);
-      const creds = await exchangeConnectLink(parsed);
-      relayManager.addTarget(creds);
-      if (shouldTickerRun()) startTicker();
-      return c.json({ ok: true, hexcoreId: creds.hexcoreId, hexcoreName: creds.hexcoreName });
+
+      // Legacy flow: link has c= (connect code) — exchange immediately
+      if (parsed.connectCode) {
+        const creds = await exchangeConnectLink(parsed);
+        relayManager.addTarget(creds);
+        if (shouldTickerRun()) startTicker();
+        return c.json({ ok: true, hexcoreId: creds.hexcoreId, hexcoreName: creds.hexcoreName });
+      }
+
+      // New flow: link has t= (invite token) — create claim for onboarding
+      const claim = await createRelayClaim(parsed);
+      storeClaim({ ...claim, createdAt: Date.now() });
+      return c.json({
+        needsOnboarding: true,
+        claimId: claim.claimId,
+        hexcoreName: claim.hexcoreName,
+        hexcoreId: claim.hexcoreId,
+        joinUrl: claim.joinUrl,
+      });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Invalid connect link";
       return c.json({ error: message }, 400);
@@ -296,6 +347,65 @@ export function createApp(options?: { dashboardDir?: string }): Hono {
     if (!ok) {
       return c.json({ error: "Target not found" }, 404);
     }
+    return c.json({ ok: true });
+  });
+
+  /** Poll claim status — used during onboarding flow */
+  app.get("/api/relay/claim-status/:claimId", async (c) => {
+    const { claimId } = c.req.param();
+    const claim = getClaim(claimId);
+    if (!claim) {
+      return c.json({ error: "Claim not found or expired" }, 404);
+    }
+
+    // Poll the relay backend for claim status
+    const httpBase = deriveHttpBaseFromWs(claim.wsUrl);
+    try {
+      const response = await fetch(`${httpBase}/api/relay-claims/${claimId}`, {
+        headers: { "X-Claim-Secret": claim.claimSecret },
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          removeClaim(claimId);
+          return c.json({ error: "Claim expired" }, 404);
+        }
+        return c.json({ status: "pending" });
+      }
+
+      const body = await response.json() as {
+        success: boolean;
+        data?: {
+          status: string;
+          accessToken?: string;
+          refreshToken?: string;
+        };
+      };
+
+      if (body.data?.status === "completed" && body.data.accessToken && body.data.refreshToken) {
+        // Claim completed — add relay target and clean up
+        relayManager.addTarget({
+          hexcoreId: claim.hexcoreId,
+          hexcoreName: claim.hexcoreName,
+          wsUrl: claim.wsUrl,
+          token: body.data.accessToken,
+          refreshToken: body.data.refreshToken,
+        });
+        removeClaim(claimId);
+        if (shouldTickerRun()) startTicker();
+        return c.json({ status: "completed", hexcoreId: claim.hexcoreId, hexcoreName: claim.hexcoreName });
+      }
+
+      return c.json({ status: "pending" });
+    } catch {
+      return c.json({ status: "pending" });
+    }
+  });
+
+  /** Cancel a pending claim */
+  app.delete("/api/relay/claims/:claimId", (c) => {
+    const { claimId } = c.req.param();
+    removeClaim(claimId);
     return c.json({ ok: true });
   });
 

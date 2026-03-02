@@ -9,7 +9,7 @@ import { buildParsedSession } from "./nodes.js";
 import { buildCodexParsedSession } from "./codex-nodes.js";
 import { detectCollisions } from "./collisions.js";
 import { buildFeed } from "./feed.js";
-import { blockedSessions } from "./blocked.js";
+import { blockedSessions, describeBlockedTool } from "./blocked.js";
 import { formatIdleDuration } from "./duration.js";
 import { computeAgentRisk, computeWorkstreamRisk } from "./risk.js";
 import { computeTurnCost } from "./pricing.js";
@@ -963,6 +963,13 @@ export function buildDashboardState(): DashboardState {
     // Risk: pass accumulated error history for trend continuity, and accumulated cost for compaction
     const risk = computeAgentRisk(parsed, sessionAcc?.errorHistory, sessionAcc?.totalCost);
 
+    const blockedOn = status === "blocked"
+      ? (() => {
+          const info = blockedSessions.get(parsed.session.id);
+          return info ? { toolName: info.toolName, description: describeBlockedTool(info) } : null;
+        })()
+      : null;
+
     agents.push({
       sessionId: parsed.session.id,
       label,
@@ -975,6 +982,7 @@ export function buildDashboardState(): DashboardState {
       plans,
       risk,
       operatorId: sessionOperatorMap.get(parsed.session.id) ?? "self",
+      blockedOn,
     });
   }
 
@@ -1044,6 +1052,7 @@ export function buildDashboardState(): DashboardState {
   for (const [projectPath, sessions] of projectGroups) {
     const allProjectAgents = agents.filter(a => a.projectPath === projectPath);
     const activeProjectAgents = allProjectAgents.filter(a => a.isActive);
+    if (activeProjectAgents.length === 0) continue;
     const orderedActiveProjectAgents = [...activeProjectAgents].sort((a, b) => (
       (sessionLastActivityMs.get(b.sessionId) ?? 0) - (sessionLastActivityMs.get(a.sessionId) ?? 0)
       || a.label.localeCompare(b.label)

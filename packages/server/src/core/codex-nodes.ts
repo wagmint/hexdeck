@@ -209,7 +209,10 @@ function buildSingleCodexTurn(events: CodexEvent[], index: number, sessionModel:
 
   // Infer task lifecycle for Codex turns so intent mapping can treat Codex
   // sessions similarly to Claude sessions (which have TaskCreate/TaskUpdate).
-  const shouldCreateTask = category === "task" || category === "feedback";
+  // For codex, any turn that produces actual work (commands, file patches, commits)
+  // should create an inferred task, not just "task"/"feedback" categories.
+  const hasWork = filesChanged.length > 0 || commands.length > 0 || hasCommit;
+  const shouldCreateTask = category === "task" || category === "feedback" || hasWork;
   const inferredTaskId = `codex-${index + 1}`;
   const inferredSubject = summary || userInstruction.slice(0, 80) || `Codex task ${index + 1}`;
   const taskCreates = shouldCreateTask

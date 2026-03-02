@@ -19,7 +19,7 @@ const agentDot: Record<AgentStatus, string> = {
   busy: "bg-dash-green animate-pulse",
   idle: "bg-dash-text-muted",
   warning: "bg-dash-yellow",
-  conflict: "bg-dash-yellow",
+  conflict: "bg-dash-red",
   blocked: "bg-dash-blue animate-dash-breathe",
 };
 

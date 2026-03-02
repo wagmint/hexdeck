@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-shell";
-import type { DashboardState } from "../lib/types";
+import type { Collision, DashboardState } from "../lib/types";
 import type { HexcoreAlert, TraySeverity } from "../lib/alerts";
 import { StatusHeader } from "./StatusHeader";
 import { AlertList } from "./AlertList";
@@ -26,6 +26,7 @@ export function MenuBarApp({
 }: MenuBarAppProps) {
   const agentCount = state?.summary.activeAgents ?? 0;
   const agents = state?.agents ?? [];
+  const collisions: Collision[] = state?.collisions ?? [];
   const closeWindow = () => {
     getCurrentWindow().hide();
   };
@@ -72,7 +73,7 @@ export function MenuBarApp({
             {alerts.length > 0 && agents.length > 0 && (
               <div className="border-t border-dash-border" />
             )}
-            <AgentList agents={agents} />
+            <AgentList agents={agents} collisions={collisions} />
           </>
         )}
       </div>

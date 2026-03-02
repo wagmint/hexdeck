@@ -126,7 +126,7 @@ function RelayIndicator({
   if (connectedCount === targetCount) {
     dotClass = "bg-dash-green animate-dash-pulse";
   } else if (connectedCount > 0) {
-    dotClass = "bg-dash-yellow animate-dash-pulse";
+    dotClass = "bg-dash-blue animate-dash-breathe";
   } else {
     dotClass = "bg-dash-text-muted";
   }

@@ -11,8 +11,6 @@ const TIER_SIZES: Record<WidgetTier, { width: number; height: number }> = {
   card: { width: 320, height: 400 },
 };
 
-const HOVER_COLLAPSE_DELAY = 200;
-
 export interface WidgetState {
   tier: WidgetTier;
   onHoverEnter: () => void;
@@ -79,22 +77,12 @@ export function useWidgetState(interactionsBlocked = false): WidgetState {
   const onHoverEnter = useCallback(() => {
     if (interactionsBlocked) return;
     clearCollapseTimer();
-    if (tier === "favicon") {
-      setTier("pill");
-      resizeWindow("pill");
-    }
-  }, [interactionsBlocked, tier, clearCollapseTimer, resizeWindow]);
+  }, [interactionsBlocked, clearCollapseTimer]);
 
   const onHoverLeave = useCallback(() => {
     if (interactionsBlocked) return;
     clearCollapseTimer();
-    if (tier === "pill") {
-      collapseTimer.current = setTimeout(() => {
-        setTier("favicon");
-        resizeWindow("favicon");
-      }, HOVER_COLLAPSE_DELAY);
-    }
-  }, [interactionsBlocked, tier, clearCollapseTimer, resizeWindow]);
+  }, [interactionsBlocked, clearCollapseTimer]);
 
   const onClickFavicon = useCallback(() => {
     if (interactionsBlocked) return;

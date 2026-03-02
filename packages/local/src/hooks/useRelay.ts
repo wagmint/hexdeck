@@ -8,21 +8,38 @@ import {
   removeRelayTarget,
   includeProject as apiInclude,
   excludeProject as apiExclude,
+  pollClaimStatus,
+  cancelClaim,
+  type ConnectResult,
 } from "@/lib/relay-api";
 import { getActiveSessions } from "@/lib/api";
+
+export interface PendingOnboarding {
+  claimId: string;
+  hexcoreName: string;
+  hexcoreId: string;
+  joinUrl: string;
+}
 
 interface UseRelayResult {
   targets: RelayTargetInfo[];
   activeProjects: ActiveProject[];
-  connect: (link: string) => Promise<{ error?: string }>;
+  pendingOnboarding: PendingOnboarding | null;
+  connect: (link: string) => Promise<ConnectResult>;
   remove: (hexcoreId: string) => void;
   toggleProject: (hexcoreId: string, projectPath: string, include: boolean) => void;
+  cancelOnboarding: () => void;
+  openJoinUrl: () => void;
 }
+
+const CLAIM_POLL_INTERVAL = 3000;
 
 export function useRelay(isOpen: boolean): UseRelayResult {
   const [targets, setTargets] = useState<RelayTargetInfo[]>([]);
   const [activeProjects, setActiveProjects] = useState<ActiveProject[]>([]);
+  const [pendingOnboarding, setPendingOnboarding] = useState<PendingOnboarding | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const claimPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -47,6 +64,7 @@ export function useRelay(isOpen: boolean): UseRelayResult {
     }
   }, []);
 
+  // Main data polling
   useEffect(() => {
     if (!isOpen) {
       if (intervalRef.current) {
@@ -67,9 +85,58 @@ export function useRelay(isOpen: boolean): UseRelayResult {
     };
   }, [isOpen, fetchData]);
 
-  const connect = useCallback(async (link: string) => {
+  // Claim status polling (when onboarding is active)
+  useEffect(() => {
+    if (!pendingOnboarding) {
+      if (claimPollRef.current) {
+        clearInterval(claimPollRef.current);
+        claimPollRef.current = null;
+      }
+      return;
+    }
+
+    const poll = async () => {
+      try {
+        const result = await pollClaimStatus(pendingOnboarding.claimId);
+        if (result.status === "completed") {
+          setPendingOnboarding(null);
+          fetchData(); // Refresh targets to show the new connection
+        } else if (result.status === "expired") {
+          setPendingOnboarding(null);
+        }
+      } catch {
+        // Keep polling
+      }
+    };
+
+    // Poll immediately, then on interval
+    poll();
+    claimPollRef.current = setInterval(poll, CLAIM_POLL_INTERVAL);
+
+    return () => {
+      if (claimPollRef.current) {
+        clearInterval(claimPollRef.current);
+        claimPollRef.current = null;
+      }
+    };
+  }, [pendingOnboarding, fetchData]);
+
+  const connect = useCallback(async (link: string): Promise<ConnectResult> => {
     const result = await apiConnect(link);
-    if (!result.error) fetchData();
+    if (result.error) return result;
+
+    if (result.needsOnboarding && result.claimId && result.hexcoreName && result.hexcoreId && result.joinUrl) {
+      setPendingOnboarding({
+        claimId: result.claimId,
+        hexcoreName: result.hexcoreName,
+        hexcoreId: result.hexcoreId,
+        joinUrl: result.joinUrl,
+      });
+      return result;
+    }
+
+    // Legacy flow — already connected
+    fetchData();
     return result;
   }, [fetchData]);
 
@@ -85,5 +152,27 @@ export function useRelay(isOpen: boolean): UseRelayResult {
     [fetchData]
   );
 
-  return { targets, activeProjects, connect, remove, toggleProject };
+  const cancelOnboardingCb = useCallback(() => {
+    if (pendingOnboarding) {
+      cancelClaim(pendingOnboarding.claimId).catch(() => {});
+      setPendingOnboarding(null);
+    }
+  }, [pendingOnboarding]);
+
+  const openJoinUrl = useCallback(() => {
+    if (pendingOnboarding?.joinUrl) {
+      window.open(pendingOnboarding.joinUrl, "_blank");
+    }
+  }, [pendingOnboarding]);
+
+  return {
+    targets,
+    activeProjects,
+    pendingOnboarding,
+    connect,
+    remove,
+    toggleProject,
+    cancelOnboarding: cancelOnboardingCb,
+    openJoinUrl,
+  };
 }

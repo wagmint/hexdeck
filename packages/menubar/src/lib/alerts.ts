@@ -35,7 +35,9 @@ export function deriveAlerts(state: DashboardState): HexcoreAlert[] {
         id: `blocked-${agent.sessionId}`,
         severity: "blue",
         title: "Needs approval",
-        detail: `${agent.label} is waiting for you`,
+        detail: agent.blockedOn?.description
+          ? `${agent.label}: ${agent.blockedOn.description}`
+          : `${agent.label} is waiting for you`,
         timestamp: new Date().toISOString(),
       });
     }
@@ -125,7 +127,6 @@ export function worstSeverity(
   const active = state.agents.filter((a) => a.isActive);
   if (alerts.some((a) => a.severity === "red")) return "red";
   if (active.some((a) => a.status === "blocked") || alerts.some((a) => a.severity === "blue")) return "blue";
-  if (active.some((a) => a.status === "conflict") || active.some((a) => a.status === "warning") || alerts.some((a) => a.severity === "yellow")) return "yellow";
-  if (active.some((a) => a.status === "busy")) return "green";
+  if (active.length > 0) return "green";
   return "grey";
 }

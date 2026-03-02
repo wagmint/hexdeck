@@ -80,9 +80,11 @@ export function AgentCard({ workstream, isSelected, onSelect }: AgentCardProps) 
               {agent.agentType === "codex" ? "codex" : "claude"}
             </span>
             <OperatorTag operatorId={agent.operatorId} />
-            {agent.currentTask && (
+            {agent.status === "blocked" && agent.blockedOn?.description ? (
+              <span className="text-[9px] text-dash-blue truncate">{agent.blockedOn.description}</span>
+            ) : agent.currentTask ? (
               <span className="text-[9px] text-dash-text-dim truncate">{agent.currentTask}</span>
-            )}
+            ) : null}
           </div>
         ))}
       </div>

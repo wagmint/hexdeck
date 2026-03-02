@@ -141,6 +141,8 @@ export interface Agent {
   risk: AgentRisk;
   /** Operator this agent belongs to */
   operatorId: string;
+  /** What the agent is blocked on (tool name + description) when status === "blocked" */
+  blockedOn?: { toolName: string; description: string } | null;
 }
 
 export interface Workstream {

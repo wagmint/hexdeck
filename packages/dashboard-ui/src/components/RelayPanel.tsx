@@ -3,21 +3,34 @@
 import { useState } from "react";
 import type { RelayTargetInfo, ActiveProject } from "../types";
 
+export interface PendingOnboarding {
+  claimId: string;
+  hexcoreName: string;
+  hexcoreId: string;
+  joinUrl: string;
+}
+
 export interface RelayPanelProps {
   targets: RelayTargetInfo[];
   activeProjects: ActiveProject[];
-  onConnect: (link: string) => Promise<{ error?: string }>;
+  pendingOnboarding: PendingOnboarding | null;
+  onConnect: (link: string) => Promise<{ error?: string; needsOnboarding?: boolean }>;
   onRemove: (hexcoreId: string) => void;
   onToggleProject: (hexcoreId: string, projectPath: string, include: boolean) => void;
+  onOpenJoinUrl: () => void;
+  onCancelOnboarding: () => void;
   onClose: () => void;
 }
 
 export function RelayPanel({
   targets,
   activeProjects,
+  pendingOnboarding,
   onConnect,
   onRemove,
   onToggleProject,
+  onOpenJoinUrl,
+  onCancelOnboarding,
   onClose,
 }: RelayPanelProps) {
   const [link, setLink] = useState("");
@@ -57,32 +70,43 @@ export function RelayPanel({
       </div>
 
       <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-3 space-y-4">
-        {/* Connect section */}
-        <div className="space-y-2">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={link}
-              onChange={(e) => setLink(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="hexcore+wss://..."
-              className="flex-1 bg-dash-bg border border-dash-border rounded px-2 py-1 text-[11px] font-mono text-dash-text placeholder:text-dash-text-muted focus:outline-none focus:border-dash-blue"
-            />
-            <button
-              onClick={handleConnect}
-              disabled={connecting || !link.trim()}
-              className="px-3 py-1 bg-dash-surface-3 border border-dash-border rounded text-[10px] text-dash-text-dim hover:text-dash-text hover:bg-dash-surface-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {connecting ? "..." : "Connect"}
-            </button>
+        {/* Onboarding card — shown when waiting for user to join via web */}
+        {pendingOnboarding && (
+          <OnboardingCard
+            onboarding={pendingOnboarding}
+            onOpenJoinUrl={onOpenJoinUrl}
+            onCancel={onCancelOnboarding}
+          />
+        )}
+
+        {/* Connect section — hidden during onboarding */}
+        {!pendingOnboarding && (
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="hexcore+wss://..."
+                className="flex-1 bg-dash-bg border border-dash-border rounded px-2 py-1 text-[11px] font-mono text-dash-text placeholder:text-dash-text-muted focus:outline-none focus:border-dash-blue"
+              />
+              <button
+                onClick={handleConnect}
+                disabled={connecting || !link.trim()}
+                className="px-3 py-1 bg-dash-surface-3 border border-dash-border rounded text-[10px] text-dash-text-dim hover:text-dash-text hover:bg-dash-surface-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {connecting ? "..." : "Connect"}
+              </button>
+            </div>
+            {connectError && (
+              <div className="text-dash-red text-[10px]">{connectError}</div>
+            )}
           </div>
-          {connectError && (
-            <div className="text-dash-red text-[10px]">{connectError}</div>
-          )}
-        </div>
+        )}
 
         {/* Target cards */}
-        {targets.length === 0 ? (
+        {targets.length === 0 && !pendingOnboarding ? (
           <div className="text-center text-dash-text-muted text-xs py-6">
             No relay targets. Paste a connect link to get started.
           </div>
@@ -104,6 +128,53 @@ export function RelayPanel({
   );
 }
 
+function OnboardingCard({
+  onboarding,
+  onOpenJoinUrl,
+  onCancel,
+}: {
+  onboarding: PendingOnboarding;
+  onOpenJoinUrl: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="border border-dash-blue/30 rounded bg-dash-bg p-4 space-y-3">
+      <div className="space-y-1">
+        <div className="text-dash-text font-semibold text-xs">
+          Join &ldquo;{onboarding.hexcoreName}&rdquo;
+        </div>
+        <div className="text-dash-text-dim text-[10px]">
+          Sign in at hexcore.app to continue
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <button
+          onClick={onOpenJoinUrl}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-dash-blue/10 border border-dash-blue/30 rounded text-[10px] text-dash-blue hover:bg-dash-blue/20 transition-colors"
+        >
+          Open Hexcore
+          <span className="text-[9px]">&rarr;</span>
+        </button>
+
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-dash-text-muted flex items-center gap-1.5">
+            Waiting
+            <span className="inline-block w-1 h-1 rounded-full bg-dash-blue animate-dash-pulse" />
+          </span>
+        </div>
+      </div>
+
+      <button
+        onClick={onCancel}
+        className="text-[9px] text-dash-text-muted hover:text-dash-text transition-colors"
+      >
+        Cancel
+      </button>
+    </div>
+  );
+}
+
 function TargetCard({
   target,
   activeProjects,
@@ -120,8 +191,6 @@ function TargetCard({
     connecting: "bg-dash-yellow animate-dash-pulse",
     disconnected: "bg-dash-text-muted",
   }[target.status];
-
-  const home = typeof window !== "undefined" ? "" : "";
 
   return (
     <div className="border border-dash-border rounded bg-dash-bg p-3 space-y-2">

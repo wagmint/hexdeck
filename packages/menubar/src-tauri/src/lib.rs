@@ -24,7 +24,7 @@ struct WidgetSettings {
     #[serde(default)]
     has_seen_tooltip: bool,
     #[serde(default)]
-    has_completed_onboarding: bool,
+    onboarding_v1_completed: bool,
 }
 
 fn position_file() -> Option<PathBuf> {
@@ -50,12 +50,12 @@ fn load_widget_visibility() -> bool {
 
 fn load_settings() -> WidgetSettings {
     let Some(path) = settings_file() else {
-        return WidgetSettings { show_widget: true, has_seen_tooltip: false, has_completed_onboarding: false };
+        return WidgetSettings { show_widget: true, has_seen_tooltip: false, onboarding_v1_completed: false };
     };
     let Ok(data) = fs::read_to_string(path) else {
-        return WidgetSettings { show_widget: true, has_seen_tooltip: false, has_completed_onboarding: false };
+        return WidgetSettings { show_widget: true, has_seen_tooltip: false, onboarding_v1_completed: false };
     };
-    serde_json::from_str(&data).unwrap_or(WidgetSettings { show_widget: true, has_seen_tooltip: false, has_completed_onboarding: false })
+    serde_json::from_str(&data).unwrap_or(WidgetSettings { show_widget: true, has_seen_tooltip: false, onboarding_v1_completed: false })
 }
 
 fn save_settings(settings: &WidgetSettings) -> Result<(), String> {
@@ -272,13 +272,13 @@ fn save_has_seen_tooltip() -> Result<(), String> {
 
 #[tauri::command]
 fn load_has_completed_onboarding() -> bool {
-    load_settings().has_completed_onboarding
+    load_settings().onboarding_v1_completed
 }
 
 #[tauri::command]
 fn save_has_completed_onboarding() -> Result<(), String> {
     let mut settings = load_settings();
-    settings.has_completed_onboarding = true;
+    settings.onboarding_v1_completed = true;
     save_settings(&settings)
 }
 
@@ -465,7 +465,7 @@ pub fn run() {
             apply_widget_visibility(&app.handle().clone(), show_widget_flag.load(Ordering::SeqCst));
 
             // Show onboarding window on first launch
-            if !load_settings().has_completed_onboarding {
+            if !load_settings().onboarding_v1_completed {
                 if let Some(onboarding) = app.get_webview_window("onboarding") {
                     let _ = onboarding.show();
                     let _ = onboarding.set_focus();

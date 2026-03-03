@@ -43,9 +43,9 @@ Any tool that writes session logs — Claude Code, Codex, or both — streams in
 
 Hexdeck runs as a floating hexagon widget on your desktop. It reflects the overall state of your agents at a glance:
 
-- **Blue** — an agent needs your approval
-- **Green** — an agent is actively working
-- **Grey** — no active agents
+- 🔵 **Blue** — an agent needs your approval
+- 🟢 **Green** — an agent is actively working
+- ⚪ **Grey** — no active agents
 
 Expand the widget to see details, approve or deny tool requests, and open the full dashboard.
 

@@ -951,8 +951,8 @@ export function buildDashboardState(prefetchedActiveSessions?: SessionInfo[]): D
     const projectPath = parsed.session.projectPath;
     const label = labelMap.get(parsed.session.id) ?? parsed.session.id.slice(0, 8);
     const isActive = activeSessionIds.has(parsed.session.id);
-    const status = determineAgentStatus(parsed, isActive, collisionFileSet);
     const isCodexAgent = codexSessionIds.has(parsed.session.id);
+    const status = determineAgentStatus(parsed, isActive, collisionFileSet, isCodexAgent);
 
     const lastTurn = parsed.turns[parsed.turns.length - 1];
     const currentTask = lastTurn?.summary ?? "idle";
@@ -1208,12 +1208,14 @@ export function buildDashboardState(prefetchedActiveSessions?: SessionInfo[]): D
 }
 
 /** How long since last file modification before an active session is considered idle */
-const IDLE_THRESHOLD_MS = 120_000; // 2 minutes (fallback — Stop hook handles the normal case)
+const IDLE_THRESHOLD_MS = 120_000; // 2 minutes (fallback — Stop hook handles the normal case for Claude)
+const CODEX_IDLE_THRESHOLD_MS = 30_000; // 30 seconds (Codex has no Stop hook — this is the primary mechanism)
 
 function determineAgentStatus(
   parsed: ParsedSession,
   isActive: boolean,
-  collisionSessionIds: Set<string>
+  collisionSessionIds: Set<string>,
+  isCodex = false,
 ): AgentStatus {
   // Blocked: waiting on user permission approval (from CC hook)
   if (hasBlockedSession(parsed.session.id)) return "blocked";
@@ -1230,11 +1232,12 @@ function determineAgentStatus(
   if (isActive) {
     const mtimeMs = parsed.session.modifiedAt.getTime();
 
-    // Instant idle: Stop hook fired and transcript hasn't changed since
-    if (isSessionStopped(parsed.session.id, mtimeMs)) return "idle";
+    // Instant idle: Stop hook fired and transcript hasn't changed since (Claude only)
+    if (!isCodex && isSessionStopped(parsed.session.id, mtimeMs)) return "idle";
 
     // Fallback: no recent file writes → idle
-    return Date.now() - mtimeMs > IDLE_THRESHOLD_MS ? "idle" : "busy";
+    const threshold = isCodex ? CODEX_IDLE_THRESHOLD_MS : IDLE_THRESHOLD_MS;
+    return Date.now() - mtimeMs > threshold ? "idle" : "busy";
   }
 
   return "idle";

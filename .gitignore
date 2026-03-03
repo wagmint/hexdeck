@@ -5,4 +5,5 @@ out/
 dashboard/
 *.tsbuildinfo
 .claude/
+CLAUDE.md
 docs/

@@ -69,3 +69,22 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Guided tour animations */
+.tour-spotlight-in {
+  animation: tour-spotlight-in 0.2s ease-out;
+}
+
+.tour-tooltip-in {
+  animation: tour-tooltip-in 0.2s ease-out;
+}
+
+@keyframes tour-spotlight-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes tour-tooltip-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}

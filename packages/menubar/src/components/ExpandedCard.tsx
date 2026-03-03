@@ -6,6 +6,7 @@ import type { DashboardState } from "../lib/types";
 import { AlertList } from "./AlertList";
 import { AgentList } from "./AgentList";
 import { GlowHex } from "./GlowHex";
+import { ColorLegendPopover } from "./ColorLegendPopover";
 
 interface ExpandedCardProps {
   severity: TraySeverity;
@@ -44,6 +45,7 @@ export function ExpandedCard({
           <span className="text-xs text-dash-text-dim">
             {agentCount} agent{agentCount !== 1 ? "s" : ""}
           </span>
+          <ColorLegendPopover />
           {onClose && (
             <button
               onClick={onClose}

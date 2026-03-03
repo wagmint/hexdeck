@@ -17,6 +17,7 @@ import {
   RiskPanel,
   RelayPanel,
 } from "@hexdeck/dashboard-ui";
+import { GuidedTour } from "@/components/GuidedTour";
 
 export default function DashboardPage() {
   type DashboardAgent = DashboardState["agents"][number];
@@ -251,7 +252,7 @@ export default function DashboardPage() {
             <div className="text-dash-text-muted text-4xl mb-6">&#9678;</div>
             <h2 className="text-lg font-medium text-dash-text mb-3">Hexdeck is running</h2>
             <p className="text-sm text-dash-text-muted leading-relaxed mb-6">
-              No Claude Code sessions detected yet. Start a Claude Code session in any project
+              No sessions detected yet. Start a Claude Code or Codex session in any project
               and it will appear here automatically.
             </p>
             <div className="text-xs text-dash-text-dim space-y-2">
@@ -292,19 +293,21 @@ export default function DashboardPage() {
   return (
     <OperatorProvider operators={operators}>
     <div className="h-screen flex flex-col bg-dash-bg text-dash-text font-mono text-[11px] leading-relaxed overflow-hidden">
-      <TopBar
-        summary={summary}
-        operators={operators}
-        relayStatus={relayStatus}
-        onRelayClick={() => setRelayOpen((prev) => !prev)}
-      />
+      <div data-tour="topbar">
+        <TopBar
+          summary={summary}
+          operators={operators}
+          relayStatus={relayStatus}
+          onRelayClick={() => setRelayOpen((prev) => !prev)}
+        />
+      </div>
 
       <div
         className="flex-1 grid gap-px bg-dash-border min-h-0"
         style={{ gridTemplateColumns: "260px 1fr 320px", gridTemplateRows: "1fr" }}
       >
         {/* LEFT PANEL: Workstream / Agent cards */}
-        <div className="relative z-20 bg-dash-bg overflow-y-auto scrollbar-thin">
+        <div data-tour="agents" className="relative z-20 bg-dash-bg overflow-y-auto scrollbar-thin">
           <PanelHeader
             title={isFiltered && selectedName ? `Filtered: ${selectedName}` : "Workstreams"}
             count={isFiltered ? undefined : `${workstreams.length} project${workstreams.length !== 1 ? "s" : ""}`}
@@ -341,7 +344,7 @@ export default function DashboardPage() {
           {/* Top half: Intent Map + Live Feed */}
           <div className="flex-1 grid grid-cols-2 gap-px bg-dash-border min-h-0">
             {/* Intent Map */}
-            <div className="bg-dash-bg overflow-y-auto scrollbar-thin">
+            <div data-tour="intent-map" className="bg-dash-bg overflow-y-auto scrollbar-thin">
               <PanelHeader
                 title="Intent Map"
                 count={`${filteredWorkstreams.length} workstream${filteredWorkstreams.length !== 1 ? "s" : ""}`}
@@ -358,7 +361,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Live Feed */}
-            <div className="bg-dash-bg overflow-y-auto scrollbar-thin">
+            <div data-tour="live-feed" className="bg-dash-bg overflow-y-auto scrollbar-thin">
               <PanelHeader title="Live Feed">
                 <span className="inline-flex items-center gap-1 bg-dash-green-dim text-dash-green text-[8px] font-bold px-1.5 py-0.5 rounded tracking-widest uppercase">
                   <span className="w-1 h-1 rounded-full bg-dash-green animate-dash-pulse" />
@@ -393,7 +396,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Bottom: Plan / Collision Detail (resizable) */}
-          <div className="shrink-0 bg-dash-surface overflow-hidden" style={{ height: bottomPanelHeight }}>
+          <div data-tour="plans" className="shrink-0 bg-dash-surface overflow-hidden" style={{ height: bottomPanelHeight }}>
             {/* Drag handle */}
             <div
               onMouseDown={onResizeStart}
@@ -412,7 +415,7 @@ export default function DashboardPage() {
         </div>
 
         {/* RIGHT PANEL: Risk Analytics */}
-        <div className="bg-dash-bg overflow-y-auto scrollbar-thin">
+        <div data-tour="risk" className="bg-dash-bg overflow-y-auto scrollbar-thin">
           <PanelHeader
             title="Risk"
             count={`${summary.agentsAtRisk} at risk`}
@@ -426,6 +429,8 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      <GuidedTour />
 
       {/* Relay Panel overlay */}
       {relayOpen && (

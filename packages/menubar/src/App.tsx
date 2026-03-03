@@ -4,15 +4,24 @@ import { useAlerts } from "./hooks/useAlerts";
 import { useAutoUpdate } from "./hooks/useAutoUpdate";
 import { MenuBarApp } from "./components/MenuBarApp";
 import { WidgetApp } from "./components/WidgetApp";
+import { OnboardingWindow } from "./components/OnboardingWindow";
 
-const isWidget = getCurrentWindow().label === "widget";
+const windowLabel = getCurrentWindow().label;
 
 export default function App() {
+  if (windowLabel === "onboarding") {
+    return <OnboardingWindow />;
+  }
+
+  return <MainApp />;
+}
+
+function MainApp() {
   useAutoUpdate();
   const { state, loading, error, connected } = useHexcoreSSE();
   const { alerts, severity } = useAlerts(state, connected);
 
-  if (isWidget) {
+  if (windowLabel === "widget") {
     return (
       <WidgetApp
         severity={severity}

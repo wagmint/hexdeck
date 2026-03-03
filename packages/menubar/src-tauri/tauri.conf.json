@@ -37,6 +37,20 @@
         "alwaysOnTop": true,
         "visible": true,
         "focus": false
+      },
+      {
+        "label": "onboarding",
+        "title": "Welcome to Hexdeck",
+        "width": 500,
+        "height": 600,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "skipTaskbar": true,
+        "alwaysOnTop": false,
+        "visible": false,
+        "focus": true,
+        "center": true
       }
     ],
     "macOSPrivateApi": true,

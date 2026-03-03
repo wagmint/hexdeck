@@ -23,6 +23,8 @@ struct WidgetSettings {
     show_widget: bool,
     #[serde(default)]
     has_seen_tooltip: bool,
+    #[serde(default)]
+    has_completed_onboarding: bool,
 }
 
 fn position_file() -> Option<PathBuf> {
@@ -48,12 +50,12 @@ fn load_widget_visibility() -> bool {
 
 fn load_settings() -> WidgetSettings {
     let Some(path) = settings_file() else {
-        return WidgetSettings { show_widget: true, has_seen_tooltip: false };
+        return WidgetSettings { show_widget: true, has_seen_tooltip: false, has_completed_onboarding: false };
     };
     let Ok(data) = fs::read_to_string(path) else {
-        return WidgetSettings { show_widget: true, has_seen_tooltip: false };
+        return WidgetSettings { show_widget: true, has_seen_tooltip: false, has_completed_onboarding: false };
     };
-    serde_json::from_str(&data).unwrap_or(WidgetSettings { show_widget: true, has_seen_tooltip: false })
+    serde_json::from_str(&data).unwrap_or(WidgetSettings { show_widget: true, has_seen_tooltip: false, has_completed_onboarding: false })
 }
 
 fn save_settings(settings: &WidgetSettings) -> Result<(), String> {
@@ -269,6 +271,18 @@ fn save_has_seen_tooltip() -> Result<(), String> {
 }
 
 #[tauri::command]
+fn load_has_completed_onboarding() -> bool {
+    load_settings().has_completed_onboarding
+}
+
+#[tauri::command]
+fn save_has_completed_onboarding() -> Result<(), String> {
+    let mut settings = load_settings();
+    settings.has_completed_onboarding = true;
+    save_settings(&settings)
+}
+
+#[tauri::command]
 fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
@@ -450,6 +464,14 @@ pub fn run() {
             // When shown, briefly focus to activate macOS mouse tracking.
             apply_widget_visibility(&app.handle().clone(), show_widget_flag.load(Ordering::SeqCst));
 
+            // Show onboarding window on first launch
+            if !load_settings().has_completed_onboarding {
+                if let Some(onboarding) = app.get_webview_window("onboarding") {
+                    let _ = onboarding.show();
+                    let _ = onboarding.set_focus();
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -458,6 +480,8 @@ pub fn run() {
             load_widget_position,
             load_has_seen_tooltip,
             save_has_seen_tooltip,
+            load_has_completed_onboarding,
+            save_has_completed_onboarding,
             quit_app,
             ensure_server
         ])

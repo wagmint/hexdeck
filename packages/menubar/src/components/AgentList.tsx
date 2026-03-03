@@ -127,7 +127,7 @@ function AgentRow({
           </span>
         </div>
         {agent.currentTask && (
-          <p className="text-[11px] text-dash-text-dim truncate mt-0.5">
+          <p className="text-[11px] text-dash-text-dim truncate mt-0.5" title={agent.currentTask}>
             {agent.currentTask}
           </p>
         )}

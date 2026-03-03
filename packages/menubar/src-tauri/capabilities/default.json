@@ -1,7 +1,7 @@
 {
   "identifier": "default",
   "description": "Capability for the main window",
-  "windows": ["main", "widget"],
+  "windows": ["main", "widget", "onboarding"],
   "permissions": [
     "core:default",
     "core:window:allow-show",
@@ -14,6 +14,8 @@
     "core:window:allow-set-size",
     "core:window:allow-start-dragging",
     "core:window:allow-current-monitor",
+    "core:window:allow-close",
+    "core:window:allow-destroy",
     "notification:default",
     "notification:allow-is-permission-granted",
     "notification:allow-request-permission",

@@ -127,7 +127,7 @@ export function AgentCard({ workstream, isSelected, onSelect, onDecide }: AgentC
               </span>
               <OperatorTag operatorId={agent.operatorId} />
               {agent.currentTask ? (
-                <span className="text-[9px] text-dash-text-dim truncate">{agent.currentTask}</span>
+                <span className="text-[9px] text-dash-text-dim truncate" title={agent.currentTask}>{agent.currentTask}</span>
               ) : null}
             </div>
           )

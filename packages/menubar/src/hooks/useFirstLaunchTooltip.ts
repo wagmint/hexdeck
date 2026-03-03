@@ -77,6 +77,16 @@ export function useFirstLaunchTooltip() {
       try {
         if (cancelled) return;
 
+        // Skip tooltip entirely if user has completed onboarding
+        try {
+          const completed = await invoke<boolean>("load_has_completed_onboarding");
+          if (completed) {
+            setBlockWidgetInteractions(false);
+            return;
+          }
+        } catch {}
+        if (cancelled) return;
+
         // Let position-loading settle first
         await sleep(STARTUP_DELAY);
         if (cancelled) return;

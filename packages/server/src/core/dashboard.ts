@@ -1232,6 +1232,10 @@ function determineAgentStatus(
   if (isActive) {
     const mtimeMs = parsed.session.modifiedAt.getTime();
 
+    // Instant idle: last turn was interrupted (Stop hook doesn't fire on interrupt)
+    const lastTurn = parsed.turns[parsed.turns.length - 1];
+    if (lastTurn?.category === "interruption") return "idle";
+
     // Instant idle: Stop hook fired and transcript hasn't changed since (Claude only)
     if (!isCodex && isSessionStopped(parsed.session.id, mtimeMs)) return "idle";
 

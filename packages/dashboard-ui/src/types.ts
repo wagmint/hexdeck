@@ -102,6 +102,7 @@ export interface SessionPlan {
   timestamp: string;
   planDurationMs: number | null;
   draftingActivity: DraftingActivity | null;
+  isFromActiveSession: boolean;
 }
 
 export type AgentStatus = "idle" | "busy" | "warning" | "conflict" | "blocked";

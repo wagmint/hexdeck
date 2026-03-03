@@ -399,7 +399,7 @@ function finalizePlan(
   // Only attach drafting activity when status is "drafting"
   const activity = status === "drafting" ? draftingActivity : null;
 
-  return { status, markdown, tasks: activeTasks, agentLabel, timestamp, planDurationMs, draftingActivity: activity };
+  return { status, markdown, tasks: activeTasks, agentLabel, timestamp, planDurationMs, draftingActivity: activity, isFromActiveSession: false };
 }
 
 function buildSessionPlans(parsed: ParsedSession, agentLabel: string): SessionPlan[] {
@@ -812,6 +812,8 @@ function buildIntentInsights(
 
 /** Grace period: keep recently-dead sessions visible so feed/plans persist across context clears */
 const RECENT_GRACE_MS = 24 * 60 * 60 * 1000; // 24 hours
+/** How far back to scan for historical plans (beyond RECENT_GRACE_MS) */
+const PLAN_HISTORY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export function buildDashboardState(prefetchedActiveSessions?: SessionInfo[]): DashboardState {
   // 0. Load operator config
@@ -909,6 +911,36 @@ export function buildDashboardState(prefetchedActiveSessions?: SessionInfo[]): D
     } catch { /* skip broken operator config */ }
   }
 
+  // 2c. Collect historical sessions for plan history (beyond RECENT_GRACE_MS, up to PLAN_HISTORY_MS)
+  const historicalSessions = new Map<string, SessionInfo>();
+  for (const project of projects) {
+    if (!activeProjectPaths.has(project.decodedPath)) continue;
+    for (const s of listSessions(project.encodedName)) {
+      if (allSessions.has(s.id) || historicalSessions.has(s.id)) continue;
+      if (isCodexSession(s)) continue;
+      const age = now - s.modifiedAt.getTime();
+      if (age >= RECENT_GRACE_MS && age < PLAN_HISTORY_MS) {
+        historicalSessions.set(s.id, s);
+      }
+    }
+  }
+  for (const op of config.operators) {
+    if (!op.claude) continue;
+    try {
+      for (const project of listProjects(op.claude)) {
+        if (!activeProjectPaths.has(project.decodedPath)) continue;
+        for (const s of listSessions(project.encodedName, op.claude)) {
+          if (allSessions.has(s.id) || historicalSessions.has(s.id)) continue;
+          if (isCodexSession(s)) continue;
+          const age = now - s.modifiedAt.getTime();
+          if (age >= RECENT_GRACE_MS && age < PLAN_HISTORY_MS) {
+            historicalSessions.set(s.id, s);
+          }
+        }
+      }
+    } catch { /* skip */ }
+  }
+
   // 3. Parse all sessions
   const parsedSessions: ParsedSession[] = [];
   const sessionLastActivityMs = new Map<string, number>();
@@ -936,8 +968,11 @@ export function buildDashboardState(prefetchedActiveSessions?: SessionInfo[]): D
     } catch { /* skip broken Codex session */ }
   }
 
-  // 4. Build session label map
-  const labelMap = buildLabelMap(parsedSessions.map(p => p.session.id));
+  // 4. Build session label map (include historical session IDs for plan labels)
+  const labelMap = buildLabelMap([
+    ...parsedSessions.map(p => p.session.id),
+    ...[...historicalSessions.keys()],
+  ]);
 
   // 5. Detect collisions (only between currently active sessions)
   const activeParsed = parsedSessions.filter(p => activeSessionIds.has(p.session.id));
@@ -963,6 +998,8 @@ export function buildDashboardState(prefetchedActiveSessions?: SessionInfo[]): D
     if (plans.length === 0 && sessionAcc?.plans?.length) {
       plans = sessionAcc.plans.map(p => ({ ...p, agentLabel: label }));
     }
+    // Tag plans with whether their owning session is currently running
+    plans = plans.map(p => ({ ...p, isFromActiveSession: isActive }));
 
     // Risk: pass accumulated error history for trend continuity, and accumulated cost for compaction
     const risk = computeAgentRisk(parsed, sessionAcc?.errorHistory, sessionAcc?.totalCost);
@@ -988,6 +1025,20 @@ export function buildDashboardState(prefetchedActiveSessions?: SessionInfo[]): D
       operatorId: sessionOperatorMap.get(parsed.session.id) ?? "self",
       blockedOn,
     });
+  }
+
+  // 6b. Build plan history from older sessions (plans only, no agents)
+  const historicalPlansMap = new Map<string, SessionPlan[]>();
+  for (const session of historicalSessions.values()) {
+    try {
+      const parsed = getCachedOrParse(session);
+      const label = labelMap.get(session.id) ?? session.id.slice(0, 8);
+      const plans = buildSessionPlans(parsed, label).map(p => ({ ...p, isFromActiveSession: false }));
+      if (plans.length === 0) continue;
+      const pp = parsed.session.projectPath;
+      if (!historicalPlansMap.has(pp)) historicalPlansMap.set(pp, []);
+      historicalPlansMap.get(pp)!.push(...plans);
+    } catch { /* skip unparseable */ }
   }
 
   // ─── Stall / idle detection (post-pass, no existing code modified) ──
@@ -1089,7 +1140,7 @@ export function buildDashboardState(prefetchedActiveSessions?: SessionInfo[]): D
     const agentByLabel = new Map(allProjectAgents.map(a => [a.label, a]));
 
     // Preserve plan history for the Plans panel/workstream card.
-    const plans = allProjectAgents
+    let plans = allProjectAgents
       .flatMap(a => a.plans)
       .filter((p) => {
         if (!isRenderablePlan(p)) return false;
@@ -1099,8 +1150,16 @@ export function buildDashboardState(prefetchedActiveSessions?: SessionInfo[]): D
         // Ignore stale drafting plans from inactive sessions (e.g. user esc/cancel then exited).
         if (p.status === "drafting" && owner && !owner.isActive) return false;
         return true;
-      })
-      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+      });
+
+    // Merge historical plans from older sessions (plan-only, no agents)
+    const histPlans = historicalPlansMap.get(projectPath);
+    if (histPlans) {
+      for (const hp of histPlans) {
+        if (isRenderablePlan(hp)) plans.push(hp);
+      }
+    }
+    plans.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
     // Use only active-agent plans for live intent/progress calculations.
     const livePlans = orderedActiveProjectAgents.flatMap(a => a.plans).filter(isRenderablePlan);

@@ -110,6 +110,8 @@ export interface SessionPlan {
   planDurationMs: number | null;
   /** Activity data accumulated during drafting phase (only when status === "drafting") */
   draftingActivity: DraftingActivity | null;
+  /** Whether the owning agent's session is currently running */
+  isFromActiveSession: boolean;
 }
 
 export type AgentStatus = "idle" | "busy" | "warning" | "conflict" | "blocked";

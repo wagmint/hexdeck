@@ -146,6 +146,7 @@ function serializePlan(p: SessionPlan): RelaySessionPlan {
     draftingActivity: p.draftingActivity
       ? serializeDraftingActivity(p.draftingActivity)
       : null,
+    isFromActiveSession: p.isFromActiveSession,
   };
 }
 

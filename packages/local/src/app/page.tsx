@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback, useLayoutEffect, useMemo } fr
 import { useDashboard } from "@/hooks/useDashboard";
 import { useRelay } from "@/hooks/useRelay";
 import { decideSession } from "@/lib/dashboard-api";
-import type { Collision, DashboardState, RelayStatus } from "@hexdeck/dashboard-ui";
+import type { Collision, DashboardState, RelayStatus, PlanWindow } from "@hexdeck/dashboard-ui";
 import {
   OperatorProvider,
   TopBar,
@@ -28,6 +28,7 @@ export default function DashboardPage() {
   const [selectedProjectPath, setSelectedProjectPath] = useState<string | null>(null);
   const [seenEventIds, setSeenEventIds] = useState<Set<string>>(new Set());
   const isFirstRender = useRef(true);
+  const [planWindow, setPlanWindow] = useState<PlanWindow>("24h");
   const [bottomPanelHeight, setBottomPanelHeight] = useState(400);
   const isDragging = useRef(false);
   const dragStartY = useRef(0);
@@ -405,7 +406,7 @@ export default function DashboardPage() {
             {selectedCollision ? (
               <CollisionDetail collision={selectedCollision} onDismiss={() => setSelectedCollision(null)} />
             ) : (
-              <PlanDetail workstreams={filteredWorkstreams} />
+              <PlanDetail workstreams={filteredWorkstreams} planWindow={planWindow} onPlanWindowChange={setPlanWindow} />
             )}
           </div>
         </div>

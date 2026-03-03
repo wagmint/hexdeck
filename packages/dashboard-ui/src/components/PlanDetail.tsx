@@ -5,8 +5,12 @@ import type { SessionPlan, Workstream, DraftingActivity, IntentTaskView, AgentTy
 import { OperatorTag } from "./OperatorTag";
 import { timeAgo, formatDuration } from "../utils";
 
+export type PlanWindow = "24h" | "3d" | "7d";
+
 interface PlanDetailProps {
   workstreams: Workstream[];
+  planWindow?: PlanWindow;
+  onPlanWindowChange?: (w: PlanWindow) => void;
 }
 
 interface PlanEntry {
@@ -32,11 +36,19 @@ function extractTitle(md: string | null): string {
   return match ? match[1].slice(0, 60) : "Untitled plan";
 }
 
-function collectPlans(workstreams: Workstream[]): PlanEntry[] {
+const WINDOW_MS: Record<PlanWindow, number> = {
+  "24h": 24 * 60 * 60 * 1000,
+  "3d": 3 * 24 * 60 * 60 * 1000,
+  "7d": 7 * 24 * 60 * 60 * 1000,
+};
+
+function collectPlans(workstreams: Workstream[], planWindow: PlanWindow = "24h"): PlanEntry[] {
+  const cutoff = Date.now() - WINDOW_MS[planWindow];
   const entries: PlanEntry[] = [];
   for (const ws of workstreams) {
     for (const plan of ws.plans) {
       if (plan.status === "none" || plan.status === "rejected") continue;
+      if (new Date(plan.timestamp).getTime() < cutoff) continue;
       const done = plan.tasks.filter((t) => t.status === "completed").length;
       const matchingAgent = ws.agents.find((a) => a.label === plan.agentLabel);
       if (matchingAgent?.agentType === "codex") continue;
@@ -140,11 +152,43 @@ const taskIcon: Record<string, { char: string; className: string }> = {
   deleted: { char: "\u2212", className: "text-dash-text-muted opacity-40" },
 };
 
-function PlanOverview({ entries, onSelect }: { entries: PlanEntry[]; onSelect: (idx: number) => void }) {
+const PLAN_WINDOWS: PlanWindow[] = ["24h", "3d", "7d"];
+
+function PlanOverview({ entries, onSelect, planWindow, onPlanWindowChange }: {
+  entries: PlanEntry[];
+  onSelect: (idx: number) => void;
+  planWindow: PlanWindow;
+  onPlanWindowChange?: (w: PlanWindow) => void;
+}) {
   const [expandedPlanKeys, setExpandedPlanKeys] = useState<Set<string>>(new Set());
 
   if (entries.length === 0) {
-    return <div className="h-full flex items-center justify-center text-dash-text-muted text-xs">No active plans</div>;
+    return (
+      <div className="h-full flex flex-col">
+        <div className="flex items-center px-3.5 py-2.5 border-b border-dash-border bg-dash-surface">
+          <span className="font-display font-bold text-xs text-dash-text">Plans</span>
+          <span className="ml-2 text-[9px] text-dash-text-muted">0 total</span>
+          {onPlanWindowChange && (
+            <div className="ml-auto flex items-center gap-px">
+              {PLAN_WINDOWS.map((w) => (
+                <button
+                  key={w}
+                  onClick={() => onPlanWindowChange(w)}
+                  className={`text-[8px] px-1.5 py-0.5 rounded transition-colors ${
+                    w === planWindow
+                      ? "bg-dash-surface-2 text-dash-text font-semibold"
+                      : "text-dash-text-muted hover:text-dash-text-dim"
+                  }`}
+                >
+                  {w}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="flex-1 flex items-center justify-center text-dash-text-muted text-xs">No plans in {planWindow} window</div>
+      </div>
+    );
   }
 
   return (
@@ -152,6 +196,23 @@ function PlanOverview({ entries, onSelect }: { entries: PlanEntry[]; onSelect: (
       <div className="flex items-center px-3.5 py-2.5 border-b border-dash-border bg-dash-surface">
         <span className="font-display font-bold text-xs text-dash-text">Plans</span>
         <span className="ml-2 text-[9px] text-dash-text-muted">{entries.length} total</span>
+        {onPlanWindowChange && (
+          <div className="ml-auto flex items-center gap-px">
+            {PLAN_WINDOWS.map((w) => (
+              <button
+                key={w}
+                onClick={() => onPlanWindowChange(w)}
+                className={`text-[8px] px-1.5 py-0.5 rounded transition-colors ${
+                  w === planWindow
+                    ? "bg-dash-surface-2 text-dash-text font-semibold"
+                    : "text-dash-text-muted hover:text-dash-text-dim"
+                }`}
+              >
+                {w}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       {entries.map((entry, i) => {
         const cfg = statusConfig[entry.plan.status];
@@ -184,6 +245,11 @@ function PlanOverview({ entries, onSelect }: { entries: PlanEntry[]; onSelect: (
                 <div className="flex items-center gap-2 mt-0.5 text-[9px] text-dash-text-muted">
                   <span className="font-semibold text-dash-text-dim">{entry.plan.agentLabel}</span>
                   <OperatorTag operatorId={entry.operatorId} />
+                  {!entry.plan.isFromActiveSession && (
+                    <span className="text-[7px] font-bold tracking-widest uppercase px-1 py-px rounded shrink-0 bg-dash-surface-2 text-dash-text-muted">
+                      PAST SESSION
+                    </span>
+                  )}
                   <span>{entry.workstreamName}</span>
                   {entry.tasksTotal > 0 && (
                     <span
@@ -319,6 +385,11 @@ function PlanMarkdownView({ entry, onBack }: { entry: PlanEntry; onBack: () => v
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-[9px] text-dash-text-dim font-semibold">{entry.plan.agentLabel}</span>
           <OperatorTag operatorId={entry.operatorId} />
+          {!entry.plan.isFromActiveSession && (
+            <span className="text-[7px] font-bold tracking-widest uppercase px-1 py-px rounded shrink-0 bg-dash-surface-2 text-dash-text-muted">
+              PAST SESSION
+            </span>
+          )}
           <span className="text-[9px] text-dash-text-muted">{timeAgo(entry.plan.timestamp)}</span>
           {entry.tasksTotal > 0 && <span className="text-[9px] text-dash-text-muted">{entry.tasksDone}/{entry.tasksTotal} tasks</span>}
         </div>
@@ -398,9 +469,9 @@ function PlanVsRealityView({ workstream }: { workstream: Workstream }) {
   );
 }
 
-export function PlanDetail({ workstreams }: PlanDetailProps) {
+export function PlanDetail({ workstreams, planWindow = "24h", onPlanWindowChange }: PlanDetailProps) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
-  const entries = collectPlans(workstreams);
+  const entries = collectPlans(workstreams, planWindow);
   if (selectedIdx !== null && selectedIdx < entries.length) return <PlanMarkdownView entry={entries[selectedIdx]} onBack={() => setSelectedIdx(null)} />;
-  return <PlanOverview entries={entries} onSelect={setSelectedIdx} />;
+  return <PlanOverview entries={entries} onSelect={setSelectedIdx} planWindow={planWindow} onPlanWindowChange={onPlanWindowChange} />;
 }

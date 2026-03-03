@@ -48,6 +48,7 @@ export { WorkstreamNode } from "./components/WorkstreamNode";
 export { FeedItem } from "./components/FeedItem";
 export { CollisionDetail } from "./components/CollisionDetail";
 export { PlanDetail } from "./components/PlanDetail";
+export type { PlanWindow } from "./components/PlanDetail";
 export { RiskPanel } from "./components/RiskPanel";
 export { ProgressBar } from "./components/ProgressBar";
 export { DeviationItem } from "./components/DeviationItem";

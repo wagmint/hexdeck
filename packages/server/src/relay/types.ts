@@ -46,6 +46,7 @@ export interface RelaySessionPlan {
   timestamp: string; // ISO
   planDurationMs: number | null;
   draftingActivity: RelayDraftingActivity | null;
+  isFromActiveSession: boolean;
 }
 
 export interface RelayAgent {

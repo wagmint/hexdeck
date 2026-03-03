@@ -4,8 +4,8 @@ import type { Agent, AgentStatus, Collision } from "../lib/types";
 const statusDot: Record<AgentStatus, string> = {
   idle: "bg-dash-text-muted",
   busy: "bg-dash-green",
-  warning: "bg-dash-green",
-  conflict: "bg-dash-green",
+  warning: "bg-dash-text-muted",
+  conflict: "bg-dash-text-muted",
   blocked: "bg-dash-blue",
 };
 

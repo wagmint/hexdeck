@@ -88,6 +88,6 @@ export function worstSeverity(
 ): TraySeverity {
   const active = state.agents.filter((a) => a.isActive);
   if (active.some((a) => a.status === "blocked")) return "blue";
-  if (active.some((a) => a.status === "busy" || a.status === "warning" || a.status === "conflict")) return "green";
+  if (active.some((a) => a.status === "busy")) return "green";
   return "grey";
 }

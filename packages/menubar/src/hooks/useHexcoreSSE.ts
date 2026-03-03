@@ -5,6 +5,7 @@ import type { DashboardState } from "../lib/types";
 const SSE_URL = "http://localhost:7433/api/dashboard/stream";
 const INITIAL_RETRY_MS = 2000;
 const MAX_RETRY_MS = 10000;
+const STALE_THRESHOLD_MS = 12_000; // 12s = missed 2+ heartbeats (server sends every 5s)
 
 interface UseHexcoreSSEResult {
   state: DashboardState | null;
@@ -24,6 +25,25 @@ export function useHexcoreSSE(): UseHexcoreSSEResult {
   const esRef = useRef<EventSource | null>(null);
   const hasTriedEnsure = useRef(false);
   const mountedRef = useRef(true);
+  const lastMessageTime = useRef(0);
+
+  /** Close current connection and reconnect immediately (bypass backoff). */
+  const reconnectNow = useCallback(() => {
+    if (!mountedRef.current) return;
+    if (esRef.current) {
+      esRef.current.close();
+      esRef.current = null;
+    }
+    if (retryTimer.current) {
+      clearTimeout(retryTimer.current);
+      retryTimer.current = null;
+    }
+    retryDelay.current = INITIAL_RETRY_MS;
+    // Use setTimeout(0) to avoid calling connect synchronously inside an event handler
+    setTimeout(() => {
+      if (mountedRef.current) connect();
+    }, 0);
+  }, []); // connect added below via mutual ref
 
   const connect = useCallback(() => {
     if (!mountedRef.current) return;
@@ -33,6 +53,7 @@ export function useHexcoreSSE(): UseHexcoreSSEResult {
 
     es.addEventListener("state", (e) => {
       try {
+        lastMessageTime.current = Date.now();
         const data: DashboardState = JSON.parse(e.data);
         setState(data);
         setError(null);
@@ -47,9 +68,15 @@ export function useHexcoreSSE(): UseHexcoreSSEResult {
       }
     });
 
+    // Listen for heartbeat events — just update timestamp, no state processing
+    es.addEventListener("hb", () => {
+      lastMessageTime.current = Date.now();
+    });
+
     es.onopen = () => {
       setConnected(true);
       setError(null);
+      lastMessageTime.current = Date.now();
     };
 
     es.onerror = () => {
@@ -81,6 +108,32 @@ export function useHexcoreSSE(): UseHexcoreSSEResult {
     mountedRef.current = true;
     connect();
 
+    // Staleness check: every 5s, if no message in 12s, force reconnect
+    const stalenessInterval = setInterval(() => {
+      if (
+        lastMessageTime.current > 0 &&
+        Date.now() - lastMessageTime.current > STALE_THRESHOLD_MS
+      ) {
+        reconnectNow();
+      }
+    }, 5000);
+
+    // Visibility listener: catches laptop sleep/wake (lid open fires visibilitychange)
+    const onVisibility = () => {
+      if (!document.hidden && lastMessageTime.current > 0) {
+        if (Date.now() - lastMessageTime.current > STALE_THRESHOLD_MS) {
+          reconnectNow();
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    // Online listener: catches network drops/reconnects
+    const onOnline = () => {
+      reconnectNow();
+    };
+    window.addEventListener("online", onOnline);
+
     return () => {
       mountedRef.current = false;
       if (esRef.current) {
@@ -91,8 +144,11 @@ export function useHexcoreSSE(): UseHexcoreSSEResult {
         clearTimeout(retryTimer.current);
         retryTimer.current = null;
       }
+      clearInterval(stalenessInterval);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("online", onOnline);
     };
-  }, [connect]);
+  }, [connect, reconnectNow]);
 
   return { state, loading, error, connected };
 }

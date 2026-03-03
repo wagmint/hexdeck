@@ -47,6 +47,7 @@ interface SSEClient {
 
 const clients = new Set<SSEClient>();
 let lastPushedJson = "";
+let lastBroadcastTime = 0;
 let tickerInterval: ReturnType<typeof setInterval> | null = null;
 let sseMessageId = 0;
 
@@ -67,8 +68,18 @@ function startTicker() {
     // SSE (existing logic)
     const data = serializeState(rawState);
     const json = JSON.stringify(data);
-    if (json === lastPushedJson) return;
+    if (json === lastPushedJson) {
+      // No state change — send heartbeat every 5s to keep connection alive
+      if (Date.now() - lastBroadcastTime >= 5000) {
+        lastBroadcastTime = Date.now();
+        for (const client of clients) {
+          client.stream.writeSSE({ event: "hb", data: "" }).catch(() => {});
+        }
+      }
+      return;
+    }
     lastPushedJson = json;
+    lastBroadcastTime = Date.now();
     sseMessageId++;
     const id = String(sseMessageId);
     for (const client of clients) {

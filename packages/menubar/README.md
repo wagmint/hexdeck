@@ -16,12 +16,10 @@ The menu bar app connects to the local Hexdeck server — you need the CLI runni
 
 ## What it does
 
-A color-coded tray icon shows the overall state of your agents:
+A color-coded floating hex widget shows the overall state of your agents:
 
-- **Blue** — an agent is actively working
-- **Green** — agents are online, no issues
-- **Yellow** — something needs attention
-- **Red** — a critical issue (e.g. a collision between agents)
+- **Blue** — an agent needs your approval
+- **Green** — an agent is actively working
 - **Grey** — no active agents or disconnected
 
 Click the icon to see active agents and current alerts.

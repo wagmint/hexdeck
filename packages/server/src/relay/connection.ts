@@ -132,8 +132,8 @@ export class RelayConnection {
             ?? (msg as { message?: string }).message ?? "unknown";
           console.error(`[relay] Auth failed for ${this.hexcoreId}: ${reason}`);
 
-          // If token expired and we have a refresh token, try refreshing
-          if (reason.toLowerCase().includes("expired") && this.refreshToken) {
+          // Try refreshing for any auth failure when we have a refresh token
+          if (this.refreshToken) {
             this.tryTokenRefresh();
           } else {
             this.disconnect();
@@ -176,14 +176,14 @@ export class RelayConnection {
 
       if (!res.ok) {
         console.error(`[relay] Token refresh failed for ${this.hexcoreId}: ${res.status}`);
-        this.disconnect();
+        this.scheduleReconnect();
         return;
       }
 
       const body = await res.json() as { success: boolean; data?: { accessToken: string } };
       if (!body.success || !body.data?.accessToken) {
         console.error(`[relay] Token refresh returned invalid response for ${this.hexcoreId}`);
-        this.disconnect();
+        this.scheduleReconnect();
         return;
       }
 

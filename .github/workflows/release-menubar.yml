@@ -2,12 +2,19 @@ name: Release Menubar
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. menubar-v0.5.17)"
+        required: true
   push:
     tags:
       - "menubar-v*"
 
 permissions:
   contents: write
+
+env:
+  RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
 jobs:
   build-macos:
@@ -89,8 +96,8 @@ jobs:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         with:
           projectPath: packages/menubar
-          tagName: ${{ github.ref_name }}
-          releaseName: "Hexdeck ${{ github.ref_name }}"
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: "Hexdeck ${{ env.RELEASE_TAG }}"
           releaseBody: "See the assets below to download and install this version."
           releaseDraft: false
           prerelease: false
@@ -103,13 +110,15 @@ jobs:
     steps:
       - name: Extract version from tag
         id: version
-        run: echo "version=${GITHUB_REF_NAME#menubar-v}" >> "$GITHUB_OUTPUT"
+        run: |
+          TAG="${{ env.RELEASE_TAG }}"
+          echo "version=${TAG#menubar-v}" >> "$GITHUB_OUTPUT"
 
       - name: Download release DMGs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release download "${{ github.ref_name }}" \
+          gh release download "${{ env.RELEASE_TAG }}" \
             --repo "${{ github.repository }}" \
             --pattern "*.dmg" \
             --dir artifacts
@@ -136,12 +145,12 @@ jobs:
             version "${{ steps.version.outputs.version }}"
 
             on_arm do
-              url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.sha.outputs.arm_dmg }}"
+              url "https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/${{ steps.sha.outputs.arm_dmg }}"
               sha256 "${{ steps.sha.outputs.arm_sha }}"
             end
 
             on_intel do
-              url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.sha.outputs.x86_dmg }}"
+              url "https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/${{ steps.sha.outputs.x86_dmg }}"
               sha256 "${{ steps.sha.outputs.x86_sha }}"
             end
 

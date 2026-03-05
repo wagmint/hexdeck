@@ -13,6 +13,7 @@ import { hasBlockedSession, getBlockedForSession, describeBlockedTool, extractTo
 import { formatIdleDuration } from "./duration.js";
 import { computeAgentRisk, computeWorkstreamRisk } from "./risk.js";
 import { computeTurnCost } from "./pricing.js";
+import { resolveCodexBusyIdle } from "./codex-status.js";
 import { loadOperatorConfig, getSelfName, operatorId as makeOperatorId, getOperatorColor } from "./config.js";
 import type {
   ParsedSession, SessionInfo, Agent, AgentStatus,
@@ -1274,7 +1275,6 @@ export function buildDashboardState(prefetchedActiveSessions?: SessionInfo[]): D
 
 /** How long since last file modification before an active session is considered idle */
 const IDLE_THRESHOLD_MS = 120_000; // 2 minutes (fallback — Stop hook handles the normal case for Claude)
-const CODEX_IDLE_THRESHOLD_MS = 30_000; // 30 seconds (Codex has no Stop hook — this is the primary mechanism)
 
 function determineAgentStatus(
   parsed: ParsedSession,
@@ -1304,9 +1304,18 @@ function determineAgentStatus(
     // Instant idle: Stop hook fired and transcript hasn't changed since (Claude only)
     if (!isCodex && isSessionStopped(parsed.session.id, mtimeMs)) return "idle";
 
-    // Fallback: no recent file writes → idle
-    const threshold = isCodex ? CODEX_IDLE_THRESHOLD_MS : IDLE_THRESHOLD_MS;
-    return Date.now() - mtimeMs > threshold ? "idle" : "busy";
+    // Codex has no Stop hook — use Codex event semantics for responsiveness.
+    if (isCodex) {
+      return resolveCodexBusyIdle({
+        nowMs: Date.now(),
+        sessionMtimeMs: mtimeMs,
+        runtime: parsed.codexRuntime,
+        lastTurn,
+      });
+    }
+
+    // Claude fallback: no recent file writes → idle
+    return Date.now() - mtimeMs > IDLE_THRESHOLD_MS ? "idle" : "busy";
   }
 
   return "idle";

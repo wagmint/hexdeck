@@ -10,6 +10,7 @@ import type { CodexEvent } from "../parser/codex.js";
  */
 export function buildCodexParsedSession(session: SessionInfo, events: CodexEvent[]): ParsedSession {
   const turns = buildCodexTurns(events);
+  const codexRuntime = deriveCodexRuntime(events, turns);
 
   // Aggregate stats
   const allFilesChanged = new Set<string>();
@@ -52,6 +53,7 @@ export function buildCodexParsedSession(session: SessionInfo, events: CodexEvent
   return {
     session,
     turns,
+    codexRuntime,
     stats: {
       totalEvents: events.length,
       totalTurns: turns.length,
@@ -67,6 +69,54 @@ export function buildCodexParsedSession(session: SessionInfo, events: CodexEvent
       correctionTurns,
       primaryModel,
     },
+  };
+}
+
+function deriveCodexRuntime(events: CodexEvent[], turns: TurnNode[]): ParsedSession["codexRuntime"] {
+  if (events.length === 0) {
+    return {
+      lastEventType: null,
+      lastEventAt: null,
+      inTurn: false,
+      lastToolActivityAt: null,
+    };
+  }
+
+  let inTurn = false;
+  let lastToolActivityAt: Date | null = null;
+
+  for (const event of events) {
+    if (event.type === "turn_started") inTurn = true;
+    if (event.type === "turn_complete" || event.type === "turn_aborted" || event.type === "shutdown") {
+      inTurn = false;
+    }
+    if (
+      event.type === "exec_command"
+      || event.type === "patch_apply"
+      || event.type === "agent_message"
+      || event.type === "agent_reasoning"
+    ) {
+      lastToolActivityAt = event.timestamp;
+    }
+  }
+
+  const lastEvent = events[events.length - 1];
+  const turnTail = turns[turns.length - 1];
+  if (turnTail?.durationMs === null) {
+    inTurn = true;
+  }
+
+  return {
+    lastEventType:
+      lastEvent.type === "turn_started"
+      || lastEvent.type === "turn_complete"
+      || lastEvent.type === "turn_aborted"
+      || lastEvent.type === "shutdown"
+        ? lastEvent.type
+        : null,
+    lastEventAt: lastEvent.timestamp,
+    inTurn,
+    lastToolActivityAt,
   };
 }
 

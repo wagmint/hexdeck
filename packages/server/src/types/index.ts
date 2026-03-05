@@ -349,6 +349,13 @@ export interface TurnNode {
 export interface ParsedSession {
   session: SessionInfo;
   turns: TurnNode[];
+  /** Optional runtime hints for Codex sessions (unused for Claude). */
+  codexRuntime?: {
+    lastEventType: "turn_started" | "turn_complete" | "turn_aborted" | "shutdown" | null;
+    lastEventAt: Date | null;
+    inTurn: boolean;
+    lastToolActivityAt: Date | null;
+  };
   stats: {
     totalEvents: number;
     totalTurns: number;

@@ -30,6 +30,10 @@ const typeConfig: Record<
     icon: "\u2192",
     iconClass: "bg-dash-green-dim text-dash-green",
   },
+  push: {
+    icon: "\u21A5",
+    iconClass: "bg-dash-green-dim text-dash-green",
+  },
   error: {
     icon: "\u2716",
     iconClass: "bg-dash-yellow-dim text-dash-yellow",

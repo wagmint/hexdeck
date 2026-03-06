@@ -183,7 +183,8 @@ export type FeedEventType =
   | "session_ended"
   | "stall"
   | "idle"
-  | "blocked";
+  | "blocked"
+  | "push";
 
 export interface FeedEvent {
   id: string;

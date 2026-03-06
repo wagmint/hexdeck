@@ -65,6 +65,7 @@ export interface Collision {
     operatorId: string;
   }[];
   severity: CollisionSeverity;
+  alertLevel?: "yellow" | "red";
   isCrossOperator: boolean;
   detectedAt: string;
 }
@@ -83,7 +84,8 @@ export type FeedEventType =
   | "session_ended"
   | "stall"
   | "idle"
-  | "blocked";
+  | "blocked"
+  | "push";
 
 export interface FeedEvent {
   id: string;

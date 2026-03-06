@@ -4,7 +4,9 @@ import type {
   AuthMessage,
   StateUpdateMessage,
   HeartbeatMessage,
+  CollisionAckMessage,
   ServerMessage,
+  RelayCollision,
 } from "./types.js";
 
 const HEARTBEAT_INTERVAL_MS = 20_000;
@@ -16,6 +18,20 @@ export type RelayConnectionStatus = "connected" | "connecting" | "disconnected";
 /** Callback to persist refreshed token back to config */
 export type OnTokenRefreshed = (hexcoreId: string, newToken: string) => void;
 
+/** Cross-operator collision alert from relay merged_state */
+export interface RelayCollisionAlert {
+  id: string;
+  filePath: string;
+  agents: { sessionId: string; label: string; operatorId: string; lastAction: string }[];
+  severity: "warning" | "critical";
+  alertLevel?: "yellow" | "red";
+  isCrossOperator: boolean;
+  detectedAt: string;
+}
+
+/** Callback for incoming collision alerts */
+export type OnCollisionAlerts = (hexcoreId: string, collisions: RelayCollisionAlert[]) => void;
+
 export class RelayConnection {
   readonly hexcoreId: string;
 
@@ -23,6 +39,7 @@ export class RelayConnection {
   private token: string;
   private refreshToken: string;
   private onTokenRefreshed: OnTokenRefreshed | null;
+  private onCollisionAlerts: OnCollisionAlerts | null;
   private ws: WebSocket | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -39,12 +56,14 @@ export class RelayConnection {
     token: string,
     refreshToken: string = "",
     onTokenRefreshed: OnTokenRefreshed | null = null,
+    onCollisionAlerts: OnCollisionAlerts | null = null,
   ) {
     this.hexcoreId = hexcoreId;
     this.wsUrl = wsUrl;
     this.token = token;
     this.refreshToken = refreshToken;
     this.onTokenRefreshed = onTokenRefreshed;
+    this.onCollisionAlerts = onCollisionAlerts;
   }
 
   get isConnected(): boolean {
@@ -85,6 +104,12 @@ export class RelayConnection {
     this.lastStateJson = json;
 
     const msg: StateUpdateMessage = { type: "state_update", state };
+    this.send(msg);
+  }
+
+  sendCollisionAck(collisionId: string, action: "acknowledged" | "confirmed"): void {
+    if (!this.isConnected) return;
+    const msg: CollisionAckMessage = { type: "collision_ack", collisionId, action };
     this.send(msg);
   }
 
@@ -137,6 +162,17 @@ export class RelayConnection {
             this.tryTokenRefresh();
           } else {
             this.disconnect();
+          }
+        } else if (msg.type === "merged_state" && this.onCollisionAlerts) {
+          // Extract cross-operator collision alerts with alertLevel
+          const state = msg.state as { collisions?: RelayCollisionAlert[] };
+          if (state?.collisions) {
+            const crossOpCollisions = state.collisions.filter(
+              c => c.isCrossOperator && c.alertLevel,
+            );
+            if (crossOpCollisions.length > 0) {
+              this.onCollisionAlerts(this.hexcoreId, crossOpCollisions);
+            }
           }
         }
       } catch {

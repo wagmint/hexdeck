@@ -70,6 +70,7 @@ export function transformToOperatorState(
       filePath: c.filePath,
       agents: c.agents,
       severity: c.severity,
+      ...(c.alertLevel ? { alertLevel: c.alertLevel } : {}),
       isCrossOperator: c.isCrossOperator,
       detectedAt: serializeDate(c.detectedAt),
     }));
@@ -118,6 +119,7 @@ function mapAgent(a: Agent): RelayAgent {
     status: a.status,
     currentTask: a.currentTask,
     filesChanged: a.filesChanged,
+    uncommittedFiles: a.uncommittedFiles,
     projectPath: a.projectPath,
     isActive: a.isActive,
     planStatus: topPlan?.status ?? "none",

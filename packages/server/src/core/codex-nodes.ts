@@ -342,6 +342,8 @@ function buildSingleCodexTurn(events: CodexEvent[], index: number, sessionModel:
     filesRead,
     commands,
     hasCommit,
+    hasPush: false,
+    hasPull: false,
     commitMessage,
     commitSha,
     hasError: errorCount > 0,

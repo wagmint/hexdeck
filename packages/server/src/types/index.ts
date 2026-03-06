@@ -307,6 +307,8 @@ export interface TurnNode {
 
   /** Git commit info */
   hasCommit: boolean;
+  hasPush: boolean;
+  hasPull: boolean;
   commitMessage: string | null;
   commitSha: string | null;
 

@@ -133,6 +133,8 @@ export interface Agent {
   currentTask: string;
   /** Files this agent has changed */
   filesChanged: string[];
+  /** Currently uncommitted files in this agent's project */
+  uncommittedFiles: string[];
   /** Project path this agent belongs to */
   projectPath: string;
   /** Whether this agent is currently active (has running process) */
@@ -215,6 +217,8 @@ export interface Collision {
   }[];
   /** Severity: critical if cross-project or cross-operator, warning if same project */
   severity: CollisionSeverity;
+  /** Alert level for cross-operator collisions: yellow = uncommitted overlap, red = confirmed conflict */
+  alertLevel?: "yellow" | "red";
   /** Whether this collision involves agents from different operators */
   isCrossOperator: boolean;
   /** Display timestamp */
@@ -235,7 +239,8 @@ export type FeedEventType =
   | "session_ended"
   | "stall"
   | "idle"
-  | "blocked";
+  | "blocked"
+  | "push";
 
 export interface FeedEvent {
   /** Unique ID for deduplication */

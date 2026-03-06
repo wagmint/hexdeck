@@ -62,6 +62,8 @@ function buildSingleTurn(events: SessionEvent[], index: number): TurnNode | null
   const commitMessages: string[] = [];
   const escalationQuestions: string[] = [];
   let hasCommit = false;
+  let hasPush = false;
+  let hasPull = false;
   let commitMessage: string | null = null;
   let commitSha: string | null = null;
   const gitCommitCallIds = new Set<string>();
@@ -182,6 +184,8 @@ function buildSingleTurn(events: SessionEvent[], index: number): TurnNode | null
             if (commitMessage) commitMessages.push(commitMessage);
             gitCommitCallIds.add(call.id);
           }
+          if (isGitPush(cmd)) hasPush = true;
+          if (isGitPull(cmd)) hasPull = true;
         }
       }
 
@@ -283,6 +287,8 @@ function buildSingleTurn(events: SessionEvent[], index: number): TurnNode | null
     filesRead: [...filesRead],
     commands,
     hasCommit,
+    hasPush,
+    hasPull,
     commitMessage,
     commitSha,
     hasError: errorCount > 0,
@@ -895,6 +901,14 @@ function extractCommand(input: Record<string, unknown>): string | null {
 
 function isGitCommit(cmd: string): boolean {
   return /git\s+commit/.test(cmd);
+}
+
+function isGitPush(cmd: string): boolean {
+  return /git\s+push\b/.test(cmd);
+}
+
+function isGitPull(cmd: string): boolean {
+  return /git\s+(pull|fetch|rebase)\b/.test(cmd);
 }
 
 function extractCommitMessage(cmd: string): string | null {

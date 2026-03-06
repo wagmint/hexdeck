@@ -79,7 +79,8 @@ export function useAlerts(
     }
 
     for (const alert of alerts) {
-      if (alert.severity === "blue" && !seenAlertIds.current.has(alert.id)) {
+      if ((alert.severity === "red" || alert.severity === "yellow" || alert.severity === "blue")
+        && !seenAlertIds.current.has(alert.id)) {
         sendAlertNotification(alert);
       }
       seenAlertIds.current.add(alert.id);

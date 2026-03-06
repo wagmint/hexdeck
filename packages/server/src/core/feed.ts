@@ -81,6 +81,19 @@ export function buildFeed(
         });
       }
 
+      if (turn.hasPush) {
+        addEvent({
+          id: `push-${sessionId}-${turn.index}`,
+          type: "push",
+          timestamp,
+          agentLabel: label,
+          sessionId,
+          projectPath,
+          operatorId,
+          message: `Pushed changes`,
+        });
+      }
+
       if (turn.hasCompaction) {
         addEvent({
           id: `compaction-${sessionId}-${turn.index}`,

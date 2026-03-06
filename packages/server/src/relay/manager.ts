@@ -3,7 +3,7 @@ import { loadOperatorConfig, getSelfName, getOperatorColor } from "../core/confi
 import { loadRelayConfig, saveRelayConfig } from "./config.js";
 import { transformToOperatorState } from "./transform.js";
 import { RelayConnection } from "./connection.js";
-import type { RelayConnectionStatus } from "./connection.js";
+import type { RelayConnectionStatus, RelayCollisionAlert, OnCollisionAlerts } from "./connection.js";
 import type { RelayTarget } from "./types.js";
 
 export interface RelayTargetStatus {
@@ -17,6 +17,7 @@ export interface RelayTargetStatus {
 class RelayManager {
   private connections = new Map<string, RelayConnection>();
   private started = false;
+  private collisionAlertCallback: OnCollisionAlerts | null = null;
 
   /** True if any relay targets are configured (keeps ticker alive). */
   get hasTargets(): boolean {
@@ -53,6 +54,19 @@ class RelayManager {
         addedAt: t.addedAt,
       };
     });
+  }
+
+  /** Register a callback for cross-operator collision alerts from relay. */
+  onCollisionAlerts(cb: OnCollisionAlerts): void {
+    this.collisionAlertCallback = cb;
+  }
+
+  /** Forward a collision acknowledgment to the relay for a specific hexcore. */
+  acknowledgeCollision(hexcoreId: string, collisionId: string, action: "acknowledged" | "confirmed"): void {
+    const conn = this.connections.get(hexcoreId);
+    if (conn) {
+      conn.sendCollisionAck(collisionId, action);
+    }
   }
 
   /** Add or update a relay target from parsed connect link fields. */
@@ -186,6 +200,7 @@ class RelayManager {
           target.token,
           target.refreshToken,
           this.handleTokenRefreshed.bind(this),
+          this.collisionAlertCallback,
         );
         this.connections.set(target.hexcoreId, conn);
         conn.connect();

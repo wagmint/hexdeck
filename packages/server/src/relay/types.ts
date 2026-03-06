@@ -56,6 +56,7 @@ export interface RelayAgent {
   status: "idle" | "busy" | "warning" | "conflict" | "blocked";
   currentTask: string;
   filesChanged: string[];
+  uncommittedFiles: string[];
   projectPath: string;
   isActive: boolean;
   planStatus: "drafting" | "implementing" | "completed" | "rejected" | "none";
@@ -116,6 +117,7 @@ export interface RelayCollision {
     operatorId: string;
   }[];
   severity: "warning" | "critical";
+  alertLevel?: "yellow" | "red";
   isCrossOperator: boolean;
   detectedAt: string; // ISO
 }
@@ -134,7 +136,8 @@ export type RelayFeedEventType =
   | "session_ended"
   | "stall"
   | "idle"
-  | "blocked";
+  | "blocked"
+  | "push";
 
 export interface RelayFeedEvent {
   id: string;
@@ -180,7 +183,13 @@ export interface HeartbeatMessage {
   type: "heartbeat";
 }
 
-export type ClientMessage = AuthMessage | StateUpdateMessage | HeartbeatMessage;
+export interface CollisionAckMessage {
+  type: "collision_ack";
+  collisionId: string;
+  action: "acknowledged" | "confirmed";
+}
+
+export type ClientMessage = AuthMessage | StateUpdateMessage | HeartbeatMessage | CollisionAckMessage;
 
 // Server → Client messages
 export interface AuthOkMessage {
@@ -193,7 +202,12 @@ export interface AuthErrorMessage {
   reason: string;
 }
 
-export type ServerMessage = AuthOkMessage | AuthErrorMessage;
+export interface MergedStateMessage {
+  type: "merged_state";
+  state: unknown;
+}
+
+export type ServerMessage = AuthOkMessage | AuthErrorMessage | MergedStateMessage;
 
 // ─── Relay Config Types ─────────────────────────────────────────────────────
 

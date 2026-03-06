@@ -26,6 +26,8 @@ function makeTurn(ts: number, durationMs: number | null): TurnNode {
     filesChanged: [],
     filesRead: [],
     hasCommit: false,
+    hasPush: false,
+    hasPull: false,
     commitMessage: null,
     commitSha: null,
     commands: [],

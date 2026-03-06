@@ -1,6 +1,6 @@
 import type { DashboardState } from "./types";
 
-export type AlertSeverity = "blue" | "green";
+export type AlertSeverity = "red" | "yellow" | "blue" | "green";
 
 export interface HexcoreAlert {
   id: string;
@@ -8,6 +8,7 @@ export interface HexcoreAlert {
   title: string;
   detail: string;
   timestamp: string;
+  collisionId?: string;
   blockedItems?: Array<{ toolName: string; description: string; detail?: string }>;
 }
 
@@ -16,6 +17,32 @@ const RECENT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 export function deriveAlerts(state: DashboardState): HexcoreAlert[] {
   const alerts: HexcoreAlert[] = [];
   const now = Date.now();
+
+  // Red/Yellow: cross-operator collision alerts
+  for (const collision of state.collisions) {
+    if (!collision.alertLevel) continue;
+    const agentLabels = collision.agents.map(a => a.label).join(" & ");
+    const fileName = collision.filePath.split("/").pop() ?? collision.filePath;
+    if (collision.alertLevel === "red") {
+      alerts.push({
+        id: `collision-red-${collision.id}`,
+        severity: "red",
+        title: "Conflict detected",
+        detail: `${agentLabels} have conflicting changes on ${fileName}`,
+        timestamp: collision.detectedAt,
+        collisionId: collision.id,
+      });
+    } else {
+      alerts.push({
+        id: `collision-yellow-${collision.id}`,
+        severity: "yellow",
+        title: "File overlap",
+        detail: `${agentLabels} are both editing ${fileName}`,
+        timestamp: collision.detectedAt,
+        collisionId: collision.id,
+      });
+    }
+  }
 
   // Blue: agents waiting on user permission approval
   for (const agent of state.agents) {
@@ -66,10 +93,12 @@ export function deriveAlerts(state: DashboardState): HexcoreAlert[] {
     }
   }
 
-  // Sort: blue first, then green; within same severity, newest first
+  // Sort: red > yellow > blue > green; within same severity, newest first
   const severityOrder: Record<AlertSeverity, number> = {
-    blue: 0,
-    green: 1,
+    red: 0,
+    yellow: 1,
+    blue: 2,
+    green: 3,
   };
   alerts.sort((a, b) => {
     const sevDiff = severityOrder[a.severity] - severityOrder[b.severity];
@@ -80,12 +109,14 @@ export function deriveAlerts(state: DashboardState): HexcoreAlert[] {
   return alerts;
 }
 
-export type TraySeverity = "green" | "blue" | "grey";
+export type TraySeverity = "red" | "yellow" | "green" | "blue" | "grey";
 
 export function worstSeverity(
-  _alerts: HexcoreAlert[],
+  alerts: HexcoreAlert[],
   state: DashboardState,
 ): TraySeverity {
+  if (alerts.some(a => a.severity === "red")) return "red";
+  if (alerts.some(a => a.severity === "yellow")) return "yellow";
   const active = state.agents.filter((a) => a.isActive);
   if (active.some((a) => a.status === "blocked")) return "blue";
   if (active.some((a) => a.status === "busy")) return "green";

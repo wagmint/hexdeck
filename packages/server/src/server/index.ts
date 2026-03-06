@@ -6,7 +6,7 @@ import { streamSSE, type SSEStreamingApi } from "hono/streaming";
 import { serve, type ServerType } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { listProjects, listSessions, getActiveSessions } from "../discovery/sessions.js";
-import { buildDashboardState } from "../core/dashboard.js";
+import { buildDashboardState, setRelayCollisionAlerts } from "../core/dashboard.js";
 import { blockedSessions, clearBlockedSession, clearStaleBlocked, ensureHooks, createPendingDecision, hasPendingDecision, hasBlockedSession, resolveAllDecisions, markSessionStopped, type BlockedInfo } from "../core/blocked.js";
 import { relayManager } from "../relay/manager.js";
 import { parseConnectLink, exchangeConnectLink, createRelayClaim, deriveHttpBaseFromWs } from "../relay/link.js";
@@ -383,6 +383,26 @@ export function createApp(options?: { dashboardDir?: string }): Hono {
     }
   });
 
+  /** Resolve a cross-operator collision alert (from relay) */
+  app.post("/api/collisions/:id/resolve", async (c) => {
+    try {
+      const collisionId = c.req.param("id");
+      const body = await c.req.json<{ action?: string }>();
+      const action = body.action;
+      if (action !== "acknowledged" && action !== "confirmed") {
+        return c.json({ error: "Invalid action — must be 'acknowledged' or 'confirmed'" }, 400);
+      }
+      // Forward to all relay connections
+      const targets = relayManager.getStatus();
+      for (const target of targets) {
+        relayManager.acknowledgeCollision(target.hexcoreId, collisionId, action);
+      }
+      return c.json({ ok: true });
+    } catch {
+      return c.json({ error: "Invalid JSON" }, 400);
+    }
+  });
+
   function pickString(obj: Record<string, unknown>, ...keys: string[]): string | null {
     for (const k of keys) {
       if (typeof obj[k] === "string" && (obj[k] as string).length > 0) {
@@ -586,6 +606,24 @@ export function startServer(options?: StartServerOptions): ServerType {
   ensureHooks();
 
   // Start relay manager (connects to configured relay targets)
+  relayManager.onCollisionAlerts((_hexcoreId, collisions) => {
+    // Convert relay collision alerts into local Collision format
+    setRelayCollisionAlerts(collisions.map(c => ({
+      id: c.id,
+      filePath: c.filePath,
+      agents: c.agents.map(a => ({
+        sessionId: a.sessionId,
+        label: a.label,
+        projectPath: "",
+        lastAction: a.lastAction,
+        operatorId: a.operatorId,
+      })),
+      severity: c.severity === "critical" ? "critical" as const : "warning" as const,
+      alertLevel: c.alertLevel,
+      isCrossOperator: c.isCrossOperator,
+      detectedAt: new Date(c.detectedAt),
+    })));
+  });
   relayManager.start();
   if (relayManager.hasTargets) startTicker();
 

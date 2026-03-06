@@ -11,7 +11,19 @@ function timeAgo(timestamp: string): string {
   return `${hours}h ago`;
 }
 
-const severityStyles = {
+const severityStyles: Record<string, { bg: string; border: string; dot: string; title: string }> = {
+  red: {
+    bg: "bg-red-500/8",
+    border: "border-red-500/20",
+    dot: "bg-red-500",
+    title: "text-red-400",
+  },
+  yellow: {
+    bg: "bg-yellow-500/8",
+    border: "border-yellow-500/20",
+    dot: "bg-yellow-500",
+    title: "text-yellow-400",
+  },
   blue: {
     bg: "bg-dash-blue/8",
     border: "border-dash-blue/20",
@@ -26,10 +38,23 @@ const severityStyles = {
   },
 };
 
+async function resolveCollision(collisionId: string, action: "acknowledged" | "confirmed") {
+  try {
+    await fetch(`http://localhost:7433/api/collisions/${encodeURIComponent(collisionId)}/resolve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+  } catch {
+    // Non-critical — collision will resolve on next cycle
+  }
+}
+
 function AlertItem({ alert, onDecided }: { alert: HexcoreAlert; onDecided?: (alertId: string) => void }) {
-  const style = severityStyles[alert.severity];
+  const style = severityStyles[alert.severity] ?? severityStyles.blue;
   const isBlocked = alert.severity === "blue" && alert.id.startsWith("blocked-");
   const sessionId = isBlocked ? alert.id.slice("blocked-".length) : null;
+  const isCollisionAlert = (alert.severity === "yellow" || alert.severity === "red") && alert.collisionId;
 
   return (
     <div className={`${style.bg} ${style.border} border rounded-lg px-3 py-2`}>
@@ -37,7 +62,10 @@ function AlertItem({ alert, onDecided }: { alert: HexcoreAlert; onDecided?: (ale
         <div className="flex items-center gap-2">
           <div
             className={`w-1.5 h-1.5 rounded-full ${style.dot} ${
-              alert.severity === "blue" ? "animate-dash-breathe" : ""
+              alert.severity === "blue" ? "animate-dash-breathe"
+              : alert.severity === "red" ? "animate-dash-pulse"
+              : alert.severity === "yellow" ? "animate-dash-breathe"
+              : ""
             }`}
           />
           <span className={`text-xs font-medium ${style.title}`}>
@@ -52,6 +80,29 @@ function AlertItem({ alert, onDecided }: { alert: HexcoreAlert; onDecided?: (ale
             size="xs"
             onDecided={() => onDecided?.(alert.id)}
           />
+        ) : isCollisionAlert ? (
+          <div className="flex gap-1">
+            <button
+              className="text-[10px] px-1.5 py-0.5 rounded bg-dash-green/20 text-dash-green hover:bg-dash-green/30 transition-colors"
+              onClick={() => {
+                resolveCollision(alert.collisionId!, "acknowledged");
+                onDecided?.(alert.id);
+              }}
+            >
+              Resolved
+            </button>
+            {alert.severity === "yellow" && (
+              <button
+                className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                onClick={() => {
+                  resolveCollision(alert.collisionId!, "confirmed");
+                  onDecided?.(alert.id);
+                }}
+              >
+                Not yet
+              </button>
+            )}
+          </div>
         ) : (
           <span className="text-[10px] text-dash-text-muted">
             {timeAgo(alert.timestamp)}
@@ -113,7 +164,7 @@ export function AlertList({ alerts }: AlertListProps) {
   }
 
   const criticalAlerts = allAlerts.filter(
-    (a) => a.severity === "blue",
+    (a) => a.severity === "red" || a.severity === "yellow" || a.severity === "blue",
   );
   const infoAlerts = allAlerts.filter((a) => a.severity === "green");
 

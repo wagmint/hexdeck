@@ -30,6 +30,16 @@ function getDirtyFiles(projectPath: string): Set<string> {
   }
 }
 
+/**
+ * Get the list of uncommitted file paths for a project directory.
+ * Returns absolute paths. Returns [] if git status fails or reports wildcard.
+ */
+export function getUncommittedFiles(projectPath: string): string[] {
+  const dirty = getDirtyFiles(projectPath);
+  if (dirty.has("*")) return [];
+  return [...dirty];
+}
+
 /** Recency window fallback: only file edits within this many minutes count */
 const RECENCY_MINUTES = 15;
 

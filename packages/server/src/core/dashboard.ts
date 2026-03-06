@@ -7,7 +7,7 @@ import { parseSessionFile, parseSystemLines } from "../parser/jsonl.js";
 import { parseCodexSessionFile } from "../parser/codex.js";
 import { buildParsedSession } from "./nodes.js";
 import { buildCodexParsedSession } from "./codex-nodes.js";
-import { detectCollisions } from "./collisions.js";
+import { detectCollisions, getUncommittedFiles } from "./collisions.js";
 import { buildFeed } from "./feed.js";
 import { hasBlockedSession, getBlockedForSession, describeBlockedTool, extractToolDetail, isSessionStopped } from "./blocked.js";
 import { formatIdleDuration } from "./duration.js";
@@ -20,6 +20,17 @@ import type {
   Workstream, WorkstreamMode, DashboardState, DashboardSummary, Operator,
   SessionPlan, PlanStatus, PlanTask, TokenUsage, DraftingActivity, IntentTaskView,
 } from "../types/index.js";
+
+// ─── Relay collision alerts (from cross-operator detection via relay) ────────
+
+import type { Collision } from "../types/index.js";
+
+let relayCollisionAlerts: Collision[] = [];
+
+/** Called by server to inject cross-operator collision alerts from relay merged_state. */
+export function setRelayCollisionAlerts(collisions: Collision[]): void {
+  relayCollisionAlerts = collisions;
+}
 
 // ─── In-memory parse cache ──────────────────────────────────────────────────
 
@@ -983,8 +994,23 @@ export function buildDashboardState(prefetchedActiveSessions?: SessionInfo[]): D
 
   // 5. Detect collisions (only between currently active sessions)
   const activeParsed = parsedSessions.filter(p => activeSessionIds.has(p.session.id));
-  const collisions = detectCollisions(activeParsed, labelMap, sessionOperatorMap);
+  const localCollisions = detectCollisions(activeParsed, labelMap, sessionOperatorMap);
+
+  // Merge relay collision alerts (cross-operator from relay merged_state)
+  const existingIds = new Set(localCollisions.map(c => c.id));
+  const mergedRelayCollisions = relayCollisionAlerts.filter(c => !existingIds.has(c.id));
+  const collisions = [...localCollisions, ...mergedRelayCollisions];
+
   const collisionFileSet = new Set(collisions.flatMap(c => c.agents.map(a => a.sessionId)));
+
+  // 5b. Cache uncommitted files per project
+  const uncommittedByProject = new Map<string, string[]>();
+  function cachedUncommitted(projectPath: string): string[] {
+    if (!uncommittedByProject.has(projectPath)) {
+      uncommittedByProject.set(projectPath, getUncommittedFiles(projectPath));
+    }
+    return uncommittedByProject.get(projectPath)!;
+  }
 
   // 6. Build agents
   const agents: Agent[] = [];
@@ -1025,6 +1051,7 @@ export function buildDashboardState(prefetchedActiveSessions?: SessionInfo[]): D
       status,
       currentTask,
       filesChanged: parsed.stats.filesChanged,
+      uncommittedFiles: cachedUncommitted(projectPath),
       projectPath,
       isActive,
       plans,

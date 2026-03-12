@@ -1,7 +1,9 @@
-import type { DashboardState } from "../types/index.js";
+import type { DashboardState, ParsedSession } from "../types/index.js";
 import { loadOperatorConfig, getSelfName, getOperatorColor } from "../core/config.js";
 import { loadRelayConfig, saveRelayConfig } from "./config.js";
 import { transformToOperatorState } from "./transform.js";
+import { buildIntentEventsForTarget } from "./intent-events.js";
+import { sendIntentEvents } from "./intent-api.js";
 import { RelayConnection } from "./connection.js";
 import type { RelayConnectionStatus, RelayCollisionAlert, OnCollisionAlerts } from "./connection.js";
 import type { RelayTarget } from "./types.js";
@@ -16,6 +18,7 @@ export interface RelayTargetStatus {
 
 class RelayManager {
   private connections = new Map<string, RelayConnection>();
+  private recentIntentEventIdsByTarget = new Map<string, Map<string, number>>();
   private started = false;
   private collisionAlertCallback: OnCollisionAlerts | null = null;
 
@@ -39,6 +42,7 @@ class RelayManager {
       conn.disconnect();
     }
     this.connections.clear();
+    this.recentIntentEventIdsByTarget.clear();
   }
 
   /** Get status for all configured targets with live connection info. */
@@ -136,7 +140,7 @@ class RelayManager {
    * Called by the ticker on each interval.
    * Re-reads config (mtime-cached), syncs connections, transforms & sends state.
    */
-  onStateUpdate(rawState: DashboardState): void {
+  onStateUpdate(rawState: DashboardState, parsedSessions: ParsedSession[]): void {
     if (!this.started) return;
 
     // Hot-reload: sync connections with current config
@@ -163,6 +167,10 @@ class RelayManager {
         target.projects,
       );
       conn.sendState(state);
+
+      // Best-effort additive event emission for Hexcore intent pipeline.
+      // This must never interfere with the existing relay state path.
+      void this.sendIntentEventsForTarget(target, rawState, parsedSessions);
     }
   }
 
@@ -208,6 +216,44 @@ class RelayManager {
         // Update tokens in case they changed
         conn.updateToken(target.token);
         conn.updateRefreshToken(target.refreshToken);
+      }
+    }
+  }
+
+  private async sendIntentEventsForTarget(
+    target: RelayTarget,
+    rawState: DashboardState,
+    parsedSessions: ParsedSession[],
+  ): Promise<void> {
+    try {
+      const allEvents = buildIntentEventsForTarget(rawState, parsedSessions, target.projects);
+      if (allEvents.length === 0) return;
+
+      const now = Date.now();
+      const recent = this.recentIntentEventIdsByTarget.get(target.hexcoreId) ?? new Map<string, number>();
+      this.pruneRecentIntentEventIds(recent, now);
+
+      const unsent = allEvents.filter((event) => !recent.has(event.eventId));
+      if (unsent.length === 0) {
+        this.recentIntentEventIdsByTarget.set(target.hexcoreId, recent);
+        return;
+      }
+
+      await sendIntentEvents(target, unsent);
+      for (const event of unsent) {
+        recent.set(event.eventId, now);
+      }
+      this.recentIntentEventIdsByTarget.set(target.hexcoreId, recent);
+    } catch {
+      // Best effort only — keep Hexdeck local/relay behavior unchanged if Hexcore ingest fails.
+    }
+  }
+
+  private pruneRecentIntentEventIds(cache: Map<string, number>, now: number): void {
+    const TTL_MS = 15 * 60 * 1000;
+    for (const [eventId, seenAt] of cache) {
+      if (now - seenAt > TTL_MS) {
+        cache.delete(eventId);
       }
     }
   }

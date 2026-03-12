@@ -834,6 +834,15 @@ const RECENT_GRACE_MS = 24 * 60 * 60 * 1000; // 24 hours
 const PLAN_HISTORY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export function buildDashboardState(prefetchedActiveSessions?: SessionInfo[]): DashboardState {
+  return buildDashboardSnapshot(prefetchedActiveSessions).state;
+}
+
+export interface DashboardSnapshot {
+  state: DashboardState;
+  parsedSessions: ParsedSession[];
+}
+
+export function buildDashboardSnapshot(prefetchedActiveSessions?: SessionInfo[]): DashboardSnapshot {
   // 0. Load operator config
   const config = loadOperatorConfig();
   const selfName = getSelfName(config);
@@ -1331,7 +1340,10 @@ export function buildDashboardState(prefetchedActiveSessions?: SessionInfo[]): D
     totalCost,
   };
 
-  return { operators, agents: activeAgents, workstreams, collisions, feed, summary };
+  return {
+    state: { operators, agents: activeAgents, workstreams, collisions, feed, summary },
+    parsedSessions,
+  };
 }
 
 /** How long since last file modification before an active session is considered idle */

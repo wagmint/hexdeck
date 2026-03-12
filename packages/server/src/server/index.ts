@@ -6,7 +6,7 @@ import { streamSSE, type SSEStreamingApi } from "hono/streaming";
 import { serve, type ServerType } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { listProjects, listSessions, getActiveSessions } from "../discovery/sessions.js";
-import { buildDashboardState, setRelayCollisionAlerts } from "../core/dashboard.js";
+import { buildDashboardState, buildDashboardSnapshot, setRelayCollisionAlerts } from "../core/dashboard.js";
 import { blockedSessions, clearBlockedSession, clearStaleBlocked, ensureHooks, createPendingDecision, hasPendingDecision, hasBlockedSession, resolveAllDecisions, markSessionStopped, type BlockedInfo } from "../core/blocked.js";
 import { relayManager } from "../relay/manager.js";
 import { parseConnectLink, exchangeConnectLink, createRelayClaim, deriveHttpBaseFromWs } from "../relay/link.js";
@@ -60,10 +60,11 @@ function startTicker() {
   tickerInterval = setInterval(() => {
     const activeSessions = getActiveSessions();
     clearStaleBlocked(activeSessions);
-    const rawState = buildDashboardState(activeSessions);
+    const snapshot = buildDashboardSnapshot(activeSessions);
+    const rawState = snapshot.state;
 
     // Relay (does its own diff check per connection)
-    relayManager.onStateUpdate(rawState);
+    relayManager.onStateUpdate(rawState, snapshot.parsedSessions);
 
     // SSE (existing logic)
     const data = serializeState(rawState);

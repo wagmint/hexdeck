@@ -154,14 +154,48 @@ fn spawn_server(app: &tauri::AppHandle) -> Result<(), String> {
 }
 
 /// Kill the server process if we spawned it (reads PID from disk).
+/// Falls back to killing by port if the PID file is missing/stale.
 fn kill_server() {
+    let mut killed_by_pid = false;
+
     if let Some(info) = load_pid_info() {
         if is_pid_running(info.pid) {
             unsafe { libc::kill(info.pid as i32, libc::SIGTERM); }
-            if let Some(dir) = hexdeck_dir() {
-                let _ = fs::remove_file(dir.join("server.pid"));
+            // Wait up to 3s for graceful shutdown (removeHooks + cleanup)
+            for _ in 0..30 {
+                std::thread::sleep(Duration::from_millis(100));
+                if !is_pid_running(info.pid) {
+                    killed_by_pid = true;
+                    break;
+                }
+            }
+            // Escalate to SIGKILL if still alive
+            if !killed_by_pid && is_pid_running(info.pid) {
+                unsafe { libc::kill(info.pid as i32, libc::SIGKILL); }
+                killed_by_pid = true;
             }
         }
+    }
+
+    // Fallback: find and kill any process listening on our port.
+    // Handles cases where PID file is missing (crash, force-quit, dev mode).
+    if !killed_by_pid {
+        if let Ok(output) = std::process::Command::new("lsof")
+            .args(["-ti", &format!(":{}", SERVER_PORT)])
+            .output()
+        {
+            let pids = String::from_utf8_lossy(&output.stdout);
+            for line in pids.lines() {
+                if let Ok(pid) = line.trim().parse::<i32>() {
+                    unsafe { libc::kill(pid, libc::SIGTERM); }
+                }
+            }
+        }
+    }
+
+    // Clean up PID file
+    if let Some(dir) = hexdeck_dir() {
+        let _ = fs::remove_file(dir.join("server.pid"));
     }
 }
 

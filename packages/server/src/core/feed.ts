@@ -10,6 +10,22 @@ const MAX_FEED_SIZE = 200;
 /** Append-only feed log, keyed by event ID */
 const feedLog = new Map<string, FeedEvent>();
 
+function upsertTransientEvent(event: FeedEvent): void {
+  const existing = feedLog.get(event.id);
+  if (
+    existing
+    && existing.type === event.type
+    && existing.timestamp.getTime() === event.timestamp.getTime()
+    && existing.message === event.message
+    && existing.agentLabel === event.agentLabel
+    && existing.projectPath === event.projectPath
+    && existing.operatorId === event.operatorId
+  ) {
+    return;
+  }
+  feedLog.set(event.id, event);
+}
+
 /**
  * Build a unified feed of events from all sessions.
  * Maintains an append-only in-memory log with a moving window.
@@ -188,7 +204,7 @@ export function buildFeed(
       if (silenceMs > SILENCE_FEED_MS) {
         const label = labelMap?.get(sessionId) ?? sessionId.slice(0, 8);
         const isStalled = stalledSessionIds?.has(sessionId) ?? false;
-        feedLog.set(`${isStalled ? "stall" : "idle"}-${sessionId}`, {
+        upsertTransientEvent({
           id: `${isStalled ? "stall" : "idle"}-${sessionId}`,
           type: isStalled ? "stall" : "idle",
           timestamp: new Date(session.session.modifiedAt),
@@ -235,7 +251,7 @@ export function buildFeed(
           ? `Waiting for permission: ${infos.length} tools (${toolNames.join(", ")})`
           : `Waiting for permission: ${infos.length} tools`;
       }
-      feedLog.set(`blocked-${sessionId}`, {
+      upsertTransientEvent({
         id: `blocked-${sessionId}`,
         type: "blocked",
         timestamp: new Date(earliest),
@@ -266,10 +282,10 @@ export function buildFeed(
       const session = sessions.find(s => s.session.id === sessionId);
       const message = buildSpinningMessage(realSignals, turns);
 
-      feedLog.set(`spinning-${sessionId}`, {
+      upsertTransientEvent({
         id: `spinning-${sessionId}`,
         type: "spinning",
-        timestamp: new Date(),
+        timestamp: turns[turns.length - 1]?.timestamp ?? new Date(session?.session.modifiedAt ?? 0),
         agentLabel: label,
         sessionId,
         projectPath: session?.session.projectPath ?? "",

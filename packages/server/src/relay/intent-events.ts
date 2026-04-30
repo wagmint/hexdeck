@@ -5,6 +5,7 @@ import type {
   ParsedSession,
 } from "../types/index.js";
 import { getLastKnownBranch } from "../core/git-state.js";
+import { getStoredSessionBranch } from "../storage/repositories.js";
 
 export type IntentEventSource = "claude" | "codex";
 export type IntentEventType =
@@ -123,8 +124,21 @@ function uniqueStrings(values: Array<string | null | undefined>): string[] {
   return out;
 }
 
-function buildAgentSnapshotEvents(agent: Agent): NormalizedIntentEvent[] {
-  const gitBranch = getLastKnownBranch(agent.projectPath);
+function resolveSessionGitBranch(agent: Agent, parsed?: ParsedSession): string | undefined {
+  const parsedBranch = parsed?.gitBranch?.trim();
+  if (parsedBranch) return parsedBranch;
+
+  const storedBranch = getStoredSessionBranch(agent.sessionId)?.trim();
+  if (storedBranch) return storedBranch;
+
+  return getLastKnownBranch(agent.projectPath);
+}
+
+function buildAgentSnapshotEvents(
+  agent: Agent,
+  parsed?: ParsedSession,
+): NormalizedIntentEvent[] {
+  const gitBranch = resolveSessionGitBranch(agent, parsed);
   const now = new Date().toISOString();
   return [
     {
@@ -289,10 +303,10 @@ export function buildIntentEventsForTarget(
   );
 
   for (const agent of agents) {
-    for (const event of buildAgentSnapshotEvents(agent)) {
+    const parsed = parsedBySession.get(agent.sessionId);
+    for (const event of buildAgentSnapshotEvents(agent, parsed)) {
       addEvent(events, event);
     }
-    const parsed = parsedBySession.get(agent.sessionId);
     if (parsed) {
       for (const event of buildTurnEvents(agent, parsed)) {
         addEvent(events, event);

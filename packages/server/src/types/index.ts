@@ -353,6 +353,8 @@ export interface TurnNode {
 export interface ParsedSession {
   session: SessionInfo;
   turns: TurnNode[];
+  /** Best-known git branch for this specific session, when the provider/session data exposes it. */
+  gitBranch?: string | null;
   /** Optional runtime hints for Codex sessions (unused for Claude). */
   codexRuntime?: {
     lastEventType: "turn_started" | "turn_complete" | "turn_aborted" | "shutdown" | null;

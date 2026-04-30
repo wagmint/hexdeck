@@ -83,6 +83,7 @@ export function makeParsedSession(
   return {
     session,
     turns,
+    gitBranch: null,
     stats: {
       totalEvents: 2,
       totalTurns: turns.length,

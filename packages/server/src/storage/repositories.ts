@@ -440,6 +440,28 @@ export function getStoredSessionRef(sessionId: string): ProviderSessionRef | nul
   };
 }
 
+export function getStoredSessionBranch(sessionId: string): string | null {
+  const row = getDb().prepare(`
+    SELECT git_branch as gitBranch
+    FROM sessions
+    WHERE id = ?
+  `).get(sessionId) as { gitBranch: string | null } | undefined;
+
+  return row?.gitBranch ?? null;
+}
+
+export function updateStoredSessionBranch(sessionId: string, gitBranch: string | null | undefined): void {
+  const normalizedBranch = gitBranch?.trim();
+  if (!normalizedBranch) return;
+
+  getDb().prepare(`
+    UPDATE sessions
+    SET git_branch = ?
+    WHERE id = ?
+      AND COALESCE(git_branch, '') != ?
+  `).run(normalizedBranch, sessionId, normalizedBranch);
+}
+
 export function listStoredClaudeSessions(): StoredSessionRow[] {
   return listStoredSessions("claude");
 }

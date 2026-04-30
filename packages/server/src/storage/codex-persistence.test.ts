@@ -17,6 +17,7 @@ interface LoadedModules {
   listStoredSessions: (provider?: "claude" | "codex") => Array<{
     id: string;
     sourceType: string;
+    gitBranch: string | null;
     metadataJson: string | null;
   }>;
   listTranscriptSources: () => Array<{
@@ -91,6 +92,7 @@ describe("Codex storage persistence", () => {
       lastEventAt: "2026-04-17T14:00:10.000Z",
       inTurn: false,
     }));
+    expect(sessions[0].gitBranch).toBe("feature/codex-persistence");
 
     expect(mod.listStoredTurns("codex-session-a")).toEqual([
       expect.objectContaining({ sourceType: "codex", sessionId: "codex-session-a", turnIndex: 0 }),
@@ -141,6 +143,36 @@ describe("Codex storage persistence", () => {
       lastEventType: "shutdown",
       lastEventAt: "2026-04-17T14:00:10.000Z",
     }));
+  });
+
+  it("refreshes stored git_branch from parsed Codex session branch when discovery state was stale", async () => {
+    const root = createFixtureRoot();
+    const rolloutPath = createCodexRollout(root, "codex-session-a");
+    const ref = makeCodexRef(rolloutPath);
+    const parseCalls = { count: 0 };
+    const adapter = makeCodexFixtureAdapter(ref, parseCalls);
+
+    vi.doMock("../core/git-state.js", async () => {
+      const actual = await vi.importActual<typeof import("../core/git-state.js")>("../core/git-state.js");
+      return {
+        ...actual,
+        getLastKnownBranch: vi.fn(() => "main"),
+        resolveCurrentBranch: vi.fn(() => "main"),
+      };
+    });
+
+    const mod = await loadModules(root);
+    await mod.initStorage();
+    await mod.syncSessionsToStorage(adapter);
+
+    const sessions = mod.listStoredSessions("codex");
+    expect(sessions).toEqual([
+      expect.objectContaining({
+        id: "codex-session-a",
+        sourceType: "codex",
+        gitBranch: "feature/codex-persistence",
+      }),
+    ]);
   });
 });
 
@@ -247,6 +279,7 @@ function createCodexRollout(root: string, sessionId: string): string {
       cwd: "/tmp/codex-project",
       source: "codex",
       model: "gpt-5.4-codex",
+      git: { branch: "feature/codex-persistence" },
     }),
     codexLine("2026-04-17T14:00:01.000Z", "event_msg", { type: "task_started" }),
     codexLine("2026-04-17T14:00:02.000Z", "response_item", {

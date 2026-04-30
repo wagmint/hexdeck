@@ -9,7 +9,7 @@ import type { ParsedSession, SessionEvent, SessionInfo, ToolCallSummary, TurnNod
 import type { ParsedProviderSession, ProviderSessionRef } from "../providers/types.js";
 import { toProviderSessionRef } from "../providers/types.js";
 import { getDb } from "./db.js";
-import type { IngestionCheckpointProgress } from "./repositories.js";
+import { updateStoredSessionBranch, type IngestionCheckpointProgress } from "./repositories.js";
 
 export interface StoredTurnRow {
   sourceType: string;
@@ -157,6 +157,8 @@ function replaceClaudeProviderEvidence(input: ReplaceParsedEvidenceInput): Inges
   const eventTurnIndex = buildEventTurnIndex(parsed.turns);
   const toolCallNameById = buildToolCallNameById(events);
   const db = getDb();
+
+  updateStoredSessionBranch(ref.id, parsed.gitBranch);
 
   deleteExistingEvidence(ref.id);
 
@@ -380,6 +382,8 @@ function replaceCodexParsedEvidence(input: ReplaceParsedEvidenceInput): Ingestio
 
   const eventTurnIndex = buildEventTurnIndex(parsed.turns);
   const db = getDb();
+
+  updateStoredSessionBranch(ref.id, parsed.gitBranch);
 
   deleteExistingEvidence(ref.id);
   insertParsedTurns(ref, parsed);

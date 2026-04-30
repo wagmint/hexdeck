@@ -11,6 +11,7 @@ import type { CodexEvent } from "../parser/codex.js";
 export function buildCodexParsedSession(session: SessionInfo, events: CodexEvent[]): ParsedSession {
   const turns = buildCodexTurns(events);
   const codexRuntime = deriveCodexRuntime(events, turns);
+  const gitBranch = deriveCodexGitBranch(events);
 
   // Aggregate stats
   const allFilesChanged = new Set<string>();
@@ -53,6 +54,7 @@ export function buildCodexParsedSession(session: SessionInfo, events: CodexEvent
   return {
     session,
     turns,
+    gitBranch,
     codexRuntime,
     stats: {
       totalEvents: events.length,
@@ -70,6 +72,16 @@ export function buildCodexParsedSession(session: SessionInfo, events: CodexEvent
       primaryModel,
     },
   };
+}
+
+function deriveCodexGitBranch(events: CodexEvent[]): string | null {
+  for (let i = events.length - 1; i >= 0; i--) {
+    const event = events[i];
+    if (event.type !== "session_meta") continue;
+    const branch = (event as Extract<CodexEvent, { type: "session_meta" }>).gitBranch;
+    if (branch) return branch;
+  }
+  return null;
 }
 
 function deriveCodexRuntime(events: CodexEvent[], turns: TurnNode[]): ParsedSession["codexRuntime"] {

@@ -29,6 +29,13 @@ export default function DashboardPage() {
   const workstreamItemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const previousWorkstreamRects = useRef<Map<string, DOMRect>>(new Map());
   const workstreamsForAnimation = state?.workstreams ?? [];
+  const workstreamAnimationKey = workstreamsForAnimation.map((ws) => {
+    const agentKey = ws.agents
+      .map((agent) => `${agent.sessionId}:${agent.status}:${agent.currentTask}:${agent.blockedOn?.length ?? 0}`)
+      .join(",");
+    const taskKey = ws.planTasks.map((task) => `${task.id}:${task.status}`).join(",");
+    return `${ws.projectId}~${ws.hasCollision ? 1 : 0}~${agentKey}~${taskKey}`;
+  }).join("|");
 
   // Approve/deny a blocked agent from the UI
   const handleDecide = useCallback(async (sessionId: string, action: "approve" | "deny") => {
@@ -96,7 +103,7 @@ export default function DashboardPage() {
     }
 
     previousWorkstreamRects.current = nextRects;
-  }, [workstreamsForAnimation]);
+  }, [workstreamAnimationKey]);
 
   if (loading && !state) {
     return (

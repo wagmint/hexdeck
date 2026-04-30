@@ -161,7 +161,14 @@ function startMergeDetectionInterval() {
           updateMergeCheckedAt(entry.id);
 
           if (result.merged) {
-            markComplete(entry.id, result.method, result.prNumber, result.prTitle);
+            markComplete(
+              entry.id,
+              result.method,
+              result.prNumber,
+              result.prTitle,
+              result.prOpenedAt,
+              result.prMergedAt,
+            );
             // Attempt immediate signal — if it fails, retry loop below picks it up
             try {
               const sent = relayManager.sendBranchCompleted(entry.projectPath, {
@@ -171,6 +178,8 @@ function startMergeDetectionInterval() {
                 commitCount: result.commitCount ?? entry.commitCount,
                 prNumber: result.prNumber,
                 prTitle: result.prTitle,
+                prOpenedAt: result.prOpenedAt,
+                prMergedAt: result.prMergedAt,
                 operatorId: entry.operatorId ?? undefined,
                 workUnitId: entry.workUnitId ?? undefined,
               });
@@ -206,6 +215,8 @@ function startMergeDetectionInterval() {
               commitCount: entry.commitCount,
               prNumber: entry.prNumber ?? undefined,
               prTitle: entry.prTitle ?? undefined,
+              prOpenedAt: entry.prOpenedAt ?? undefined,
+              prMergedAt: entry.prMergedAt ?? undefined,
               operatorId: entry.operatorId ?? undefined,
               workUnitId: entry.workUnitId ?? undefined,
             });

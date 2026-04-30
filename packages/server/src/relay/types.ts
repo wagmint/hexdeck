@@ -211,6 +211,8 @@ export interface BranchCompletedMessage {
   commitCount: number;
   prNumber?: number;
   prTitle?: string;
+  prOpenedAt?: string;
+  prMergedAt?: string;
   operatorId?: string;
   workUnitId?: string;
 }

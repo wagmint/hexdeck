@@ -71,6 +71,8 @@ export interface MergeDetectionResult {
   commitCount: number | null;
   prNumber?: number;
   prTitle?: string;
+  prOpenedAt?: string;
+  prMergedAt?: string;
   /** True when both local and remote branch are gone — candidate for archiving. */
   branchGone: boolean;
 }
@@ -110,20 +112,32 @@ function checkAncestry(repoRoot: string, commitHash: string, defaultBranch: stri
 interface PrInfo {
   number: number;
   title: string;
+  openedAt: string | null;
+  mergedAt: string | null;
 }
 
 function checkPrMerged(repoRoot: string, branch: string): PrInfo | null {
   if (!isSafeRef(branch)) return null;
   const out = gitExec(
-    `gh pr list --head ${branch} --state merged --json number,title --limit 1`,
+    `gh pr list --head ${branch} --state merged --json number,title,createdAt,mergedAt --limit 1`,
     repoRoot,
     10000,
   );
   if (!out) return null;
   try {
-    const parsed = JSON.parse(out) as Array<{ number: number; title: string }>;
+    const parsed = JSON.parse(out) as Array<{
+      number: number;
+      title: string;
+      createdAt?: string | null;
+      mergedAt?: string | null;
+    }>;
     if (parsed.length > 0) {
-      return { number: parsed[0].number, title: parsed[0].title };
+      return {
+        number: parsed[0].number,
+        title: parsed[0].title,
+        openedAt: parsed[0].createdAt ?? null,
+        mergedAt: parsed[0].mergedAt ?? null,
+      };
     }
   } catch { /* invalid JSON */ }
   return null;
@@ -168,7 +182,17 @@ export function detectMergeForBranch(
     // Method 2: PR API
     const pr = checkPrMerged(repoRoot, branch);
     if (pr) {
-      return { merged: true, method: "pr_api", headHash, commitCount, branchGone: false, prNumber: pr.number, prTitle: pr.title };
+      return {
+        merged: true,
+        method: "pr_api",
+        headHash,
+        commitCount,
+        branchGone: false,
+        prNumber: pr.number,
+        prTitle: pr.title,
+        prOpenedAt: pr.openedAt ?? undefined,
+        prMergedAt: pr.mergedAt ?? undefined,
+      };
     }
 
     return { merged: false, method: "none", headHash, commitCount, branchGone: false };
@@ -187,7 +211,17 @@ export function detectMergeForBranch(
   // Try PR API
   const pr = checkPrMerged(repoRoot, branch);
   if (pr) {
-    return { merged: true, method: "pr_api", headHash: effectiveHash, commitCount: null, branchGone: true, prNumber: pr.number, prTitle: pr.title };
+    return {
+      merged: true,
+      method: "pr_api",
+      headHash: effectiveHash,
+      commitCount: null,
+      branchGone: true,
+      prNumber: pr.number,
+      prTitle: pr.title,
+      prOpenedAt: pr.openedAt ?? undefined,
+      prMergedAt: pr.mergedAt ?? undefined,
+    };
   }
 
   // Check if remote is also gone → archive signal

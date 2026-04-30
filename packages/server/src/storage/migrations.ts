@@ -980,6 +980,20 @@ const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    id: 15,
+    name: "branch_registry_pr_timestamps",
+    up: [],
+    afterSql: (database) => {
+      const columns = database.prepare(`PRAGMA table_info(branch_registry)`).all() as Array<{ name: string }>;
+      if (!columns.some((column) => column.name === "pr_opened_at")) {
+        database.exec(`ALTER TABLE branch_registry ADD COLUMN pr_opened_at TEXT`);
+      }
+      if (!columns.some((column) => column.name === "pr_merged_at")) {
+        database.exec(`ALTER TABLE branch_registry ADD COLUMN pr_merged_at TEXT`);
+      }
+    },
+  },
 ];
 
 export function ensureMigrationTables(database: SqliteDatabase): void {

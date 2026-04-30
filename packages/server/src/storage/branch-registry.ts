@@ -18,6 +18,8 @@ export interface BranchRegistryRow {
   mergeCheckedAt: string | null;
   prNumber: number | null;
   prTitle: string | null;
+  prOpenedAt: string | null;
+  prMergedAt: string | null;
   hexcoreId: string | null;
   operatorId: string | null;
   workUnitId: string | null;
@@ -113,6 +115,8 @@ const SELECT_COLS = `
   merge_checked_at AS mergeCheckedAt,
   pr_number AS prNumber,
   pr_title AS prTitle,
+  pr_opened_at AS prOpenedAt,
+  pr_merged_at AS prMergedAt,
   hexcore_id AS hexcoreId,
   operator_id AS operatorId,
   work_unit_id AS workUnitId,
@@ -134,6 +138,8 @@ export function markComplete(
   method: string,
   prNumber?: number,
   prTitle?: string,
+  prOpenedAt?: string,
+  prMergedAt?: string,
 ): void {
   const db = getDb();
   db.prepare(`
@@ -141,9 +147,18 @@ export function markComplete(
     SET state = 'complete',
         completed_at = ?,
         pr_number = COALESCE(?, pr_number),
-        pr_title = COALESCE(?, pr_title)
+        pr_title = COALESCE(?, pr_title),
+        pr_opened_at = COALESCE(?, pr_opened_at),
+        pr_merged_at = COALESCE(?, pr_merged_at)
     WHERE id = ?
-  `).run(new Date().toISOString(), prNumber ?? null, prTitle ?? null, id);
+  `).run(
+    new Date().toISOString(),
+    prNumber ?? null,
+    prTitle ?? null,
+    prOpenedAt ?? null,
+    prMergedAt ?? null,
+    id,
+  );
   console.log(`[branch-registry] marked #${id} complete via ${method}`);
 }
 

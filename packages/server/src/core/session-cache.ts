@@ -47,6 +47,33 @@ export interface SessionAccumulator {
 
 const accumulators = new Map<string, SessionAccumulator>();
 
+function slimToolInput(input: Record<string, unknown>): Record<string, unknown> {
+  const slim: Record<string, unknown> = {};
+
+  if (typeof input.command === "string") slim.command = input.command;
+  if (typeof input.file_path === "string") slim.file_path = input.file_path;
+  if (typeof input.path === "string") slim.path = input.path;
+  if (typeof input.url === "string") slim.url = input.url;
+  if (typeof input.pattern === "string") slim.pattern = input.pattern;
+  if (typeof input.glob === "string") slim.glob = input.glob;
+
+  return slim;
+}
+
+function pruneParsedSessionForCache(parsed: ParsedSession): ParsedSession {
+  return {
+    ...parsed,
+    turns: parsed.turns.map((turn) => ({
+      ...turn,
+      toolCalls: turn.toolCalls.map((call) => ({
+        name: call.name,
+        input: slimToolInput(call.input),
+      })),
+      events: [],
+    })),
+  };
+}
+
 // ─── Accumulator helpers ─────────────────────────────────────────────────────
 
 function maxTokenUsage(a: TokenUsage | undefined, b: TokenUsage): TokenUsage {
@@ -199,7 +226,12 @@ export function getCachedOrParse(session: SessionInfo): { parsed: ParsedSession;
   // Always update accumulator to reflect current state
   updateAccumulator(session.id, parsed);
 
-  parseCache.set(session.id, { mtimeMs: currentMtime, parsed, totalLines, sourceByteLength });
+  parseCache.set(session.id, {
+    mtimeMs: currentMtime,
+    parsed: pruneParsedSessionForCache(parsed),
+    totalLines,
+    sourceByteLength,
+  });
   // Cache miss: return freshly parsed events (transient — not stored in cache)
   return { parsed, events, totalLines, sourceByteLength };
 }

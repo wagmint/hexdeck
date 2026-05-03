@@ -10,15 +10,43 @@ const CODEX_SESSIONS_DIR = join(homedir(), ".codex", "sessions");
 
 // ─── Meta cache — avoids re-reading first line on every poll cycle ──────────
 
-const metaCache = new Map<string, { mtimeMs: number; meta: { id: string; cwd: string } }>();
+const META_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const META_CACHE_MAX_ENTRIES = 512;
+
+const metaCache = new Map<string, {
+  mtimeMs: number;
+  meta: { id: string; cwd: string };
+  lastAccessAt: number;
+}>();
+
+function pruneMetaCache(now = Date.now()): void {
+  for (const [filePath, entry] of metaCache) {
+    if (now - entry.lastAccessAt > META_CACHE_TTL_MS) {
+      metaCache.delete(filePath);
+    }
+  }
+
+  if (metaCache.size <= META_CACHE_MAX_ENTRIES) return;
+
+  const oldest = [...metaCache.entries()]
+    .sort((a, b) => a[1].lastAccessAt - b[1].lastAccessAt);
+  const overflow = metaCache.size - META_CACHE_MAX_ENTRIES;
+  for (let i = 0; i < overflow; i++) {
+    metaCache.delete(oldest[i][0]);
+  }
+}
 
 function getCachedMeta(filePath: string, mtimeMs: number): { id: string; cwd: string } | null {
+  const now = Date.now();
   const cached = metaCache.get(filePath);
-  if (cached && cached.mtimeMs === mtimeMs) return cached.meta;
+  if (cached && cached.mtimeMs === mtimeMs) {
+    cached.lastAccessAt = now;
+    return cached.meta;
+  }
 
   const meta = readCodexSessionMeta(filePath);
   if (meta) {
-    metaCache.set(filePath, { mtimeMs, meta });
+    metaCache.set(filePath, { mtimeMs, meta, lastAccessAt: now });
   }
   return meta;
 }
@@ -34,6 +62,7 @@ function getCachedMeta(filePath: string, mtimeMs: number): { id: string; cwd: st
 export function discoverCodexSessions(recencyDays = 7, codexDir?: string): SessionInfo[] {
   const sessionsDir = codexDir ? join(codexDir, "sessions") : CODEX_SESSIONS_DIR;
   if (!existsSync(sessionsDir)) return [];
+  pruneMetaCache();
 
   const sessions: SessionInfo[] = [];
   const cutoff = Date.now() - recencyDays * 24 * 60 * 60 * 1000;

@@ -51,6 +51,12 @@ export interface StoredSessionRow {
   metadataJson: string | null;
 }
 
+export interface StorageRetentionResult {
+  retentionDays: number;
+  deletedSessions: number;
+  deletedTranscriptSources: number;
+}
+
 export function upsertTranscriptSource(ref: ProviderSessionRef): number {
   const db = getDb();
   const now = new Date().toISOString();
@@ -500,4 +506,61 @@ export function listIngestionCheckpoints(): IngestionCheckpointRow[] {
     FROM ingestion_checkpoints
     ORDER BY id ASC
   `).all() as IngestionCheckpointRow[];
+}
+
+export function pruneStoredSessionHistory(
+  retentionDays = parsePositiveInt(process.env.HEXDECK_STORAGE_RETENTION_DAYS, 30),
+  now = new Date(),
+): StorageRetentionResult {
+  const db = getDb();
+  const cutoff = new Date(now.getTime() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+
+  const rows = db.prepare(`
+    SELECT
+      id,
+      transcript_source_id as transcriptSourceId
+    FROM sessions
+    WHERE status = 'ended'
+      AND COALESCE(ended_at, last_event_at) < ?
+  `).all(cutoff) as Array<{ id: string; transcriptSourceId: number | null }>;
+
+  if (rows.length === 0) {
+    return { retentionDays, deletedSessions: 0, deletedTranscriptSources: 0 };
+  }
+
+  const sessionIds = rows.map((row) => row.id);
+  const transcriptSourceIds = [...new Set(
+    rows
+      .map((row) => row.transcriptSourceId)
+      .filter((id): id is number => typeof id === "number")
+  )];
+
+  const sessionPlaceholders = sessionIds.map(() => "?").join(", ");
+  db.prepare(`
+    DELETE FROM sessions
+    WHERE id IN (${sessionPlaceholders})
+  `).run(...sessionIds);
+
+  let deletedTranscriptSources = 0;
+  if (transcriptSourceIds.length > 0) {
+    const sourcePlaceholders = transcriptSourceIds.map(() => "?").join(", ");
+    db.prepare(`
+      DELETE FROM transcript_sources
+      WHERE id IN (${sourcePlaceholders})
+    `).run(...transcriptSourceIds);
+    deletedTranscriptSources = transcriptSourceIds.length;
+  }
+
+  db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+
+  return {
+    retentionDays,
+    deletedSessions: sessionIds.length,
+    deletedTranscriptSources,
+  };
+}
+
+function parsePositiveInt(value: string | undefined, fallback: number): number {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }

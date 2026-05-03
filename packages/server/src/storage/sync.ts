@@ -127,30 +127,32 @@ function syncProviderSessionRefsToStorage({
 
   try {
     const seenSessionIds: string[] = [];
-    const seenProjectPaths = new Set<string>();
+    const changedSessionIds: string[] = [];
+    const changedProjectPaths = new Set<string>();
 
     withTransaction(() => {
       for (const session of sessions) {
         const transcriptSourceId = upsertTranscriptSource(session);
         ensureIngestionCheckpoint(transcriptSourceId);
         upsertSession(session, transcriptSourceId);
-        ingestTranscriptSource(session, transcriptSourceId, parsedBySessionId?.get(session.id));
-        if (provider === "claude") {
+        const didIngest = ingestTranscriptSource(session, transcriptSourceId, parsedBySessionId?.get(session.id));
+        if (provider === "claude" && didIngest) {
           deriveAndStoreSessionState(session.id);
           deriveAndStoreTasksForSession(session.id);
+          changedSessionIds.push(session.id);
+          changedProjectPaths.add(session.projectPath);
         }
         seenSessionIds.push(session.id);
-        seenProjectPaths.add(session.projectPath);
       }
 
       // Run task derivation a second time after every session has been ingested so
       // cross-session attachment can see explicit tasks created later in discovery order.
       if (provider === "claude") {
-        for (const sessionId of seenSessionIds) {
+        for (const sessionId of changedSessionIds) {
           deriveAndStoreTasksForSession(sessionId);
         }
 
-        for (const projectPath of seenProjectPaths) {
+        for (const projectPath of changedProjectPaths) {
           deriveAndStoreWorkstreamsForProject(projectPath);
           deriveAndStoreM6ForProject(projectPath);
           deriveAndStoreHandoffsForProject(projectPath);
@@ -189,7 +191,7 @@ export function ingestTranscriptSource(
   ref: ProviderSessionRef,
   transcriptSourceId: number,
   parsed?: ParsedProviderSession,
-): void {
+): boolean {
   const checkpoint = getIngestionCheckpoint(transcriptSourceId);
   if (!checkpoint) {
     throw new Error(`Missing ingestion checkpoint for transcript source ${transcriptSourceId}`);
@@ -214,7 +216,7 @@ export function ingestTranscriptSource(
     current.lastProcessedByteOffset === fileSizeBytes &&
     current.status === "ready"
   ) {
-    return;
+    return false;
   }
 
   markIngestionCheckpointStatus(transcriptSourceId, "processing");
@@ -222,6 +224,7 @@ export function ingestTranscriptSource(
   try {
     const progress = replaceParsedEvidence({ ref, parsed });
     updateIngestionCheckpointProgress(transcriptSourceId, progress, "ready");
+    return true;
   } catch (error) {
     markIngestionCheckpointStatus(
       transcriptSourceId,

@@ -72,6 +72,7 @@ let lastSurfacingJson = "";
 let lastBackfillJson = "";
 let lastBroadcastTime = 0;
 let tickerInterval: ReturnType<typeof setInterval> | null = null;
+let tickerIntervalMs = 0;
 let sseMessageId = 0;
 let tickerRunning = false;
 let reconciliationInterval: ReturnType<typeof setInterval> | null = null;
@@ -83,6 +84,8 @@ const RECONCILIATION_INTERVAL_MS = 30_000;
 const STORAGE_SYNC_INTERVAL_MS = 30_000;
 const MERGE_DETECTION_INTERVAL_MS = 60_000;
 const STALE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const TICKER_INTERVAL_CLIENT_MS = 1_000;
+const TICKER_INTERVAL_BACKGROUND_MS = 5_000;
 
 function startReconciliationInterval() {
   if (reconciliationInterval) return;
@@ -239,6 +242,12 @@ function shouldTickerRun() {
   return clients.size > 0 || relayManager.hasTargets;
 }
 
+function getDesiredTickerIntervalMs(): number | null {
+  if (clients.size > 0) return TICKER_INTERVAL_CLIENT_MS;
+  if (relayManager.hasTargets) return TICKER_INTERVAL_BACKGROUND_MS;
+  return null;
+}
+
 /**
  * Backward-compat shim: synthesize the old workstreams/unassigned shape from
  * branch cards so the shipped menubar (pre-PR5) renders real data.
@@ -263,7 +272,14 @@ function branchesToLegacySurfacing(entry: StoredSurfacing) {
 }
 
 function startTicker() {
-  if (tickerInterval) return;
+  const desiredInterval = getDesiredTickerIntervalMs();
+  if (desiredInterval === null) return;
+  if (tickerInterval && tickerIntervalMs === desiredInterval) return;
+  if (tickerInterval) {
+    clearInterval(tickerInterval);
+    tickerInterval = null;
+  }
+  tickerIntervalMs = desiredInterval;
   tickerInterval = setInterval(() => {
     if (tickerRunning) return;
     tickerRunning = true;
@@ -277,6 +293,10 @@ function startTicker() {
 
         // Relay (does its own diff check per connection)
         relayManager.onStateUpdate(rawState, snapshot.parsedSessions);
+
+        if (clients.size === 0) {
+          return;
+        }
 
         // SSE — dashboard state
         const data = serializeState(rawState);
@@ -339,7 +359,7 @@ function startTicker() {
         tickerRunning = false;
       }
     })();
-  }, 1000);
+  }, desiredInterval);
 }
 
 function stopTicker() {
@@ -347,6 +367,7 @@ function stopTicker() {
     clearInterval(tickerInterval);
     tickerInterval = null;
   }
+  tickerIntervalMs = 0;
 }
 
 function addClient(client: SSEClient) {

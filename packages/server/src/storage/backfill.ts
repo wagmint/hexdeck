@@ -72,8 +72,9 @@ export class BackfillQueue {
     startedAt: null,
     completedAt: null,
   };
-  private seenSessionIds: string[] = [];
-  private seenProjectPaths = new Set<string>();
+  private discoveredSessionIds: string[] = [];
+  private changedSessionIds: string[] = [];
+  private changedProjectPaths = new Set<string>();
   private discoveredProviders = new Set<string>();
 
   async start(): Promise<void> {
@@ -148,6 +149,7 @@ export class BackfillQueue {
 
   private ingestOne(entry: QueueEntry): boolean {
     const { ref } = entry;
+    let didIngest = false;
 
     // Each session gets its own small transaction for crash recovery + memory release
     withTransaction(() => {
@@ -156,25 +158,28 @@ export class BackfillQueue {
       upsertSession(ref, transcriptSourceId);
 
       // ingestTranscriptSource short-circuits via checkpoint if file unchanged
-      ingestTranscriptSource(ref, transcriptSourceId);
+      didIngest = ingestTranscriptSource(ref, transcriptSourceId);
 
       if (ref.provider === "claude") {
-        deriveAndStoreSessionState(ref.id);
-        deriveAndStoreTasksForSession(ref.id);
+        if (didIngest) {
+          deriveAndStoreSessionState(ref.id);
+          deriveAndStoreTasksForSession(ref.id);
+          this.changedSessionIds.push(ref.id);
+          this.changedProjectPaths.add(ref.projectPath);
+        }
       }
 
-      this.seenSessionIds.push(ref.id);
-      this.seenProjectPaths.add(ref.projectPath);
+      this.discoveredSessionIds.push(ref.id);
     });
 
-    return true;
+    return didIngest;
   }
 
   private runDerivedPasses(): void {
     try {
       withTransaction(() => {
         // Pass 2: cross-session task derivation
-        for (const sessionId of this.seenSessionIds) {
+        for (const sessionId of this.changedSessionIds) {
           if (this.aborted) return;
           deriveAndStoreTasksForSession(sessionId);
         }
@@ -186,7 +191,7 @@ export class BackfillQueue {
     try {
       withTransaction(() => {
         // Pass 3: per-project workstream/m6/handoff derivation
-        for (const projectPath of this.seenProjectPaths) {
+        for (const projectPath of this.changedProjectPaths) {
           if (this.aborted) return;
           deriveAndStoreWorkstreamsForProject(projectPath);
           deriveAndStoreM6ForProject(projectPath);
@@ -207,13 +212,13 @@ export class BackfillQueue {
           providerBySessionId.set(entry.ref.id, entry.ref.provider);
         }
         if (this.discoveredProviders.has("claude")) {
-          const claudeIds = this.seenSessionIds.filter(
+          const claudeIds = this.discoveredSessionIds.filter(
             (id) => providerBySessionId.get(id) === "claude",
           );
           markMissingTranscriptSourcesInactive("claude", claudeIds);
         }
         if (this.discoveredProviders.has("codex")) {
-          const codexIds = this.seenSessionIds.filter(
+          const codexIds = this.discoveredSessionIds.filter(
             (id) => providerBySessionId.get(id) === "codex",
           );
           markMissingTranscriptSourcesInactive("codex", codexIds);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { SSE_DASHBOARD_URL } from "@/lib/dashboard-api";
+import { getDashboardState, SSE_DASHBOARD_URL } from "@/lib/dashboard-api";
 import type { DashboardState } from "@hexdeck/dashboard-ui";
 
 interface UseDashboardResult {
@@ -19,7 +19,23 @@ export function useDashboard(): UseDashboardResult {
   const hasReceivedData = useRef(false);
 
   useEffect(() => {
+    let cancelled = false;
     const es = new EventSource(SSE_DASHBOARD_URL);
+
+    void getDashboardState()
+      .then((data) => {
+        if (cancelled) return;
+        setState(data);
+        setError(null);
+        if (!hasReceivedData.current) {
+          hasReceivedData.current = true;
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (cancelled || hasReceivedData.current) return;
+        // Let SSE remain the fallback path before surfacing an error.
+      });
 
     es.addEventListener("state", (e) => {
       try {
@@ -50,6 +66,7 @@ export function useDashboard(): UseDashboardResult {
     };
 
     return () => {
+      cancelled = true;
       es.close();
     };
   }, []);

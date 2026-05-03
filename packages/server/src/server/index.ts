@@ -21,7 +21,7 @@ import { buildAnalyticsState } from "../control/analytics.js";
 import { querySpendByDimension, queryTrends, querySessionList, validateSpendParams, validateTrendParams, validateSessionListParams } from "../control/metrics.js";
 import { getStorageDiskUsage, getStorageInfo, initStorage, rebuildStorage } from "../storage/db.js";
 import { buildHexcoreExportPayload } from "../storage/hexcore-export.js";
-import { listIngestionCheckpoints, listStoredClaudeSessions, listTranscriptSources } from "../storage/repositories.js";
+import { listIngestionCheckpoints, listStoredClaudeSessions, listTranscriptSources, pruneStoredSessionHistory } from "../storage/repositories.js";
 import { reconcileOnStartup, reconcileSessionLifecycles } from "../storage/reconciliation.js";
 import { materializePendingSummaries, enrichPendingSummaries, classifyPendingSummaries } from "../storage/session-summaries.js";
 import { getStorageSyncStatus, syncAllSessionsToStorage, getBackfillQueue, createBackfillQueue } from "../storage/sync.js";
@@ -109,6 +109,7 @@ function startStorageSyncInterval() {
       try {
         await syncAllSessionsToStorage();
         materializePendingSummaries();
+        pruneStoredSessionHistory();
       } catch (err) {
         console.error("[storage-sync] periodic sync failed:", err);
       } finally {
@@ -990,7 +991,7 @@ export function createApp(options?: { dashboardDir?: string }): Hono {
       diskUsage: getStorageDiskUsage(),
       sync: getStorageSyncStatus(),
       policy: {
-        retention: "retain_all_history_for_now",
+        retentionDays: Number.parseInt(process.env.HEXDECK_STORAGE_RETENTION_DAYS ?? "30", 10) || 30,
         compaction: "deferred",
       },
     });
